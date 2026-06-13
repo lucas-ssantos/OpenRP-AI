@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ver Banco de Dados — OpenRP AI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #0b1120;
+        color: #e2e8f0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
+          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
+          #0b1120;
+        padding: 2rem;
+      }
+      .page {
+        width: min(1200px, 100%);
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(2rem, 2.5vw, 2.5rem);
+      }
+      p {
+        margin: 0 0 1.5rem;
+        color: #94a3b8;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .table-list {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .table-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        border-radius: 1rem;
+        background: rgba(30, 41, 59, 0.9);
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease;
+      }
+      .table-item:hover {
+        transform: translateY(-1px);
+        border-color: rgba(56, 189, 248, 0.28);
+      }
+      .table-item strong {
+        color: #f8fafc;
+      }
+      .table-item small {
+        color: #94a3b8;
+      }
+      .table-item span {
+        color: #60a5fa;
+      }
+      .content {
+        display: grid;
+        gap: 1.5rem;
+      }
+      .table-preview {
+        width: 100%;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 0.85rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      }
+      th {
+        color: #cbd5e1;
+        font-weight: 700;
+      }
+      td {
+        color: #e2e8f0;
+      }
+      .empty {
+        color: #94a3b8;
+        padding: 1.25rem;
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 1rem;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.95rem 1.1rem;
+        border-radius: 999px;
+        border: none;
+        background: #38bdf8;
+        color: #020617;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .button:hover {
+        background: #22c55e;
+      }
+      .status {
+        margin-top: 0.75rem;
+        font-size: 0.95rem;
+        color: #94a3b8;
+      }
+      .error {
+        color: #fda4af;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="card">
+        <h1>Visualizador de Banco de Dados</h1>
+        <p>Acesse tabelas e veja até os 25 últimos registros em cada lista.</p>
+        <div class="status" id="status">Carregando tabelas...</div>
+      </div>
+
+      <div class="content">
+        <div class="card">
+          <h2>Tabelas</h2>
+          <div class="table-list" id="table-list"></div>
+        </div>
+
+        <div class="card">
+          <h2>Registros</h2>
+          <div id="records-container" class="table-preview"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const tableListEl = document.getElementById('table-list');
+      const recordsContainer = document.getElementById('records-container');
+      let currentTable = null;
+
+      async function fetchTables() {
+        const response = await fetch('/api/viewdb/tables');
+        return response.json();
+      }
+
+      async function fetchRecords(table) {
+        const response = await fetch(`/api/viewdb/records?table=${encodeURIComponent(table)}`);
+        return response.json();
+      }
+
+      function renderTables(tables) {
+        if (!tables.length) {
+          tableListEl.innerHTML = '<div class="empty">Nenhuma tabela encontrada.</div>';
+          return;
+        }
+
+        tableListEl.innerHTML = tables
+          .map(
+            (table) => `
+              <button class="table-item" data-table="${table.name}">
+                <div>
+                  <strong>${table.name}</strong>
+                  <div><small>${table.count} registro${table.count === 1 ? '' : 's'}</small></div>
+                </div>
+                <span>Ver</span>
+              </button>
+            `
+          )
+          .join('');
+
+        tableListEl.querySelectorAll('.table-item').forEach((button) => {
+          button.addEventListener('click', () => {
+            loadTable(button.dataset.table);
+          });
+        });
+      }
+
+      function renderRecords(data) {
+        if (!data.ok) {
+          recordsContainer.innerHTML = `<div class="empty error">${data.message}</div>`;
+          return;
+        }
+
+        if (!data.columns.length) {
+          recordsContainer.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>';
+          return;
+        }
+
+        const header = `<div class="status">Mostrando até 25 últimos registros de <strong>${data.table}</strong> (total: ${data.total})</div>`;
+        const table = `
+          <table>
+            <thead>
+              <tr>
+                ${data.columns.map((column) => `<th>${column}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.rows
+                .map(
+                  (row) =>
+                    `<tr>${row
+                      .map((cell) => `<td>${String(cell === null ? 'NULL' : cell)}</td>`)
+                      .join('')}</tr>`
+                )
+                .join('')}
+            </tbody>
+          </table>
+        `;
+
+        recordsContainer.innerHTML = header + table;
+      }
+
+      async function loadTable(table) {
+        currentTable = table;
+        statusEl.textContent = `Carregando registros de ${table}...`;
+        const data = await fetchRecords(table);
+        renderRecords(data);
+        statusEl.textContent = `Tabela selecionada: ${table}`;
+      }
+
+      async function init() {
+        try {
+          const data = await fetchTables();
+          if (!data.ok) {
+            throw new Error(data.message || 'Erro ao carregar tabelas');
+          }
+          renderTables(data.tables);
+          if (data.tables.length) {
+            loadTable(data.tables[0].name);
+          } else {
+            statusEl.textContent = 'Nenhuma tabela disponível.';
+          }
+        } catch (err) {
+          statusEl.textContent = err.message;
+          tableListEl.innerHTML = `<div class="empty error">${err.message}</div>`;
+          recordsContainer.innerHTML = '';
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>

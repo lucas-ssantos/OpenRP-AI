@@ -53,6 +53,65 @@ export async function startWebServer(port = process.env.PORT || 3000)
         res.sendFile(path.join(publicPath, "persona.html"));
     });
 
+    //INDEX
+    app.get("/", async (req, res) => {
+        const status = await getHealthStatus();
+        if (!status.ollama.ok || !status.database.ok) {
+            return res.redirect("/check");
+        }
+
+        const persona = getPersona();
+        if (!persona) {
+            return res.redirect("/persona");
+        }
+
+        res.sendFile(path.join(publicPath, "index.html"));
+    });
+
+
+    //
+    //  CHAMADAS DE API
+    //
+
+    //CHECK FUNCIONANDO
+    app.get("/api/status", async (req, res) => {
+        const status = await getHealthStatus();
+        res.json(status);
+    });
+
+    //GET PERSONA
+    app.post("/api/persona", (req, res) => {
+        try {
+            const { name, description, avatar_url } = req.body;
+            if (!name) {
+                return res.status(400).json({ ok: false, message: 'O nome da persona é obrigatório.' });
+            }
+            savePersona({ name, description, avatar_url });
+            res.json({ ok: true });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    //GET CHARACTERS
+    app.get("/api/characters", (req, res) => {
+        try
+        {
+            const characters = getAllCharacters();
+            res.json({ ok: true, characters });
+        }
+        catch (err)
+        {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+
+
+
+    //
+    // CONSULTA DB
+    //
     app.get("/api/viewdb", (_req, res) => {
         res.sendFile(path.join(publicPath, "viewdb.html"));
     });
@@ -124,63 +183,6 @@ export async function startWebServer(port = process.env.PORT || 3000)
             res.status(500).json({ ok: false, message: err.message });
         }
     });
-
-    //INDEX
-    app.get("/", async (req, res) => {
-        const status = await getHealthStatus();
-        if (!status.ollama.ok || !status.database.ok) {
-            return res.redirect("/check");
-        }
-
-        const persona = getPersona();
-        if (!persona) {
-            return res.redirect("/persona");
-        }
-
-        res.sendFile(path.join(publicPath, "index.html"));
-    });
-
-
-
-
-    //
-    //  CHAMADAS DE API
-    //
-
-    //CHECK FUNCIONANDO
-    app.get("/api/status", async (req, res) => {
-        const status = await getHealthStatus();
-        res.json(status);
-    });
-
-    //GET PERSONA
-    app.post("/api/persona", (req, res) => {
-        try {
-            const { name, description, avatar_url } = req.body;
-            if (!name) {
-                return res.status(400).json({ ok: false, message: 'O nome da persona é obrigatório.' });
-            }
-            savePersona({ name, description, avatar_url });
-            res.json({ ok: true });
-        } catch (err) {
-            res.status(500).json({ ok: false, message: err.message });
-        }
-    });
-
-    //GET CHARACTERS
-    app.get("/api/characters", (req, res) => {
-        try
-        {
-            const characters = getAllCharacters();
-            res.json({ ok: true, characters });
-        }
-        catch (err)
-        {
-            res.status(500).json({ ok: false, message: err.message });
-        }
-    });
-
-
 
 
 
