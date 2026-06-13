@@ -524,7 +524,7 @@
         }
 
         try {
-          // 1. Load character
+          // 1. Load character info + get-or-create conversation (single endpoint)
           const charRes = await fetch(`/api/characters/${characterId}`);
           const charData = await charRes.json();
           if (!charData.ok) throw new Error(charData.message);
@@ -535,22 +535,18 @@
           if (character.scenario) scenarioEl.textContent = character.scenario;
 
           if (character.avatar_url) {
-            bgEl.style.backgroundImage = `url('${CSS.escape ? character.avatar_url : character.avatar_url}')`;
+            bgEl.style.backgroundImage = `url('${character.avatar_url}')`;
             headerAvt.src = character.avatar_url;
             headerAvt.style.display = 'block';
           }
 
-          // 2. Create conversation (server adds first_message to DB if present)
-          const convRes = await fetch('/api/conversations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ character_id: characterId }),
-          });
+          // 2. Get latest conversation or create a new one (first_message only inserted on creation)
+          const convRes = await fetch(`/api/characters/${characterId}/conversation`);
           const convData = await convRes.json();
           if (!convData.ok) throw new Error(convData.message);
-          conversationId = convData.id;
+          conversationId = convData.conversation.id;
 
-          // 3. Load messages (includes first_message if any)
+          // 3. Load all messages from the conversation
           const msgsRes = await fetch(`/api/conversations/${conversationId}/messages`);
           const msgsData = await msgsRes.json();
           if (msgsData.ok) {

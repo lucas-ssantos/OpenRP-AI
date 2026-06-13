@@ -111,6 +111,24 @@ export function getConversation(conversationId) {
   };
 }
 
+export function getLatestConversationForCharacter(characterId) {
+  const db = getDB();
+  const result = db.exec(
+    `SELECT * FROM conversations WHERE character_id = ? ORDER BY created_at DESC LIMIT 1`,
+    [characterId]
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  const row = result[0].values[0];
+  return {
+    id: row[0],
+    character_id: row[1],
+    user_persona: row[2],
+    title: row[3],
+    created_at: row[4],
+    updated_at: row[5],
+  };
+}
+
 // ===== Messages =====
 export function addMessage(conversationId, role, content, position = null) {
   const db = getDB();

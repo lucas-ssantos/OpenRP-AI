@@ -4,7 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
 import { getDB } from "./database/db.js";
-import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, createConversation, getConversation, addMessage, getConversationMessages, getLastNMessages } from "./database/queries.js";
+import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, createConversation, getConversation, getLatestConversationForCharacter, addMessage, getConversationMessages, getLastNMessages } from "./database/queries.js";
 
 async function getHealthStatus() {
     const status = {
@@ -324,6 +324,39 @@ export async function startWebServer(port = process.env.PORT || 3000)
     // ===== CHAT PAGE =====
     app.get("/chat/:characterId", (_req, res) => {
         res.sendFile(path.join(publicPath, "chat.html"));
+    });
+
+    // ===== CHARACTER — GET OR CREATE CONVERSATION =====
+    // Returns the latest existing conversation for a character, or creates one
+    // (first_message is only inserted when the conversation is brand new)
+    app.get("/api/characters/:id/conversation", (req, res) => {
+        try {
+            const character = getCharacter(req.params.id);
+            if (!character) {
+                return res.status(404).json({ ok: false, message: 'Personagem não encontrado.' });
+            }
+
+            let conv = getLatestConversationForCharacter(req.params.id);
+
+            if (conv) {
+                return res.json({ ok: true, conversation: conv, is_new: false });
+            }
+
+            // No conversation yet — create one and seed first_message
+            const persona = getPersona();
+            const convId  = createConversation(req.params.id, persona?.name || null, `Chat com ${character.name}`);
+
+            if (character.first_message) {
+                const userName = persona?.name || 'você';
+                const firstMsg = character.first_message.replace(/\{\{user\}\}/gi, userName);
+                addMessage(convId, 'assistant', firstMsg, 0);
+            }
+
+            conv = getConversation(convId);
+            res.json({ ok: true, conversation: conv, is_new: true });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
     });
 
     // ===== CHARACTER BY ID =====
