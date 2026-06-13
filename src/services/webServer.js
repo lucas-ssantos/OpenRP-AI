@@ -305,13 +305,19 @@ export async function startWebServer(port = process.env.PORT || 3000)
     app.post("/api/config", (req, res) => {
         try {
             const config = req.body;
+            console.log('Recebido config:', config);
+            
             if (!config.model) {
                 return res.status(400).json({ ok: false, message: 'Modelo é obrigatório.' });
             }
+            
             setGenerationConfig('global', null, config);
+            console.log('Config salva com sucesso');
+            
             res.json({ ok: true, message: 'Configuração salva com sucesso.' });
         } catch (err) {
-            res.status(500).json({ ok: false, message: err.message });
+            console.error('Erro ao salvar config:', err);
+            res.status(500).json({ ok: false, message: `Erro ao salvar: ${err.message}` });
         }
     });
 

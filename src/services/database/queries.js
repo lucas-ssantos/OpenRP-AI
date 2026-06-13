@@ -356,29 +356,41 @@ export function setGenerationConfig(level = 'global', id = null, config = {}) {
   if (level === 'global') {
     const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages } = config;
     const stopStr = Array.isArray(stop) ? stop.join(', ') : (stop || '');
+    const streamVal = stream === 1 || stream === true || stream === '1' ? 1 : 0;
+    const seedVal = seed !== null && seed !== undefined ? seed : -1;
+    const numCtx = num_ctx_messages || 20;
+    
     db.run(
       `INSERT OR REPLACE INTO generation_config 
        (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream ? 1 : 0, seed, stopStr, num_ctx_messages, now]
+      ['global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, streamVal, seedVal, stopStr, numCtx, now]
     );
   } else if (level === 'character') {
     const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages, system_prompt, jailbreak } = config;
     const stopStr = Array.isArray(stop) ? stop.join(', ') : (stop || '');
+    const streamVal = stream === 1 || stream === true || stream === '1' ? 1 : 0;
+    const seedVal = seed !== null && seed !== undefined ? seed : -1;
+    const numCtx = num_ctx_messages || 20;
+    
     db.run(
       `INSERT OR REPLACE INTO character_config 
        (character_id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages, system_prompt, jailbreak, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream ? 1 : 0, seed, stopStr, num_ctx_messages, system_prompt, jailbreak, now]
+      [id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, streamVal, seedVal, stopStr, numCtx, system_prompt, jailbreak, now]
     );
   } else if (level === 'conversation') {
     const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages } = config;
     const stopStr = Array.isArray(stop) ? stop.join(', ') : (stop || '');
+    const streamVal = stream === 1 || stream === true || stream === '1' ? 1 : 0;
+    const seedVal = seed !== null && seed !== undefined ? seed : -1;
+    const numCtx = num_ctx_messages || 20;
+    
     db.run(
       `INSERT OR REPLACE INTO conversation_config 
        (conversation_id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream, seed, stop, num_ctx_messages, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, stream ? 1 : 0, seed, stopStr, num_ctx_messages, now]
+      [id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, context_size, streamVal, seedVal, stopStr, numCtx, now]
     );
   }
 

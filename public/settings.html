@@ -703,13 +703,18 @@
         stop: stop,
       };
 
+      console.log('Enviando config:', config);
+
       try {
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config),
         });
+        
+        console.log('Status da resposta:', res.status);
         const result = await res.json();
+        console.log('Resultado:', result);
 
         if (!res.ok || !result.ok) {
           throw new Error(result.message || 'Erro ao salvar configuração.');
@@ -717,6 +722,7 @@
 
         showMessage('Configuração salva com sucesso!');
       } catch (err) {
+        console.error('Erro:', err);
         showMessage(err.message || 'Erro ao salvar configuração.', 'error');
       }
     }
