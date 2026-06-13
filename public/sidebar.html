@@ -7,7 +7,6 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
     background: rgba(15, 23, 42, 0.97);
     border-right: 1px solid rgba(148, 163, 184, 0.1);
     padding: 1.75rem 1rem 1.5rem;
@@ -43,6 +42,73 @@
     background: rgba(56, 189, 248, 0.14);
     border-color: rgba(56, 189, 248, 0.28);
     color: #f8fafc;
+  }
+
+  /* ── Recent characters shortcuts ───────────────────────────────── */
+  .recent-chars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 1rem;
+    padding-left: 0.35rem;
+
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+  }
+
+  .recent-char-link {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    color: #94a3b8;
+    font-size: 0.84rem;
+    transition: background 0.18s, color 0.18s;
+    border: 1px solid transparent;
+    overflow: hidden;
+  }
+
+  .recent-char-link:hover {
+    background: rgba(56, 189, 248, 0.09);
+    border-color: rgba(56, 189, 248, 0.18);
+    color: #e2e8f0;
+  }
+
+  .recent-char-avatar {
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .recent-char-placeholder {
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: #38bdf8;
+    flex-shrink: 0;
+  }
+
+  .recent-char-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Bottom nav separator ───────────────────────────────────────── */
+  .sidebar-bottom-nav {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
   }
 
   /* ── Mobile top bar (fixed) ─────────────────────────────────────── */
@@ -108,19 +174,33 @@
 
   #mobileNav .offcanvas-body {
     padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #mobileNav .sidebar-bottom-nav {
+    margin-top: auto;
   }
 </style>
 
 <!-- Desktop sidebar -->
 <aside class="sidebar-wrap">
-  <div class="px-1">
+  <div class="px-1 mb-3">
     <span class="fw-bold text-white" style="font-size:1rem; letter-spacing:-0.03em;">OpenRP AI</span>
   </div>
 
-  <nav class="nav-links nav flex-column gap-1">
-    <a class="nav-link" href="/" data-path="/">
-      <i class="bi bi-person-circle"></i> Personagens
-    </a>
+  <!-- TOP: Personagens + recent chars shortcuts -->
+  <div class="flex-grow-1">
+    <nav class="nav-links nav flex-column gap-1">
+      <a class="nav-link" href="/" data-path="/">
+        <i class="bi bi-person-circle"></i> Personagens
+      </a>
+    </nav>
+    <div class="recent-chars-list"></div>
+  </div>
+
+  <!-- BOTTOM: Persona, Configurações, Banco de Dados -->
+  <nav class="nav-links nav flex-column gap-1 sidebar-bottom-nav">
     <a class="nav-link" href="/persona" data-path="/persona">
       <i class="bi bi-person-badge"></i> Persona
     </a>
@@ -131,10 +211,6 @@
       <i class="bi bi-database"></i> Banco de Dados
     </a>
   </nav>
-
-  <p class="mt-auto px-1" style="color:#475569; font-size:0.8rem; line-height:1.5;">
-    Navegue entre personagens, persona e configurações.
-  </p>
 </aside>
 
 <!-- Mobile top bar -->
@@ -155,10 +231,19 @@
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
   </div>
   <div class="offcanvas-body">
-    <nav class="nav-links nav flex-column gap-1">
-      <a class="nav-link" href="/" data-path="/">
-        <i class="bi bi-person-circle"></i> Personagens
-      </a>
+
+    <!-- TOP: Personagens + recent chars shortcuts -->
+    <div>
+      <nav class="nav-links nav flex-column gap-1">
+        <a class="nav-link" href="/" data-path="/">
+          <i class="bi bi-person-circle"></i> Personagens
+        </a>
+      </nav>
+      <div class="recent-chars-list"></div>
+    </div>
+
+    <!-- BOTTOM: Persona, Configurações, Banco de Dados -->
+    <nav class="nav-links nav flex-column gap-1 sidebar-bottom-nav">
       <a class="nav-link" href="/persona" data-path="/persona">
         <i class="bi bi-person-badge"></i> Persona
       </a>
@@ -169,5 +254,6 @@
         <i class="bi bi-database"></i> Banco de Dados
       </a>
     </nav>
+
   </div>
 </div>

@@ -91,6 +91,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/sidebar.js"></script>
     <script>
       async function loadCharacters() {
         try {
@@ -138,17 +139,6 @@
 
       function addCharacter() {
         window.location.href = '/character/new';
-      }
-
-      async function loadSidebar() {
-        const res = await fetch('/sidebar.html');
-        const html = await res.text();
-        document.getElementById('sidebar-root').innerHTML = html;
-        document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === window.location.pathname) {
-            link.classList.add('active');
-          }
-        });
       }
 
       window.addEventListener('load', async () => {

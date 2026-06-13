@@ -111,6 +111,28 @@ export function getConversation(conversationId) {
   };
 }
 
+export function getRecentCharactersWithConversations(limit = 5) {
+  const db = getDB();
+  const result = db.exec(
+    `SELECT c.id, c.name, c.avatar_url,
+            COALESCE(MAX(m.created_at), MAX(conv.created_at)) AS last_activity
+     FROM characters c
+     INNER JOIN conversations conv ON conv.character_id = c.id
+     LEFT  JOIN messages m ON m.conversation_id = conv.id
+     GROUP BY c.id
+     ORDER BY last_activity DESC
+     LIMIT ?`,
+    [limit]
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map((row) => ({
+    id: row[0],
+    name: row[1],
+    avatar_url: row[2],
+    last_activity: row[3],
+  }));
+}
+
 export function getLatestConversationForCharacter(characterId) {
   const db = getDB();
   const result = db.exec(

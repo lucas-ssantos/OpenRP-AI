@@ -61,6 +61,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/sidebar.js"></script>
     <script>
       const form        = document.getElementById('persona-form');
       const msgError    = document.getElementById('msg-error');
@@ -68,15 +69,6 @@
       const pageTitle   = document.getElementById('page-title');
       const pageDesc    = document.getElementById('page-description');
       const sidebarRoot = document.getElementById('sidebar-root');
-
-      async function loadSidebar() {
-        const res = await fetch('/sidebar.html');
-        const html = await res.text();
-        sidebarRoot.innerHTML = html;
-        document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === window.location.pathname) link.classList.add('active');
-        });
-      }
 
       async function fetchPersona() {
         const response = await fetch('/api/persona');

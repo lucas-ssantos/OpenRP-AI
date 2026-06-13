@@ -4,7 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
 import { getDB } from "./database/db.js";
-import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, createConversation, getConversation, getLatestConversationForCharacter, addMessage, getConversationMessages, getLastNMessages } from "./database/queries.js";
+import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, createConversation, getConversation, getLatestConversationForCharacter, getRecentCharactersWithConversations, addMessage, getConversationMessages, getLastNMessages } from "./database/queries.js";
 
 async function getHealthStatus() {
     const status = {
@@ -354,6 +354,16 @@ export async function startWebServer(port = process.env.PORT || 3000)
 
             conv = getConversation(convId);
             res.json({ ok: true, conversation: conv, is_new: true });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    // ===== RECENT CHARACTERS =====
+    app.get("/api/characters/recent", (_req, res) => {
+        try {
+            const characters = getRecentCharactersWithConversations(5);
+            res.json({ ok: true, characters });
         } catch (err) {
             res.status(500).json({ ok: false, message: err.message });
         }

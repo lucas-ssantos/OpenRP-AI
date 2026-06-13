@@ -342,8 +342,66 @@
         padding: 1rem;
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.25rem;
         overflow-y: auto;
+      }
+
+      /* Recent chars shortcuts (chat offcanvas) */
+      #chatNav .recent-chars-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        margin-top: 0.2rem;
+        padding-left: 0.35rem;
+      }
+
+      #chatNav .recent-char-link {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.4rem 0.65rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        color: #94a3b8;
+        font-size: 0.84rem;
+        transition: background 0.18s, color 0.18s;
+        border: 1px solid transparent;
+        overflow: hidden;
+      }
+
+      #chatNav .recent-char-link:hover {
+        background: rgba(56, 189, 248, 0.09);
+        border-color: rgba(56, 189, 248, 0.18);
+        color: #e2e8f0;
+      }
+
+      #chatNav .recent-char-avatar {
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+
+      #chatNav .recent-char-placeholder {
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 50%;
+        background: rgba(56, 189, 248, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        color: #38bdf8;
+        flex-shrink: 0;
+      }
+
+      #chatNav .recent-char-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
       }
 
       .chat-nav-char {
@@ -479,19 +537,29 @@
           </div>
         </div>
 
-        <!-- Navegação -->
+        <!-- TOP: Personagens + recent chars shortcuts -->
         <div>
-          <div class="chat-nav-section">Navegação</div>
+          <div class="chat-nav-section">Personagens</div>
           <nav class="chat-nav-links">
-            <a href="/"><i class="bi bi-person-circle"></i> Personagens</a>
+            <a href="/"><i class="bi bi-person-circle"></i> Todos os personagens</a>
+          </nav>
+          <div class="recent-chars-list"></div>
+        </div>
+
+        <!-- Spacer -->
+        <div style="flex:1;"></div>
+
+        <!-- BOTTOM: Persona, Configurações, Banco de Dados -->
+        <div style="border-top:1px solid rgba(148,163,184,0.1); padding-top:.75rem;">
+          <nav class="chat-nav-links">
             <a href="/persona"><i class="bi bi-person-badge"></i> Persona</a>
             <a href="/settings"><i class="bi bi-sliders"></i> Configurações</a>
-            <a href="/api/viewdb"><i class="bi bi-database"></i> Banco de dados</a>
+            <a href="/api/viewdb"><i class="bi bi-database"></i> Banco de Dados</a>
           </nav>
         </div>
 
-        <!-- Ações da conversa -->
-        <div>
+        <!-- Conversa -->
+        <div style="border-top:1px solid rgba(148,163,184,0.1); padding-top:.75rem;">
           <div class="chat-nav-section">Conversa</div>
           <nav class="chat-nav-links">
             <a href="/" id="nav-new-chat" style="color:#38bdf8;">
@@ -542,6 +610,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/sidebar.js"></script>
     <script>
       const characterId = window.location.pathname.split('/')[2];
       let conversationId = null;
@@ -728,6 +797,9 @@
             navAvatar.style.display = 'block';
             document.getElementById('nav-avatar-placeholder').style.display = 'none';
           }
+
+          // Populate recent chars shortcuts in the offcanvas
+          populateRecentChars();
 
           // 2. Get latest conversation or create a new one (first_message only inserted on creation)
           const convRes = await fetch(`/api/characters/${characterId}/conversation`);

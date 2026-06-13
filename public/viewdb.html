@@ -92,6 +92,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/sidebar.js"></script>
     <script>
       const statusEl       = document.getElementById('status');
       const tableListEl    = document.getElementById('table-list');
@@ -200,14 +201,6 @@
           statusEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${err.message}</span>`;
           tableListEl.innerHTML = '';
         }
-      }
-
-      async function loadSidebar() {
-        const res = await fetch('/sidebar.html');
-        document.getElementById('sidebar-root').innerHTML = await res.text();
-        document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === window.location.pathname) link.classList.add('active');
-        });
       }
 
       window.addEventListener('load', async () => {
