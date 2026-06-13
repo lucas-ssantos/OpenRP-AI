@@ -3,105 +3,226 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenRP AI - Status</title>
+    <title>OpenRP AI — Personagens</title>
     <style>
-      body {
-        font-family: system-ui, sans-serif;
-        background: #0f172a;
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #020617;
         color: #e2e8f0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
         margin: 0;
         min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
+          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
+          #020617;
+        display: flex;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      .page {
+        width: min(1180px, 100%);
+      }
+
+      .header {
         display: flex;
         align-items: center;
-        justify-content: center;
-      }
-      .card {
-        background: rgba(15, 23, 42, 0.92);
-        border: 1px solid #334155;
-        padding: 2rem;
-        border-radius: 1rem;
-        max-width: 520px;
-        width: 100%;
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: 2rem;
-      }
-      p {
-        margin: 0.75rem 0;
-        line-height: 1.65;
-      }
-      .status {
-        display: grid;
+        justify-content: space-between;
         gap: 1rem;
-        margin-top: 1rem;
+        margin-bottom: 1.5rem;
       }
-      .status-item {
-        border: 1px solid #334155;
-        border-radius: 0.75rem;
-        padding: 1rem;
-        background: #020617;
+
+      .header h1 {
+        margin: 0;
+        font-size: clamp(2rem, 2.5vw, 2.75rem);
+        letter-spacing: -0.04em;
       }
-      .ok {
-        color: #22c55e;
+
+      .header p {
+        margin: 0.35rem 0 0;
+        color: #94a3b8;
+        max-width: 40rem;
       }
-      .error {
-        color: #f87171;
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.25rem;
       }
-      .loading {
+
+      .card {
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 1.25rem;
+        padding: 1.4rem;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(56, 189, 248, 0.35);
+        background: rgba(15, 23, 42, 1);
+      }
+
+      .card-title {
+        font-size: 1.15rem;
+        margin: 0 0 0.5rem;
+      }
+
+      .card-subtitle {
+        margin: 0;
+        color: #94a3b8;
+        font-size: 0.95rem;
+      }
+
+      .card-body {
+        flex: 1;
+        margin: 1rem 0;
+        color: #cbd5e1;
+        line-height: 1.7;
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.14);
+        color: #bfdbfe;
+        font-size: 0.82rem;
+      }
+
+      .card-add {
+        display: grid;
+        place-items: center;
+        text-align: center;
+        gap: 1rem;
+        border-style: dashed;
         color: #38bdf8;
+      }
+
+      .card-add:hover {
+        border-color: rgba(56, 189, 248, 0.45);
+        background: rgba(15, 23, 42, 1);
+      }
+
+      .card-add .plus {
+        width: 3rem;
+        height: 3rem;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        border: 1px solid rgba(56, 189, 248, 0.45);
+        font-size: 1.8rem;
+        background: rgba(56, 189, 248, 0.08);
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+      }
+
+      .status-ok {
+        background: rgba(34, 197, 94, 0.12);
+        color: #86efac;
+      }
+
+      .status-error {
+        background: rgba(248, 113, 113, 0.14);
+        color: #fecaca;
       }
     </style>
   </head>
   <body>
-    <main class="card">
-      <h1>OpenRP AI</h1>
-      <p>Verificando se os serviços do Ollama e do banco de dados foram inicializados corretamente.</p>
-      <div class="status">
-        <div class="status-item" id="ollama-status">
-          <strong>Ollama:</strong>
-          <span class="loading">Carregando...</span>
-        </div>
-        <div class="status-item" id="db-status">
-          <strong>Banco de Dados:</strong>
-          <span class="loading">Carregando...</span>
+    <div class="page">
+      <div class="header">
+        <div>
+          <h1>Personagens</h1>
+          <p>Selecione um personagem para começar a conversa ou adicione um novo perfil à sua coleção.</p>
         </div>
       </div>
-    </main>
+
+      <div class="grid" id="character-grid">
+        <div class="card card-add" role="button" onclick="addCharacter()">
+          <div class="plus">+</div>
+          <div>
+            <h2 class="card-title">Novo personagem</h2>
+            <p class="card-body">Crie um personagem para começar a roleplay.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
-      async function loadStatus() {
+      async function loadCharacters() {
         try {
-          const res = await fetch('/api/status');
-          if (!res.ok) throw new Error('Falha na requisição');
+          const res = await fetch('/api/characters');
+          if (!res.ok) throw new Error('Falha ao carregar personagens');
           const data = await res.json();
 
-          const ollamaElem = document.getElementById('ollama-status');
-          const dbElem = document.getElementById('db-status');
-
-          ollamaElem.innerHTML = `
-            <strong>Ollama:</strong>
-            <span class="${data.ollama.ok ? 'ok' : 'error'}">${data.ollama.message}</span>
+          const grid = document.getElementById('character-grid');
+          grid.innerHTML = `
+            <div class="card card-add" role="button" onclick="addCharacter()">
+              <div class="plus">+</div>
+              <div>
+                <h2 class="card-title">Novo personagem</h2>
+                <p class="card-body">Crie um personagem para começar a roleplay.</p>
+              </div>
+            </div>
           `;
 
-          dbElem.innerHTML = `
-            <strong>Banco de Dados:</strong>
-            <span class="${data.database.ok ? 'ok' : 'error'}">${data.database.message}</span>
-          `;
+          if (data.ok && Array.isArray(data.characters) && data.characters.length > 0) {
+            data.characters.forEach((character) => {
+              const card = document.createElement('article');
+              card.className = 'card';
+              card.innerHTML = `
+                <div>
+                  <h2 class="card-title">${character.display_name || character.name}</h2>
+                  <p class="card-subtitle">${character.description || 'Sem descrição disponível.'}</p>
+                </div>
+                <div class="card-body">${character.personality || 'Personalidade não definida.'}</div>
+                <div class="card-meta">
+                  <span class="badge">${character.name}</span>
+                  <span class="status-pill status-ok">Pronto</span>
+                </div>
+              `;
+              grid.appendChild(card);
+            });
+          }
         } catch (err) {
-          document.getElementById('ollama-status').innerHTML = `
-            <strong>Ollama:</strong>
-            <span class="error">Erro ao obter status</span>
-          `;
-          document.getElementById('db-status').innerHTML = `
-            <strong>Banco de Dados:</strong>
-            <span class="error">Erro ao obter status</span>
-          `;
           console.error(err);
         }
       }
 
-      window.addEventListener('load', loadStatus);
+      function addCharacter() {
+        const name = prompt('Nome do personagem:');
+        if (!name) return;
+        alert('Funcionalidade de criação será implementada em breve.');
+      }
+
+      window.addEventListener('load', loadCharacters);
     </script>
   </body>
 </html>

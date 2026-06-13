@@ -3,6 +3,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
 import { getDB } from "./database/db.js";
+import { getAllCharacters } from "./database/queries.js";
 
 export async function startWebServer(port = process.env.PORT || 3000)
 {
@@ -49,11 +50,23 @@ export async function startWebServer(port = process.env.PORT || 3000)
             dbStatus.message = "Banco de dados inicializado";
         }
         catch (err)
-    {
+        {
             dbStatus.message = `Erro no banco de dados: ${err.message}`;
         }
 
         res.json({ ollama: ollamaStatus, database: dbStatus });
+    });
+
+    app.get("/api/characters", (req, res) => {
+        try
+        {
+            const characters = getAllCharacters();
+            res.json({ ok: true, characters });
+        }
+        catch (err)
+        {
+            res.status(500).json({ ok: false, message: err.message });
+        }
     });
 
     const server = app.listen(port, () => {
