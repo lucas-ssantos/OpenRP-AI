@@ -22,10 +22,11 @@ export async function migrate() {
     CREATE TABLE IF NOT EXISTS characters (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      display_name TEXT,
       description TEXT,
       personality TEXT,
       avatar_url TEXT,
+      scenario TEXT,
+      first_message TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );

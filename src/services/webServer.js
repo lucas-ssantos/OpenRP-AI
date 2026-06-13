@@ -1,9 +1,10 @@
 import express from "express";
+import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
 import { getDB } from "./database/db.js";
-import { getAllCharacters, getPersona, savePersona } from "./database/queries.js";
+import { createCharacter, getAllCharacters, getPersona, savePersona } from "./database/queries.js";
 
 async function getHealthStatus() {
     const status = {
@@ -39,8 +40,13 @@ export async function startWebServer(port = process.env.PORT || 3000)
 {
     const app = express();
     const publicPath = path.resolve(process.cwd(), "public");
+    const uploadDir = path.join(publicPath, "uploads");
 
-    app.use(express.json());
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    app.use(express.json({ limit: "10mb" }));
 
     //
     //  CHAMADAS DE PÁGINA
@@ -51,6 +57,10 @@ export async function startWebServer(port = process.env.PORT || 3000)
 
     app.get("/persona", (_req, res) => {
         res.sendFile(path.join(publicPath, "persona.html"));
+    });
+
+    app.get("/character/new", (_req, res) => {
+        res.sendFile(path.join(publicPath, "new-character.html"));
     });
 
     //INDEX
@@ -114,6 +124,42 @@ export async function startWebServer(port = process.env.PORT || 3000)
         }
         catch (err)
         {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    app.post("/api/characters", (req, res) => {
+        try {
+            const { name, description, personality, scenario, first_message, avatar_link, avatar_upload, avatar_filename } = req.body;
+            if (!name) {
+                return res.status(400).json({ ok: false, message: 'O nome do personagem é obrigatório.' });
+            }
+
+            let avatarUrl = null;
+
+            if (avatar_upload && avatar_filename) {
+                const safeName = `${Date.now()}-${avatar_filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const destination = path.join(uploadDir, safeName);
+                const buffer = Buffer.from(avatar_upload, 'base64');
+                fs.writeFileSync(destination, buffer);
+                avatarUrl = `/uploads/${safeName}`;
+            } else if (avatar_link) {
+                avatarUrl = avatar_link;
+            } else {
+                return res.status(400).json({ ok: false, message: 'Envie um arquivo de imagem ou um link de avatar.' });
+            }
+
+            const characterId = createCharacter(
+                name,
+                description || '',
+                personality || '',
+                avatarUrl,
+                scenario || null,
+                first_message || null
+            );
+
+            res.json({ ok: true, id: characterId });
+        } catch (err) {
             res.status(500).json({ ok: false, message: err.message });
         }
     });

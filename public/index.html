@@ -260,13 +260,13 @@
               card.innerHTML = `
                 <div class="card-figure">
                   ${character.avatar_url
-                    ? `<img src="${character.avatar_url}" alt="Avatar de ${character.display_name || character.name}" />`
+                    ? `<img src="${character.avatar_url}" alt="Avatar de ${character.name}" />`
                     : `<div class="card-figure placeholder">Sem imagem disponível</div>`}
                 </div>
                 <div class="card-content">
                   <div>
-                    <h2 class="card-title">${character.display_name || character.name}</h2>
-                    <p class="card-subtitle">${character.description || 'Sem descrição disponível.'}</p>
+                    <h2 class="card-title">${character.name}</h2>
+                    <p class="card-subtitle">${character.scenario ? character.scenario : (character.description || 'Sem descrição disponível.')}</p>
                   </div>
                   <div class="card-body">${character.personality || 'Personalidade não definida.'}</div>
                   <div class="card-meta">
@@ -284,9 +284,7 @@
       }
 
       function addCharacter() {
-        const name = prompt('Nome do personagem:');
-        if (!name) return;
-        alert('Funcionalidade de criação será implementada em breve.');
+        window.location.href = '/character/new';
       }
 
       async function loadSidebar() {

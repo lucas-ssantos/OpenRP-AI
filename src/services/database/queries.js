@@ -2,13 +2,13 @@ import { getDB, saveDB } from "./db.js";
 import { v4 as uuidv4 } from "uuid";
 
 // ===== Characters =====
-export function createCharacter(name, displayName, description, personality, avatarUrl = null) {
+export function createCharacter(name, description, personality, avatarUrl = null, scenario = null, firstMessage = null) {
   const db = getDB();
   const id = uuidv4();
   db.run(
-    `INSERT INTO characters (id, name, display_name, description, personality, avatar_url)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, name, displayName, description, personality, avatarUrl]
+    `INSERT INTO characters (id, name, description, personality, avatar_url, scenario, first_message)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, name, description, personality, avatarUrl, scenario, firstMessage]
   );
   saveDB();
   return id;
@@ -25,12 +25,13 @@ export function getCharacter(characterId) {
   return {
     id: row[0],
     name: row[1],
-    display_name: row[2],
-    description: row[3],
-    personality: row[4],
-    avatar_url: row[5],
-    created_at: row[6],
-    updated_at: row[7],
+    description: row[2],
+    personality: row[3],
+    avatar_url: row[4],
+    scenario: row[5],
+    first_message: row[6],
+    created_at: row[7],
+    updated_at: row[8],
   };
 }
 
@@ -41,12 +42,13 @@ export function getAllCharacters() {
   return result[0].values.map((row) => ({
     id: row[0],
     name: row[1],
-    display_name: row[2],
-    description: row[3],
-    personality: row[4],
-    avatar_url: row[5],
-    created_at: row[6],
-    updated_at: row[7],
+    description: row[2],
+    personality: row[3],
+    avatar_url: row[4],
+    scenario: row[5],
+    first_message: row[6],
+    created_at: row[7],
+    updated_at: row[8],
   }));
 }
 
