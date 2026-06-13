@@ -2,10 +2,13 @@ import { spawnSync } from "child_process";
 
 let _webServer = null;
 let _ollamaProcess = null;
+let _saveDB = null;
 
 export function registerWebServer(server) { _webServer = server;}
 
 export function registerOllamaProcess(proc) { _ollamaProcess = proc;}
+
+export function registerSaveDB(saveFn) { _saveDB = saveFn;}
 
 export async function shutdown(code = 0)
 {
@@ -84,6 +87,17 @@ export async function shutdown(code = 0)
             catch (e)
             {
                 console.warn("Error while attempting to stop systemd Ollama service:", e.message || e);
+            }
+        }
+
+        // Save database before shutdown
+        if (_saveDB) {
+            console.log("Saving database...");
+            try {
+                _saveDB();
+                console.log("Database saved successfully");
+            } catch (e) {
+                console.error("Error saving database:", e);
             }
         }
 

@@ -1,6 +1,9 @@
 import { initOllama } from "./services/ollama.init.js";
 import { startWebServer } from "./services/webServer.js";
-import { shutdown } from "./core/shutdown.js";
+import { shutdown, registerSaveDB } from "./core/shutdown.js";
+import { initDB } from "./services/database/db.js";
+import { migrate } from "./services/database/migrations.js";
+import { saveDB } from "./services/database/save.js";
 import express from "express";
 import path from "path";
 
@@ -57,6 +60,9 @@ async function main()
     {
         console.log("\n=== Starting OpenRP AI ===\n");
         await initOllama();
+        await initDB();
+        await migrate();
+        registerSaveDB(saveDB);
         await startWebServer();
     }
     catch (err)

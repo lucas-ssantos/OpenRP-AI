@@ -9,7 +9,5 @@
   "example_dialogues": [
     { "user": "Quem é você?", "char": "Alguém que sabe mais do que deveria." }
   ],
-  "system_prompt_override": null,  // substitui o system prompt global
-  "tags": ["fantasia", "mistério"],
-  "creator_notes": "Melhor com modelos Mistral ou Llama3"
+  "system_prompt_override": null  // substitui o system prompt global
 }

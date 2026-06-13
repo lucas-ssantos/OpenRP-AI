@@ -20,3 +20,22 @@ Histórico completo da conversa
 │  [World Info / Lorebook]        │
 │  [Últimas N mensagens]          │
 └─────────────────────────────────┘
+
+
+
+Tipos de Memória
+>Auto
+Gerada pelo summaryService automaticamente
+Ex: "Na sessão anterior, o usuário revelou seu nome"manual
+
+>Manual
+Criada/editada pelo usuário
+Ex: "Ele adora café, odeia segunda-feira"
+
+>Pinned
+Sempre incluída no contexto
+Ex: Fatos permanentes do personagem
+
+>Lorebook
+Ativada por palavras-chave no chat
+Ex: Mencionar "castelo" injeta lore do castelo
