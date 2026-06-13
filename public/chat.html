@@ -306,6 +306,132 @@
         border-radius: 2px;
       }
 
+      /* ── Menu toggle button ── */
+      .menu-btn {
+        display: grid;
+        place-items: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.2s;
+      }
+      .menu-btn:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      /* ── Chat offcanvas ── */
+      #chatNav {
+        width: 260px !important;
+        background: rgba(6, 12, 30, 0.97) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.1) !important;
+      }
+
+      #chatNav .offcanvas-header {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        padding: 1.25rem 1.25rem 1rem;
+      }
+
+      #chatNav .offcanvas-body {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        overflow-y: auto;
+      }
+
+      .chat-nav-char {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        border-radius: 1rem;
+      }
+
+      .chat-nav-avatar {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid rgba(56, 189, 248, 0.4);
+        flex-shrink: 0;
+        display: none;
+      }
+
+      .chat-nav-avatar-placeholder {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
+        background: rgba(56, 189, 248, 0.12);
+        border: 2px solid rgba(56, 189, 248, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #38bdf8;
+        font-size: 1.1rem;
+      }
+
+      .chat-nav-name {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #f1f5f9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chat-nav-scenario {
+        font-size: 0.78rem;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chat-nav-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .chat-nav-links a {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.7rem 0.9rem;
+        border-radius: 0.85rem;
+        text-decoration: none;
+        color: #cbd5e1;
+        border: 1px solid transparent;
+        font-size: 0.93rem;
+        transition: background 0.18s, border-color 0.18s, color 0.18s;
+      }
+
+      .chat-nav-links a:hover {
+        background: rgba(56, 189, 248, 0.12);
+        border-color: rgba(56, 189, 248, 0.25);
+        color: #f8fafc;
+      }
+
+      .chat-nav-section {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #334155;
+        padding: 0 0.5rem;
+        margin-bottom: 0.25rem;
+      }
+
       /* ── Desktop enhancement ── */
       @media (min-width: 900px) {
         .chat-layout {
@@ -333,6 +459,50 @@
     </style>
   </head>
   <body>
+    <!-- ── Offcanvas menu ─────────────────────────────────────────── -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="chatNav">
+      <div class="offcanvas-header">
+        <span style="font-weight:700; font-size:.95rem; letter-spacing:-.02em; color:#f8fafc;">OpenRP AI</span>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+      </div>
+      <div class="offcanvas-body">
+
+        <!-- Personagem atual -->
+        <div class="chat-nav-char">
+          <img class="chat-nav-avatar" id="nav-avatar" alt="" />
+          <div class="chat-nav-avatar-placeholder" id="nav-avatar-placeholder">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div style="min-width:0;">
+            <div class="chat-nav-name" id="nav-char-name">—</div>
+            <div class="chat-nav-scenario" id="nav-char-scenario">Em conversa</div>
+          </div>
+        </div>
+
+        <!-- Navegação -->
+        <div>
+          <div class="chat-nav-section">Navegação</div>
+          <nav class="chat-nav-links">
+            <a href="/"><i class="bi bi-person-circle"></i> Personagens</a>
+            <a href="/persona"><i class="bi bi-person-badge"></i> Persona</a>
+            <a href="/settings"><i class="bi bi-sliders"></i> Configurações</a>
+            <a href="/api/viewdb"><i class="bi bi-database"></i> Banco de dados</a>
+          </nav>
+        </div>
+
+        <!-- Ações da conversa -->
+        <div>
+          <div class="chat-nav-section">Conversa</div>
+          <nav class="chat-nav-links">
+            <a href="/" id="nav-new-chat" style="color:#38bdf8;">
+              <i class="bi bi-plus-circle"></i> Nova conversa
+            </a>
+          </nav>
+        </div>
+
+      </div>
+    </div>
+
     <div class="bg" id="bg"></div>
     <div class="bg-overlay"></div>
 
@@ -346,6 +516,13 @@
           <div class="header-name" id="char-name">Carregando…</div>
           <div class="header-scenario" id="char-scenario"></div>
         </div>
+        <button class="menu-btn"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#chatNav"
+                title="Menu"
+                aria-label="Abrir menu">
+          <i class="bi bi-list" style="font-size:1.15rem;"></i>
+        </button>
       </header>
 
       <main class="messages" id="messages"></main>
@@ -538,6 +715,18 @@
             bgEl.style.backgroundImage = `url('${character.avatar_url}')`;
             headerAvt.src = character.avatar_url;
             headerAvt.style.display = 'block';
+          }
+
+          // Populate offcanvas with character info
+          document.getElementById('nav-char-name').textContent = character.name;
+          if (character.scenario) {
+            document.getElementById('nav-char-scenario').textContent = character.scenario;
+          }
+          if (character.avatar_url) {
+            const navAvatar = document.getElementById('nav-avatar');
+            navAvatar.src = character.avatar_url;
+            navAvatar.style.display = 'block';
+            document.getElementById('nav-avatar-placeholder').style.display = 'none';
           }
 
           // 2. Get latest conversation or create a new one (first_message only inserted on creation)
