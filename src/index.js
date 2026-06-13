@@ -10,25 +10,32 @@ import path from "path";
 
 let _isShuttingDown = false;
 
-async function handleProcessEvent(type, err) {
+async function handleProcessEvent(type, err)
+{
     if (_isShuttingDown) return;
     _isShuttingDown = true;
 
     if (type === "SIGINT") console.log("\nReceived SIGINT (CTRL+C)");
     else if (type === "SIGTERM") console.log("\nReceived SIGTERM");
-    else if (type === "uncaughtException") {
+    else if (type === "uncaughtException")
+    {
         console.error("\nUncaught Exception");
         console.error(err);
-    } else if (type === "unhandledRejection") {
+    }
+    else if(type === "unhandledRejection")
+    {
         console.error("\nUnhandled Promise Rejection");
         console.error(err);
     }
 
     const code = (type === "uncaughtException" || type === "unhandledRejection") ? 1 : 0;
 
-    try {
+    try
+    {
         await shutdown(code);
-    } catch (e) {
+    }
+    catch (e)
+    {
         console.error("Error during shutdown:", e);
     }
 
@@ -43,17 +50,17 @@ process.on("unhandledRejection", (err) => handleProcessEvent("unhandledRejection
 //  MAIN
 //
 
-async function main() {
+async function main()
+{
 
-    try {
-
+    try
+    {
         console.log("\n=== Starting OpenRP AI ===\n");
         await initOllama();
         await startWebServer();
-
     }
-    catch (err) {
-        
+    catch (err)
+    {    
         console.error("Error during initialization:", err);
     }
 
