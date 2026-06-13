@@ -1,5 +1,6 @@
 import express from "express";
 import { spawn } from "child_process";
+import { registerWebServer } from "../core/shutdown.js";
 
 export async function startWebServer(port = process.env.PORT || 3000) {
   const app = express();
@@ -28,6 +29,9 @@ export async function startWebServer(port = process.env.PORT || 3000) {
       console.warn("Falha ao abrir o navegador automaticamente:", e.message);
     }
   });
+
+  // register server for graceful shutdown
+  registerWebServer(server);
 
   return { app, server };
 }

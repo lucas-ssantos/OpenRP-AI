@@ -1,7 +1,47 @@
 import { initOllama } from "./services/ollama.init.js";
 import { startWebServer } from "./services/webServer.js";
+import { shutdown } from "./core/shutdown.js";
 import express from "express";
 import path from "path";
+
+//
+//  SHUTDOWN
+//
+
+let _isShuttingDown = false;
+
+async function handleProcessEvent(type, err) {
+    if (_isShuttingDown) return;
+    _isShuttingDown = true;
+
+    if (type === "SIGINT") console.log("\nReceived SIGINT (CTRL+C)");
+    else if (type === "SIGTERM") console.log("\nReceived SIGTERM");
+    else if (type === "uncaughtException") {
+        console.error("\nUncaught Exception");
+        console.error(err);
+    } else if (type === "unhandledRejection") {
+        console.error("\nUnhandled Promise Rejection");
+        console.error(err);
+    }
+
+    const code = (type === "uncaughtException" || type === "unhandledRejection") ? 1 : 0;
+
+    try {
+        await shutdown(code);
+    } catch (e) {
+        console.error("Error during shutdown:", e);
+    }
+
+    process.exit(code);
+}
+
+["SIGINT", "SIGTERM"].forEach(sig => process.on(sig, () => handleProcessEvent(sig)));
+process.on("uncaughtException", (err) => handleProcessEvent("uncaughtException", err));
+process.on("unhandledRejection", (err) => handleProcessEvent("unhandledRejection", err));
+
+//
+//  MAIN
+//
 
 async function main() {
 
@@ -20,82 +60,3 @@ async function main() {
 }
 
 main ();
-
-process.on(
-
-    "SIGINT",
-
-    async () => {
-
-        console.log(
-
-            "\nReceived SIGINT (CTRL+C)"
-
-        );
-
-        await shutdown(0);
-
-    }
-
-);
-
-//SIGTERM
-process.on(
-
-    "SIGTERM",
-
-    async () => {
-
-        console.log(
-
-            "\nReceived SIGTERM"
-
-        );
-
-        await shutdown(0);
-
-    }
-
-);
-
-//uncaughtException
-process.on(
-
-    "uncaughtException",
-
-    async err => {
-
-        console.error(
-
-            "\nUncaught Exception"
-
-        );
-
-        console.error(err);
-
-        await shutdown(1);
-
-    }
-
-);
-
-//unhandledRejection
-process.on(
-
-    "unhandledRejection",
-
-    async err => {
-
-        console.error(
-
-            "\nUnhandled Promise Rejection"
-
-        );
-
-        console.error(err);
-
-        await shutdown(1);
-
-    }
-
-);
