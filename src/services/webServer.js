@@ -1,34 +1,64 @@
 import express from "express";
+import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
+import { getDB } from "./database/db.js";
 
 export async function startWebServer(port = process.env.PORT || 3000)
 {
     const app = express();
+    const publicPath = path.resolve(process.cwd(), "public");
 
-    app.get("/", async (req, res) => {
+    app.use(express.static(publicPath));
+
+    app.get("/api/status", async (req, res) => 
+    {
+        const ollamaStatus = {
+            ok: false,
+            message: "Ollama não disponível",
+        };
+
         try
         {
-            const resp = await fetch("http://127.0.0.1:11434/api/tags");
-            if(resp.ok)
+            const response = await fetch("http://127.0.0.1:11434/api/tags");
+            if(response.ok)
             {
-                res.send("<html><body><h1>Ollama está ativo ✅</h1></body></html>");
+                ollamaStatus.ok = true;
+                ollamaStatus.message = "Ollama está ativo";
             }
             else
             {
-                res.send(`<html><body><h1>Ollama respondeu com status ${resp.status}</h1></body></html>`);
+                ollamaStatus.message = `Ollama respondeu com status ${response.status}`;
             }
         }
         catch (err)
         {
-            res.send("<html><body><h1>Ollama não está acessível ❌</h1></body></html>");
+            ollamaStatus.message = "Ollama não está acessível";
         }
+
+        const dbStatus = {
+            ok: false,
+            message: "Banco de dados não inicializado",
+        };
+
+        try
+        {
+            const db = getDB();
+            db.exec("SELECT 1");
+            dbStatus.ok = true;
+            dbStatus.message = "Banco de dados inicializado";
+        }
+        catch (err)
+    {
+            dbStatus.message = `Erro no banco de dados: ${err.message}`;
+        }
+
+        res.json({ ollama: ollamaStatus, database: dbStatus });
     });
 
     const server = app.listen(port, () => {
         const url = `http://localhost:${port}`;
         console.log(`Web server listening on ${url}`);
-        // Open URL in default browser (Linux: xdg-open)
         try
         {
             const opener = spawn("xdg-open", [url], { detached: true, stdio: "ignore" });
@@ -40,8 +70,6 @@ export async function startWebServer(port = process.env.PORT || 3000)
         }
     });
 
-    // register server for graceful shutdown
     registerWebServer(server);
-
     return { app, server };
 }

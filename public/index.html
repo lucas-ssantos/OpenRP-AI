@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenRP AI - Status</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.92);
+        border: 1px solid #334155;
+        padding: 2rem;
+        border-radius: 1rem;
+        max-width: 520px;
+        width: 100%;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 2rem;
+      }
+      p {
+        margin: 0.75rem 0;
+        line-height: 1.65;
+      }
+      .status {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      .status-item {
+        border: 1px solid #334155;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        background: #020617;
+      }
+      .ok {
+        color: #22c55e;
+      }
+      .error {
+        color: #f87171;
+      }
+      .loading {
+        color: #38bdf8;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>OpenRP AI</h1>
+      <p>Verificando se os serviços do Ollama e do banco de dados foram inicializados corretamente.</p>
+      <div class="status">
+        <div class="status-item" id="ollama-status">
+          <strong>Ollama:</strong>
+          <span class="loading">Carregando...</span>
+        </div>
+        <div class="status-item" id="db-status">
+          <strong>Banco de Dados:</strong>
+          <span class="loading">Carregando...</span>
+        </div>
+      </div>
+    </main>
+    <script>
+      async function loadStatus() {
+        try {
+          const res = await fetch('/api/status');
+          if (!res.ok) throw new Error('Falha na requisição');
+          const data = await res.json();
+
+          const ollamaElem = document.getElementById('ollama-status');
+          const dbElem = document.getElementById('db-status');
+
+          ollamaElem.innerHTML = `
+            <strong>Ollama:</strong>
+            <span class="${data.ollama.ok ? 'ok' : 'error'}">${data.ollama.message}</span>
+          `;
+
+          dbElem.innerHTML = `
+            <strong>Banco de Dados:</strong>
+            <span class="${data.database.ok ? 'ok' : 'error'}">${data.database.message}</span>
+          `;
+        } catch (err) {
+          document.getElementById('ollama-status').innerHTML = `
+            <strong>Ollama:</strong>
+            <span class="error">Erro ao obter status</span>
+          `;
+          document.getElementById('db-status').innerHTML = `
+            <strong>Banco de Dados:</strong>
+            <span class="error">Erro ao obter status</span>
+          `;
+          console.error(err);
+        }
+      }
+
+      window.addEventListener('load', loadStatus);
+    </script>
+  </body>
+</html>
