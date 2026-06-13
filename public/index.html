@@ -257,6 +257,8 @@
             data.characters.forEach((character) => {
               const card = document.createElement('article');
               card.className = 'card';
+              card.style.cursor = 'pointer';
+              card.addEventListener('click', () => { window.location.href = `/chat/${character.id}`; });
               card.innerHTML = `
                 <div class="card-figure">
                   ${character.avatar_url

@@ -4,7 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
 import { getDB } from "./database/db.js";
-import { createCharacter, getAllCharacters, getPersona, savePersona, getGenerationConfig, setGenerationConfig } from "./database/queries.js";
+import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, createConversation, getConversation, addMessage, getConversationMessages, getLastNMessages } from "./database/queries.js";
 
 async function getHealthStatus() {
     const status = {
@@ -318,6 +318,251 @@ export async function startWebServer(port = process.env.PORT || 3000)
         } catch (err) {
             console.error('Erro ao salvar config:', err);
             res.status(500).json({ ok: false, message: `Erro ao salvar: ${err.message}` });
+        }
+    });
+
+    // ===== CHAT PAGE =====
+    app.get("/chat/:characterId", (_req, res) => {
+        res.sendFile(path.join(publicPath, "chat.html"));
+    });
+
+    // ===== CHARACTER BY ID =====
+    app.get("/api/characters/:id", (req, res) => {
+        try {
+            const character = getCharacter(req.params.id);
+            if (!character) {
+                return res.status(404).json({ ok: false, message: 'Personagem não encontrado.' });
+            }
+            res.json({ ok: true, character });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    // ===== CONVERSATIONS =====
+    app.post("/api/conversations", (req, res) => {
+        try {
+            const { character_id, title } = req.body;
+            if (!character_id) {
+                return res.status(400).json({ ok: false, message: 'character_id é obrigatório.' });
+            }
+            const character = getCharacter(character_id);
+            if (!character) {
+                return res.status(404).json({ ok: false, message: 'Personagem não encontrado.' });
+            }
+            const persona = getPersona();
+            const convTitle = title || `Chat com ${character.name}`;
+            const convId = createConversation(character_id, persona?.name || null, convTitle);
+
+            if (character.first_message) {
+                const userName = persona?.name || 'você';
+                const firstMsg = character.first_message.replace(/\{\{user\}\}/gi, userName);
+                addMessage(convId, 'assistant', firstMsg, 0);
+            }
+
+            res.json({ ok: true, id: convId });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    app.get("/api/conversations/:id", (req, res) => {
+        try {
+            const conv = getConversation(req.params.id);
+            if (!conv) {
+                return res.status(404).json({ ok: false, message: 'Conversa não encontrada.' });
+            }
+            res.json({ ok: true, conversation: conv });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    app.get("/api/conversations/:id/messages", (req, res) => {
+        try {
+            const messages = getConversationMessages(req.params.id);
+            res.json({ ok: true, messages });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    // ===== CHAT — STREAMING =====
+    app.post("/api/conversations/:id/messages", async (req, res) => {
+        const conversationId = req.params.id;
+        try {
+            const { content } = req.body;
+            if (!content?.trim()) {
+                return res.status(400).json({ ok: false, message: 'Conteúdo da mensagem é obrigatório.' });
+            }
+
+            const conv = getConversation(conversationId);
+            if (!conv) return res.status(404).json({ ok: false, message: 'Conversa não encontrada.' });
+
+            const character = getCharacter(conv.character_id);
+            if (!character) return res.status(404).json({ ok: false, message: 'Personagem não encontrado.' });
+
+            const persona = getPersona();
+
+            const globalConfig = getGenerationConfig('global');
+            const charConfig = getGenerationConfig('character', conv.character_id);
+            const config = {
+                model: 'qwen3:8b',
+                temperature: 0.85,
+                top_p: 0.95,
+                top_k: 40,
+                min_p: 0.05,
+                repeat_penalty: 1.1,
+                repeat_last_n: 64,
+                max_tokens: 512,
+                context_size: 4096,
+                seed: -1,
+                stop: [],
+                num_ctx_messages: 20,
+                ...globalConfig,
+                ...(charConfig?.model ? charConfig : {}),
+            };
+
+            const systemParts = [];
+            systemParts.push(character.description
+                ? `You are ${character.name}. ${character.description}`
+                : `You are ${character.name}.`);
+            if (character.personality) systemParts.push(`Personality: ${character.personality}`);
+            if (character.scenario) systemParts.push(`Scenario: ${character.scenario}`);
+            if (persona?.name) {
+                const personaLine = `The user's name is ${persona.name}.${persona.description ? ' ' + persona.description : ''}`;
+                systemParts.push(personaLine);
+            }
+            systemParts.push(`Respond in first person as ${character.name}. Stay in character at all times. Be engaging and immersive.`);
+            const systemPrompt = systemParts.join('\n\n');
+
+            const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+
+            const ollamaMessages = [{ role: 'system', content: systemPrompt }];
+            for (const msg of recentMsgs) {
+                if (msg.role === 'system') continue;
+                ollamaMessages.push({ role: msg.role, content: msg.content });
+            }
+            ollamaMessages.push({ role: 'user', content: content.trim() });
+
+            const nextPos = recentMsgs.length > 0 ? (recentMsgs[recentMsgs.length - 1].position ?? recentMsgs.length) + 1 : 1;
+            addMessage(conversationId, 'user', content.trim(), nextPos);
+
+            res.set({
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            });
+            res.flushHeaders();
+
+            const ollamaRes = await fetch('http://127.0.0.1:11434/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: config.model || 'qwen3:8b',
+                    messages: ollamaMessages,
+                    stream: true,
+                    options: {
+                        temperature: config.temperature,
+                        top_p: config.top_p,
+                        top_k: config.top_k,
+                        min_p: config.min_p,
+                        repeat_penalty: config.repeat_penalty,
+                        repeat_last_n: config.repeat_last_n,
+                        num_ctx: config.context_size,
+                        num_predict: config.max_tokens,
+                        seed: (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
+                        stop: config.stop?.length ? config.stop : undefined,
+                    },
+                }),
+            });
+
+            if (!ollamaRes.ok) {
+                const errText = await ollamaRes.text();
+                res.write(`data: ${JSON.stringify({ error: `Ollama: ${ollamaRes.status} — ${errText}` })}\n\n`);
+                res.end();
+                return;
+            }
+
+            let fullContent = '';
+            let inThink = false;
+            const reader = ollamaRes.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    let parsed;
+                    try { parsed = JSON.parse(line); } catch { continue; }
+
+                    if (parsed.message?.content) {
+                        let delta = parsed.message.content;
+
+                        if (inThink) {
+                            const endIdx = delta.indexOf('</think>');
+                            if (endIdx !== -1) {
+                                inThink = false;
+                                delta = delta.slice(endIdx + 8);
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        while (delta.includes('<think>')) {
+                            const startIdx = delta.indexOf('<think>');
+                            const before = delta.slice(0, startIdx);
+                            if (before) {
+                                fullContent += before;
+                                res.write(`data: ${JSON.stringify({ delta: before, done: false })}\n\n`);
+                            }
+                            const endIdx = delta.indexOf('</think>', startIdx);
+                            if (endIdx !== -1) {
+                                delta = delta.slice(endIdx + 8);
+                            } else {
+                                inThink = true;
+                                delta = '';
+                            }
+                        }
+
+                        if (delta) {
+                            fullContent += delta;
+                            res.write(`data: ${JSON.stringify({ delta, done: false })}\n\n`);
+                        }
+                    }
+
+                    if (parsed.done) {
+                        const asstMsgId = fullContent ? addMessage(conversationId, 'assistant', fullContent, nextPos + 1) : null;
+                        res.write(`data: ${JSON.stringify({ delta: '', done: true, message_id: asstMsgId })}\n\n`);
+                        res.end();
+                        return;
+                    }
+                }
+            }
+
+            if (fullContent) {
+                const asstMsgId = addMessage(conversationId, 'assistant', fullContent, nextPos + 1);
+                res.write(`data: ${JSON.stringify({ delta: '', done: true, message_id: asstMsgId })}\n\n`);
+            }
+            res.end();
+
+        } catch (err) {
+            console.error('Chat error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ ok: false, message: err.message });
+            } else {
+                try {
+                    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+                    res.end();
+                } catch { /* ignore */ }
+            }
         }
     });
 

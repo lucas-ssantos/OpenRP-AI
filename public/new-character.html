@@ -279,7 +279,7 @@
 
           success.textContent = 'Personagem criado com sucesso! Redirecionando...';
           setTimeout(() => {
-            window.location.href = '/';
+            window.location.href = `/chat/${result.id}`;
           }, 1200);
         } catch (err) {
           message.textContent = err.message || 'Erro ao salvar personagem.';
