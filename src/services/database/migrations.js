@@ -10,15 +10,12 @@ export async function migrate() {
     "SELECT name FROM sqlite_master WHERE type='table';"
   );
 
-  if (tables.length > 0 && tables[0].values.length > 0) {
-    const tableNames = tables[0].values.map((row) => row[0]);
-    if (tableNames.includes("characters")) {
-      console.log("Migrations already applied.");
-      return;
-    }
+  const tableNames = tables.length > 0 ? tables[0].values.map((row) => row[0]) : [];
+  if (tableNames.length === 0) {
+    console.log("Creating database schema...");
+  } else {
+    console.log("Applying missing migrations if needed...");
   }
-
-  console.log("Creating database schema...");
 
   // ===== CHARACTERS =====
   db.run(`
@@ -44,6 +41,18 @@ export async function migrate() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
+    );
+  `);
+
+  // ===== PERSONA =====
+  db.run(`
+    CREATE TABLE IF NOT EXISTS persona (
+      id TEXT PRIMARY KEY DEFAULT 'self',
+      name TEXT NOT NULL,
+      description TEXT,
+      avatar_url TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
