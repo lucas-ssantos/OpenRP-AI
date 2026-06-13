@@ -1,217 +1,104 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Novo Personagem — OpenRP AI</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
-        background: #020617;
-        color: #e2e8f0;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        padding: 2rem;
-        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
-          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
-          #020617;
-      }
-
-      .layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 1.5rem;
-      }
-
-      .main-content {
-        min-width: 0;
-      }
-
-      .container {
-        width: min(700px, 100%);
-        margin: 0 auto;
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-        border-radius: 1.5rem;
-        padding: 2rem;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-      }
-
-      h1 {
-        margin: 0 0 0.75rem;
-        font-size: clamp(2rem, 2.5vw, 2.5rem);
-      }
-
-      p {
-        margin: 0 0 1.5rem;
-        color: #94a3b8;
-        line-height: 1.6;
-      }
-
-      .grid {
-        display: grid;
-        gap: 1rem;
-      }
-
-      label {
-        display: block;
-        margin-bottom: 0.5rem;
-        color: #cbd5e1;
-        font-weight: 600;
-      }
-
-      input,
-      textarea,
-      select {
-        width: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 0.85rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: #e2e8f0;
-        padding: 0.95rem 1rem;
-        font: inherit;
-        margin-bottom: 1rem;
-      }
-
-      textarea {
-        min-height: 140px;
-        resize: vertical;
-      }
-
-      .field-row {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 1rem;
-      }
-
-      .field-row > div {
-        display: grid;
-      }
-
-      .upload-group {
-        display: grid;
-        gap: 1rem;
-      }
-
-      .upload-group label {
-        margin: 0;
-      }
-
-      .helper {
-        color: #94a3b8;
-        font-size: 0.95rem;
-        margin: -0.75rem 0 1rem;
-      }
-
-      button {
-        width: 100%;
-        border: none;
-        border-radius: 0.95rem;
-        padding: 1rem 1.25rem;
-        font: inherit;
-        font-weight: 700;
-        color: #020617;
-        background: #38bdf8;
-        cursor: pointer;
-        transition: transform 0.2s ease, background-color 0.2s ease;
-      }
-
-      button:hover {
-        transform: translateY(-1px);
-        background: #0ea5e9;
-      }
-
-      .error {
-        margin-top: 1rem;
-        color: #fda4af;
-      }
-
-      .success {
-        margin-top: 1rem;
-        color: #86efac;
-      }
-
-      @media (max-width: 900px) {
-        .field-row {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="layout">
-      <div id="sidebar-root"></div>
-      <main class="main-content">
-        <div class="container">
-          <h1>Novo personagem</h1>
-          <p>Cadastre um personagem com imagem. Você pode enviar um arquivo ou informar um link.</p>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
 
-          <form id="character-form">
-            <div class="grid">
-              <div>
-                <label for="name">Nome</label>
-                <input id="name" name="name" type="text" placeholder="Nome único" required />
-              </div>
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+          <div class="mx-auto" style="max-width:680px;">
 
-              <div>
-                <label for="scenario">Cenário</label>
-                <input id="scenario" name="scenario" type="text" placeholder="Breve situação ou contexto" />
-              </div>
+            <div class="mb-4">
+              <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">Novo personagem</h1>
+              <p class="text-secondary mb-0">Cadastre um personagem com imagem. Você pode enviar um arquivo ou informar um link.</p>
             </div>
 
-            <label for="description">Descrição</label>
-            <textarea id="description" name="description" placeholder="Descreva o personagem..."></textarea>
+            <div class="glass-card card p-4">
+              <form id="character-form">
 
-            <label for="first_message">Primeira mensagem</label>
-            <textarea id="first_message" name="first_message" placeholder="Mensagem inicial do personagem..."></textarea>
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label" for="name">Nome <span class="text-danger">*</span></label>
+                    <input id="name" name="name" type="text" class="form-control" placeholder="Nome único do personagem" required />
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label" for="scenario">Cenário</label>
+                    <input id="scenario" name="scenario" type="text" class="form-control" placeholder="Breve situação ou contexto" />
+                  </div>
+                </div>
 
-            <label for="personality">Personalidade</label>
-            <textarea id="personality" name="personality" placeholder="Como o personagem age e fala..."></textarea>
+                <div class="mb-3">
+                  <label class="form-label" for="description">Descrição</label>
+                  <textarea id="description" name="description" class="form-control" placeholder="Descreva o personagem..."></textarea>
+                </div>
 
-            <div class="upload-group">
-              <div>
-                <label for="avatar_upload">Upload de imagem</label>
-                <input id="avatar_upload" name="avatar_upload" type="file" accept="image/*" />
-                <p class="helper">Envie uma imagem ou use um link abaixo. O upload é salvo no servidor.</p>
-              </div>
+                <div class="mb-3">
+                  <label class="form-label" for="first_message">Primeira mensagem</label>
+                  <textarea id="first_message" name="first_message" class="form-control" placeholder="Mensagem inicial do personagem... Use {{user}} para o nome do jogador."></textarea>
+                </div>
 
-              <div>
-                <label for="avatar_link">Link da imagem (opcional)</label>
-                <input id="avatar_link" name="avatar_link" type="url" placeholder="https://..." />
-              </div>
+                <div class="mb-4">
+                  <label class="form-label" for="personality">Personalidade</label>
+                  <textarea id="personality" name="personality" class="form-control" placeholder="Como o personagem age e fala..."></textarea>
+                </div>
+
+                <div class="glass-card card p-3 mb-4" style="border-radius:.85rem !important;">
+                  <p class="fw-semibold mb-3 d-flex align-items-center gap-2" style="color:#cbd5e1; font-size:.9rem;">
+                    <i class="bi bi-image text-info"></i> Imagem do personagem
+                  </p>
+                  <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label" for="avatar_upload">Upload de arquivo</label>
+                      <input id="avatar_upload" name="avatar_upload" type="file" accept="image/*" class="form-control" />
+                      <div class="form-text mt-1">Envie uma imagem salva no servidor.</div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label" for="avatar_link">Ou use um link</label>
+                      <input id="avatar_link" name="avatar_link" type="url" class="form-control" placeholder="https://..." />
+                      <div class="form-text mt-1">URL pública de uma imagem.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="msg-error" class="alert-glass-error mb-3" role="status" style="display:none;"></div>
+                <div id="msg-success" class="alert-glass-success mb-3" role="status" style="display:none;"></div>
+
+                <button type="submit" class="btn-sky w-100">
+                  <i class="bi bi-check-circle me-2"></i>Salvar personagem
+                </button>
+
+              </form>
             </div>
 
-            <button type="submit">Salvar personagem</button>
-            <div id="message" class="error" role="status"></div>
-            <div id="success" class="success" role="status"></div>
-          </form>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      const form = document.getElementById('character-form');
-      const message = document.getElementById('message');
-      const success = document.getElementById('success');
-      const sidebarRoot = document.getElementById('sidebar-root');
+      const form     = document.getElementById('character-form');
+      const msgError = document.getElementById('msg-error');
+      const msgOk    = document.getElementById('msg-success');
 
-      async function loadSidebar() {
-        const sidebar = await fetch('/sidebar.html');
-        const html = await sidebar.text();
-        sidebarRoot.innerHTML = html;
-        document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === window.location.pathname) {
-            link.classList.add('active');
-          }
-        });
+      function showError(text) {
+        msgError.textContent = text;
+        msgError.style.display = 'block';
+        msgOk.style.display = 'none';
+      }
+
+      function showSuccess(text) {
+        msgOk.textContent = text;
+        msgOk.style.display = 'block';
+        msgError.style.display = 'none';
       }
 
       async function readFileAsBase64(file) {
@@ -225,42 +112,25 @@
 
       async function handleSubmit(event) {
         event.preventDefault();
-        message.textContent = '';
-        success.textContent = '';
+        msgError.style.display = 'none';
+        msgOk.style.display = 'none';
 
-        const name = document.getElementById('name').value.trim();
-        const scenario = document.getElementById('scenario').value.trim();
+        const name        = document.getElementById('name').value.trim();
+        const scenario    = document.getElementById('scenario').value.trim();
         const description = document.getElementById('description').value.trim();
         const personality = document.getElementById('personality').value.trim();
         const firstMessage = document.getElementById('first_message').value.trim();
-        const avatarLink = document.getElementById('avatar_link').value.trim();
-        const avatarFile = document.getElementById('avatar_upload').files[0];
+        const avatarLink  = document.getElementById('avatar_link').value.trim();
+        const avatarFile  = document.getElementById('avatar_upload').files[0];
 
-        if (!name) {
-          message.textContent = 'O nome do personagem é obrigatório.';
-          return;
-        }
+        if (!name) { showError('O nome do personagem é obrigatório.'); return; }
+        if (!avatarFile && !avatarLink) { showError('Envie uma imagem ou informe um link de avatar.'); return; }
 
-        if (!avatarFile && !avatarLink) {
-          message.textContent = 'Envie uma imagem ou informe um link de avatar.';
-          return;
-        }
-
-        let avatar_upload = null;
-        let avatar_filename = null;
-        let body = {
-          name,
-          scenario,
-          description,
-          personality,
-          first_message: firstMessage,
-        };
+        const body = { name, scenario, description, personality, first_message: firstMessage };
 
         if (avatarFile) {
-          avatar_upload = await readFileAsBase64(avatarFile);
-          avatar_filename = avatarFile.name;
-          body.avatar_upload = avatar_upload;
-          body.avatar_filename = avatar_filename;
+          body.avatar_upload   = await readFileAsBase64(avatarFile);
+          body.avatar_filename = avatarFile.name;
         } else {
           body.avatar_link = avatarLink;
         }
@@ -273,17 +143,22 @@
           });
           const result = await response.json();
 
-          if (!response.ok || !result.ok) {
-            throw new Error(result.message || 'Falha ao salvar personagem.');
-          }
+          if (!response.ok || !result.ok) throw new Error(result.message || 'Falha ao salvar personagem.');
 
-          success.textContent = 'Personagem criado com sucesso! Redirecionando...';
-          setTimeout(() => {
-            window.location.href = `/chat/${result.id}`;
-          }, 1200);
+          showSuccess('Personagem criado com sucesso! Redirecionando...');
+          setTimeout(() => { window.location.href = `/chat/${result.id}`; }, 1200);
         } catch (err) {
-          message.textContent = err.message || 'Erro ao salvar personagem.';
+          showError(err.message || 'Erro ao salvar personagem.');
         }
+      }
+
+      async function loadSidebar() {
+        const res = await fetch('/sidebar.html');
+        const html = await res.text();
+        document.getElementById('sidebar-root').innerHTML = html;
+        document.querySelectorAll('.nav-links a').forEach((link) => {
+          if (link.dataset.path === window.location.pathname) link.classList.add('active');
+        });
       }
 
       window.addEventListener('load', async () => {

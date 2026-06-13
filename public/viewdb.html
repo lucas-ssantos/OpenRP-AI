@@ -1,275 +1,212 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ver Banco de Dados — OpenRP AI</title>
+    <title>Banco de Dados — OpenRP AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
     <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
-        background: #0b1120;
-        color: #e2e8f0;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
-          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
-          #0b1120;
-        padding: 2rem;
-      }
-      .layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 1.5rem;
-      }
-      .main-content {
-        min-width: 0;
-      }
-      .page {
-        width: min(1200px, 100%);
-        margin: 0 auto;
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: clamp(2rem, 2.5vw, 2.5rem);
-      }
-      p {
-        margin: 0 0 1.5rem;
-        color: #94a3b8;
-      }
-      .card {
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 1.25rem;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-      }
-      .table-list {
-        display: grid;
-        gap: 0.75rem;
-      }
       .table-item {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 1rem;
-        padding: 1rem 1.25rem;
-        border-radius: 1rem;
-        background: rgba(30, 41, 59, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .8rem 1rem;
+        border-radius: .85rem;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.08);
         cursor: pointer;
-        transition: transform 0.18s ease, border-color 0.18s ease;
+        transition: background .18s, border-color .18s, transform .18s;
+        text-decoration: none;
+        color: inherit;
       }
       .table-item:hover {
+        background: rgba(30, 41, 59, 0.95);
+        border-color: rgba(56, 189, 248, 0.22);
         transform: translateY(-1px);
-        border-color: rgba(56, 189, 248, 0.28);
+        color: inherit;
       }
-      .table-item strong {
-        color: #f8fafc;
+      .table-item.active-table {
+        background: rgba(12, 74, 110, 0.35);
+        border-color: rgba(56, 189, 248, 0.35);
       }
-      .table-item small {
-        color: #94a3b8;
-      }
-      .table-item span {
-        color: #60a5fa;
-      }
-      .content {
-        display: grid;
-        gap: 1.5rem;
-      }
-      .table-preview {
-        width: 100%;
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 0.85rem 1rem;
-        text-align: left;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      }
-      th {
-        color: #cbd5e1;
-        font-weight: 700;
-      }
-      td {
-        color: #e2e8f0;
-      }
-      .empty {
-        color: #94a3b8;
-        padding: 1.25rem;
-        background: rgba(15, 23, 42, 0.85);
-        border-radius: 1rem;
-      }
-      .button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.95rem 1.1rem;
+
+      .record-count {
+        background: rgba(59, 130, 246, 0.14);
+        color: #93c5fd;
         border-radius: 999px;
-        border: none;
-        background: #38bdf8;
-        color: #020617;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .button:hover {
-        background: #22c55e;
-      }
-      .status {
-        margin-top: 0.75rem;
-        font-size: 0.95rem;
-        color: #94a3b8;
-      }
-      .error {
-        color: #fda4af;
+        padding: .2rem .65rem;
+        font-size: .78rem;
+        font-weight: 600;
+        white-space: nowrap;
       }
     </style>
   </head>
   <body>
-    <div class="layout">
-      <div id="sidebar-root"></div>
-      <main class="main-content">
-        <div class="page">
-          <div class="card">
-            <h1>Visualizador de Banco de Dados</h1>
-        <p>Acesse tabelas e veja até os 25 últimos registros em cada lista.</p>
-        <div class="status" id="status">Carregando tabelas...</div>
-      </div>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
 
-      <div class="content">
-        <div class="card">
-          <h2>Tabelas</h2>
-          <div class="table-list" id="table-list"></div>
-        </div>
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+          <div class="mx-auto" style="max-width:1100px;">
 
-        <div class="card">
-          <h2>Registros</h2>
-          <div id="records-container" class="table-preview"></div>
-        </div>
+            <div class="mb-4">
+              <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">Banco de dados</h1>
+              <p class="text-secondary mb-0">Visualize até os 25 últimos registros de cada tabela.</p>
+            </div>
+
+            <div class="row g-4">
+
+              <!-- Tabelas -->
+              <div class="col-12 col-md-4">
+                <div class="glass-card card p-4 h-100">
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-database text-info"></i>
+                    <h6 class="mb-0 fw-semibold">Tabelas</h6>
+                  </div>
+                  <div id="status" class="text-secondary small mb-3">
+                    <i class="bi bi-hourglass-split me-1"></i>Carregando tabelas…
+                  </div>
+                  <div class="d-flex flex-column gap-2" id="table-list"></div>
+                </div>
+              </div>
+
+              <!-- Registros -->
+              <div class="col-12 col-md-8">
+                <div class="glass-card card p-4">
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-table text-info"></i>
+                    <h6 class="mb-0 fw-semibold">Registros</h6>
+                  </div>
+                  <div id="records-container">
+                    <p class="text-secondary small">Selecione uma tabela à esquerda para ver os registros.</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </main>
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      const statusEl = document.getElementById('status');
-      const tableListEl = document.getElementById('table-list');
-      const recordsContainer = document.getElementById('records-container');
-      let currentTable = null;
+      const statusEl       = document.getElementById('status');
+      const tableListEl    = document.getElementById('table-list');
+      const recordsEl      = document.getElementById('records-container');
+      let currentTable     = null;
 
       async function fetchTables() {
-        const response = await fetch('/api/viewdb/tables');
-        return response.json();
+        const res = await fetch('/api/viewdb/tables');
+        return res.json();
       }
 
       async function fetchRecords(table) {
-        const response = await fetch(`/api/viewdb/records?table=${encodeURIComponent(table)}`);
-        return response.json();
+        const res = await fetch(`/api/viewdb/records?table=${encodeURIComponent(table)}`);
+        return res.json();
       }
 
       function renderTables(tables) {
         if (!tables.length) {
-          tableListEl.innerHTML = '<div class="empty">Nenhuma tabela encontrada.</div>';
+          tableListEl.innerHTML = '<p class="text-secondary small">Nenhuma tabela encontrada.</p>';
           return;
         }
 
-        tableListEl.innerHTML = tables
-          .map(
-            (table) => `
-              <button class="table-item" data-table="${table.name}">
-                <div>
-                  <strong>${table.name}</strong>
-                  <div><small>${table.count} registro${table.count === 1 ? '' : 's'}</small></div>
-                </div>
-                <span>Ver</span>
-              </button>
-            `
-          )
-          .join('');
+        tableListEl.innerHTML = tables.map((t) => `
+          <button class="table-item" data-table="${t.name}">
+            <div>
+              <div class="fw-semibold" style="font-size:.9rem;">${t.name}</div>
+              <div class="text-secondary" style="font-size:.78rem;">${t.count} registro${t.count !== 1 ? 's' : ''}</div>
+            </div>
+            <span class="record-count">${t.count}</span>
+          </button>
+        `).join('');
 
-        tableListEl.querySelectorAll('.table-item').forEach((button) => {
-          button.addEventListener('click', () => {
-            loadTable(button.dataset.table);
-          });
+        tableListEl.querySelectorAll('.table-item').forEach((btn) => {
+          btn.addEventListener('click', () => loadTable(btn.dataset.table));
         });
       }
 
       function renderRecords(data) {
         if (!data.ok) {
-          recordsContainer.innerHTML = `<div class="empty error">${data.message}</div>`;
+          recordsEl.innerHTML = `<div class="alert-glass-error"><i class="bi bi-exclamation-triangle me-1"></i>${data.message}</div>`;
           return;
         }
 
         if (!data.columns.length) {
-          recordsContainer.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>';
+          recordsEl.innerHTML = '<p class="text-secondary small">Nenhum registro encontrado.</p>';
           return;
         }
 
-        const header = `<div class="status">Mostrando até 25 últimos registros de <strong>${data.table}</strong> (total: ${data.total})</div>`;
-        const table = `
-          <table>
-            <thead>
-              <tr>
-                ${data.columns.map((column) => `<th>${column}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${data.rows
-                .map(
-                  (row) =>
-                    `<tr>${row
-                      .map((cell) => `<td>${String(cell === null ? 'NULL' : cell)}</td>`)
-                      .join('')}</tr>`
-                )
-                .join('')}
-            </tbody>
-          </table>
+        recordsEl.innerHTML = `
+          <div class="text-secondary small mb-3">
+            Mostrando até 25 de <strong class="text-light">${data.total}</strong> registros em <strong class="text-info">${data.table}</strong>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm">
+              <thead>
+                <tr>${data.columns.map(c => `<th>${c}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${data.rows.map(row =>
+                  `<tr>${row.map(cell =>
+                    `<td title="${cell === null ? 'NULL' : String(cell)}">
+                       ${cell === null ? '<span class="text-secondary">NULL</span>' : String(cell)}
+                     </td>`
+                  ).join('')}</tr>`
+                ).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
-
-        recordsContainer.innerHTML = header + table;
       }
 
       async function loadTable(table) {
         currentTable = table;
-        statusEl.textContent = `Carregando registros de ${table}...`;
+        statusEl.textContent = `Carregando ${table}…`;
+
+        tableListEl.querySelectorAll('.table-item').forEach((btn) => {
+          btn.classList.toggle('active-table', btn.dataset.table === table);
+        });
+
+        recordsEl.innerHTML = `
+          <div class="d-flex align-items-center gap-2 text-secondary small py-3">
+            <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+            Carregando registros…
+          </div>
+        `;
+
         const data = await fetchRecords(table);
         renderRecords(data);
-        statusEl.textContent = `Tabela selecionada: ${table}`;
+        statusEl.textContent = '';
       }
 
       async function init() {
         try {
           const data = await fetchTables();
-          if (!data.ok) {
-            throw new Error(data.message || 'Erro ao carregar tabelas');
-          }
+          if (!data.ok) throw new Error(data.message || 'Erro ao carregar tabelas');
+
+          statusEl.textContent = '';
           renderTables(data.tables);
+
           if (data.tables.length) {
             loadTable(data.tables[0].name);
           } else {
             statusEl.textContent = 'Nenhuma tabela disponível.';
           }
         } catch (err) {
-          statusEl.textContent = err.message;
-          tableListEl.innerHTML = `<div class="empty error">${err.message}</div>`;
-          recordsContainer.innerHTML = '';
+          statusEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${err.message}</span>`;
+          tableListEl.innerHTML = '';
         }
       }
 
       async function loadSidebar() {
-        const sidebar = await fetch('/sidebar.html');
-        const html = await sidebar.text();
-        document.getElementById('sidebar-root').innerHTML = html;
+        const res = await fetch('/sidebar.html');
+        document.getElementById('sidebar-root').innerHTML = await res.text();
         document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === window.location.pathname) {
-            link.classList.add('active');
-          }
+          if (link.dataset.path === window.location.pathname) link.classList.add('active');
         });
       }
 
@@ -278,7 +215,5 @@
         init();
       });
     </script>
-  </main>
-</div>
   </body>
 </html>

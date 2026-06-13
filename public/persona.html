@@ -1,232 +1,142 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cadastrar Persona — OpenRP AI</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
-        background: #020617;
-        color: #e2e8f0;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        padding: 2rem;
-        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
-          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
-          #020617;
-      }
-
-      .layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 1.5rem;
-      }
-
-      .main-content {
-        min-width: 0;
-      }
-
-      .container {
-        width: min(600px, 100%);
-        margin: 0 auto;
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-        border-radius: 1.5rem;
-        padding: 2rem;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-      }
-
-      h1 {
-        margin: 0 0 0.75rem;
-        font-size: clamp(2rem, 2.5vw, 2.5rem);
-      }
-
-      p {
-        margin: 0 0 1.5rem;
-        color: #94a3b8;
-        line-height: 1.6;
-      }
-
-      label {
-        display: block;
-        margin-bottom: 0.5rem;
-        color: #cbd5e1;
-        font-weight: 600;
-      }
-
-      input,
-      textarea {
-        width: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 0.85rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: #e2e8f0;
-        padding: 0.95rem 1rem;
-        font: inherit;
-        margin-bottom: 1rem;
-      }
-
-      textarea {
-        min-height: 140px;
-        resize: vertical;
-      }
-
-      button {
-        width: 100%;
-        border: none;
-        border-radius: 0.95rem;
-        padding: 1rem 1.25rem;
-        font: inherit;
-        font-weight: 700;
-        color: #020617;
-        background: #38bdf8;
-        cursor: pointer;
-        transition: transform 0.2s ease, background-color 0.2s ease;
-      }
-
-      button:hover {
-        transform: translateY(-1px);
-        background: #0ea5e9;
-      }
-
-      .hint {
-        margin: 1rem 0 0;
-        color: #94a3b8;
-        font-size: 0.95rem;
-      }
-
-      .error {
-        margin-top: 1rem;
-        color: #fda4af;
-      }
-    </style>
+    <title>Persona — OpenRP AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="layout">
-      <div id="sidebar-root" style="display: none;"></div>
-      <main class="main-content">
-        <div class="container">
-          <h1 id="page-title">Cadastrar sua persona</h1>
-          <p id="page-description">Antes de continuar, informe o nome e a descrição do seu personagem principal na aplicação.</p>
-          <div id="loading-state" class="hint">Carregando dados da persona...</div>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
 
-          <form id="persona-form">
-            <label for="name">Nome</label>
-            <input id="name" name="name" type="text" placeholder="Ex: Arya Stark" required />
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+          <div class="mx-auto" style="max-width:600px;">
 
-            <label for="description">Descrição</label>
-            <textarea id="description" name="description" placeholder="Descreva a persona..." required></textarea>
+            <div class="mb-4">
+              <h1 id="page-title" class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">Cadastrar sua persona</h1>
+              <p id="page-description" class="text-secondary mb-0">Antes de continuar, informe o nome e a descrição do seu personagem principal.</p>
+            </div>
 
-            <label for="avatar_url">URL do Avatar (opcional)</label>
-            <input id="avatar_url" name="avatar_url" type="url" placeholder="https://..." />
+            <div class="glass-card card p-4">
 
-            <button type="submit">Salvar persona</button>
-            <div id="message" class="error" role="status"></div>
-          </form>
+              <div id="loading-state" class="text-secondary small mb-3">
+                <i class="bi bi-hourglass-split me-1"></i>Carregando dados da persona…
+              </div>
 
-          <p class="hint">Após salvar, você será redirecionado para a página principal.</p>
-        </div>
+              <form id="persona-form">
+                <div class="mb-3">
+                  <label class="form-label" for="name">Nome <span class="text-danger">*</span></label>
+                  <input id="name" name="name" type="text" class="form-control" placeholder="Ex: Arya Stark" required />
+                </div>
 
-        <script>
-          const form = document.getElementById('persona-form');
-          const message = document.getElementById('message');
-          const loadingState = document.getElementById('loading-state');
-          const sidebarRoot = document.getElementById('sidebar-root');
-          const pageTitle = document.getElementById('page-title');
-          const pageDescription = document.getElementById('page-description');
+                <div class="mb-3">
+                  <label class="form-label" for="description">Descrição <span class="text-danger">*</span></label>
+                  <textarea id="description" name="description" class="form-control" placeholder="Descreva a persona..."></textarea>
+                </div>
 
-          async function loadSidebar() {
-            const sidebar = await fetch('/sidebar.html');
-            const html = await sidebar.text();
-            sidebarRoot.innerHTML = html;
-            sidebarRoot.style.display = 'block';
-            document.querySelectorAll('.nav-links a').forEach((link) => {
-              if (link.dataset.path === window.location.pathname) {
-                link.classList.add('active');
-              }
-            });
-          }
+                <div class="mb-4">
+                  <label class="form-label" for="avatar_url">URL do avatar <span class="text-secondary fw-normal">(opcional)</span></label>
+                  <input id="avatar_url" name="avatar_url" type="url" class="form-control" placeholder="https://..." />
+                </div>
 
-          async function fetchPersona() {
-            const response = await fetch('/api/persona');
-            if (response.status === 404) {
-              return null;
-            }
-            if (!response.ok) {
-              throw new Error('Falha ao carregar a persona');
-            }
-            const result = await response.json();
-            return result.persona;
-          }
+                <div id="msg-error" class="alert-glass-error mb-3" role="status" style="display:none;"></div>
 
-          async function initializePage() {
-            try {
-              const persona = await fetchPersona();
-              loadingState.style.display = 'none';
+                <button type="submit" class="btn-sky w-100">
+                  <i class="bi bi-check-circle me-2"></i>Salvar persona
+                </button>
+              </form>
 
-              if (persona) {
-                pageTitle.textContent = 'Editar persona';
-                pageDescription.textContent = 'Atualize os dados da sua persona quando desejar.';
-                document.getElementById('name').value = persona.name || '';
-                document.getElementById('description').value = persona.description || '';
-                document.getElementById('avatar_url').value = persona.avatar_url || '';
-                await loadSidebar();
-              } else {
-                pageTitle.textContent = 'Cadastrar sua persona';
-                pageDescription.textContent = 'Antes de continuar, informe o nome e a descrição do seu personagem principal na aplicação.';
-              }
-            } catch (err) {
-              console.error(err);
-              loadingState.textContent = 'Erro ao carregar os dados. Você pode cadastrar uma nova persona abaixo.';
-            }
-          }
+              <p class="text-secondary small text-center mt-3 mb-0">
+                Após salvar, você será redirecionado para a página principal.
+              </p>
+            </div>
 
-          form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            message.textContent = '';
-
-            const data = {
-              name: document.getElementById('name').value.trim(),
-              description: document.getElementById('description').value.trim(),
-              avatar_url: document.getElementById('avatar_url').value.trim() || null,
-            };
-
-            if (!data.name || !data.description) {
-              message.textContent = 'Por favor, preencha o nome e a descrição.';
-              return;
-            }
-
-            try {
-              const response = await fetch('/api/persona', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-              });
-
-              const result = await response.json();
-              if (!response.ok || !result.ok) {
-                throw new Error(result.message || 'Falha ao salvar persona');
-              }
-
-              window.location.href = '/';
-            } catch (err) {
-              console.error(err);
-              message.textContent = err.message || 'Erro ao salvar persona. Tente novamente.';
-            }
-          });
-
-          window.addEventListener('load', initializePage);
-        </script>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const form        = document.getElementById('persona-form');
+      const msgError    = document.getElementById('msg-error');
+      const loadingEl   = document.getElementById('loading-state');
+      const pageTitle   = document.getElementById('page-title');
+      const pageDesc    = document.getElementById('page-description');
+      const sidebarRoot = document.getElementById('sidebar-root');
+
+      async function loadSidebar() {
+        const res = await fetch('/sidebar.html');
+        const html = await res.text();
+        sidebarRoot.innerHTML = html;
+        document.querySelectorAll('.nav-links a').forEach((link) => {
+          if (link.dataset.path === window.location.pathname) link.classList.add('active');
+        });
+      }
+
+      async function fetchPersona() {
+        const response = await fetch('/api/persona');
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error('Falha ao carregar a persona');
+        return (await response.json()).persona;
+      }
+
+      async function initializePage() {
+        try {
+          const persona = await fetchPersona();
+          loadingEl.style.display = 'none';
+
+          if (persona) {
+            pageTitle.textContent = 'Editar persona';
+            pageDesc.textContent  = 'Atualize os dados da sua persona quando desejar.';
+            document.getElementById('name').value        = persona.name        || '';
+            document.getElementById('description').value = persona.description || '';
+            document.getElementById('avatar_url').value  = persona.avatar_url  || '';
+            await loadSidebar();
+          } else {
+            loadingEl.style.display = 'none';
+          }
+        } catch (err) {
+          loadingEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${err.message}</span>`;
+        }
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        msgError.style.display = 'none';
+
+        const data = {
+          name:        document.getElementById('name').value.trim(),
+          description: document.getElementById('description').value.trim(),
+          avatar_url:  document.getElementById('avatar_url').value.trim() || null,
+        };
+
+        if (!data.name || !data.description) {
+          msgError.textContent = 'Por favor, preencha o nome e a descrição.';
+          msgError.style.display = 'block';
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/persona', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.message || 'Falha ao salvar persona');
+          window.location.href = '/';
+        } catch (err) {
+          msgError.textContent = err.message || 'Erro ao salvar persona. Tente novamente.';
+          msgError.style.display = 'block';
+        }
+      });
+
+      window.addEventListener('load', initializePage);
+    </script>
   </body>
 </html>

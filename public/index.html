@@ -1,240 +1,96 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-bs-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenRP AI — Personagens</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
     <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
-        background: #020617;
-        color: #e2e8f0;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 30%),
-          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 28%),
-          #020617;
-        padding: 2rem;
-      }
-
-      .layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 1.5rem;
-      }
-
-      .main-content {
-        min-width: 0;
-      }
-
-      .page {
-        width: min(1180px, 100%);
-      }
-
-      .header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .header h1 {
-        margin: 0;
-        font-size: clamp(2rem, 2.5vw, 2.75rem);
-        letter-spacing: -0.04em;
-      }
-
-      .header p {
-        margin: 0.35rem 0 0;
-        color: #94a3b8;
-        max-width: 40rem;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 1.3rem;
-      }
-
-      .card {
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-        border-radius: 1.25rem;
+      .char-card {
+        cursor: pointer;
+        transition: transform 0.22s ease, border-color 0.22s ease;
         overflow: hidden;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        transition: transform 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+      }
+      .char-card:hover {
+        transform: translateY(-5px);
+        border-color: rgba(56, 189, 248, 0.4) !important;
       }
 
-      .card:hover {
-        transform: translateY(-4px);
-        border-color: rgba(56, 189, 248, 0.35);
-        background: rgba(15, 23, 42, 1);
-      }
-
-      .card-figure {
-        position: relative;
-        min-height: 180px;
-        aspect-ratio: 4 / 3;
-        background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(15, 23, 42, 0.9));
-      }
-
-      .card-figure img {
-        width: 100%;
-        height: 100%;
+      .card-thumb {
+        height: 190px;
         object-fit: cover;
-        display: block;
+        width: 100%;
       }
 
-      .card-figure.placeholder {
-        display: grid;
-        place-items: center;
-        color: #94a3b8;
-        font-size: 0.95rem;
-        padding: 1rem;
-      }
-
-      .card-content {
+      .card-thumb-placeholder {
+        height: 190px;
+        background: linear-gradient(180deg, rgba(56,189,248,.14), rgba(15,23,42,.9));
         display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        padding: 1.4rem;
-        min-height: 220px;
-      }
-
-      .card-title {
-        font-size: 1.18rem;
-        margin: 0 0 0.35rem;
-      }
-
-      .card-subtitle {
-        margin: 0;
-        color: #94a3b8;
-        font-size: 0.95rem;
-      }
-
-      .card-body {
-        flex: 1;
-        margin: 1rem 0;
-        color: #cbd5e1;
-        line-height: 1.7;
-      }
-
-      .card-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      .badge {
-        display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.45rem 0.75rem;
-        border-radius: 999px;
-        background: rgba(59, 130, 246, 0.14);
-        color: #bfdbfe;
-        font-size: 0.82rem;
+        color: #64748b;
+        font-size: 0.9rem;
       }
 
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.45rem 0.7rem;
-        border-radius: 999px;
-        font-size: 0.85rem;
-      }
-
-      .status-ok {
-        background: rgba(34, 197, 94, 0.12);
-        color: #86efac;
-      }
-
-      .status-error {
-        background: rgba(248, 113, 113, 0.14);
-        color: #fecaca;
-      }
-
-      .card-add {
-        display: grid;
-        place-items: center;
-        text-align: center;
-        gap: 1rem;
-        border-style: dashed;
+      .add-card {
+        cursor: pointer;
+        border-style: dashed !important;
+        border-color: rgba(56, 189, 248, 0.3) !important;
         color: #38bdf8;
         min-height: 320px;
+        transition: border-color 0.2s, background 0.2s;
+      }
+      .add-card:hover {
+        border-color: rgba(56, 189, 248, 0.55) !important;
+        background: rgba(15, 23, 42, 1) !important;
       }
 
-      .card-add:hover {
-        border-color: rgba(56, 189, 248, 0.45);
-        background: rgba(15, 23, 42, 1);
-      }
-
-      .card-add .plus {
+      .add-icon {
         width: 3rem;
         height: 3rem;
-        display: grid;
-        place-items: center;
-        border-radius: 999px;
-        border: 1px solid rgba(56, 189, 248, 0.45);
-        font-size: 1.8rem;
+        border-radius: 50%;
+        border: 1px solid rgba(56, 189, 248, 0.4);
         background: rgba(56, 189, 248, 0.08);
-      }
-
-      @media (max-width: 900px) {
-        .card-content {
-          padding: 1.25rem;
-        }
-      }
-
-      @media (max-width: 640px) {
-        body {
-          padding: 1rem;
-        }
-
-        .page {
-          width: 100%;
-        }
-
-        .card-add {
-          min-height: 280px;
-        }
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        line-height: 1;
       }
     </style>
   </head>
   <body>
-    <div class="layout">
-      <div id="sidebar-root"></div>
-      <main class="main-content">
-        <div class="page">
-          <div class="header">
-        <div>
-          <h1>Personagens</h1>
-          <p>Selecione um personagem para começar a conversa ou adicione um novo perfil à sua coleção.</p>
-        </div>
-      </div>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
 
-      <div class="grid" id="character-grid">
-        <div class="card card-add" role="button" onclick="addCharacter()">
-          <div class="plus">+</div>
-          <div>
-            <h2 class="card-title">Novo personagem</h2>
-            <p class="card-body">Crie um personagem para começar a roleplay.</p>
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+
+          <div class="mb-4">
+            <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.5rem); letter-spacing:-0.04em;">Personagens</h1>
+            <p class="text-secondary mb-0">Selecione um personagem para conversar ou adicione um novo à sua coleção.</p>
           </div>
-        </div>
+
+          <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-4" id="character-grid">
+
+            <!-- Add card (static) -->
+            <div class="col">
+              <div class="card glass-card add-card h-100 d-flex flex-column align-items-center justify-content-center text-center p-4"
+                   role="button" onclick="addCharacter()">
+                <div class="add-icon mb-3">+</div>
+                <h5 class="mb-1 fw-semibold" style="color:#38bdf8;">Novo personagem</h5>
+                <p class="text-secondary small mb-0">Crie um personagem para começar o roleplay.</p>
+              </div>
+            </div>
+
+          </div>
+        </main>
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
       async function loadCharacters() {
         try {
@@ -243,41 +99,36 @@
           const data = await res.json();
 
           const grid = document.getElementById('character-grid');
-          grid.innerHTML = `
-            <div class="card card-add" role="button" onclick="addCharacter()">
-              <div class="plus">+</div>
-              <div>
-                <h2 class="card-title">Novo personagem</h2>
-                <p class="card-body">Crie um personagem para começar a roleplay.</p>
-              </div>
-            </div>
-          `;
 
           if (data.ok && Array.isArray(data.characters) && data.characters.length > 0) {
             data.characters.forEach((character) => {
-              const card = document.createElement('article');
-              card.className = 'card';
-              card.style.cursor = 'pointer';
-              card.addEventListener('click', () => { window.location.href = `/chat/${character.id}`; });
-              card.innerHTML = `
-                <div class="card-figure">
-                  ${character.avatar_url
-                    ? `<img src="${character.avatar_url}" alt="Avatar de ${character.name}" />`
-                    : `<div class="card-figure placeholder">Sem imagem disponível</div>`}
-                </div>
-                <div class="card-content">
-                  <div>
-                    <h2 class="card-title">${character.name}</h2>
-                    <p class="card-subtitle">${character.scenario ? character.scenario : (character.description || 'Sem descrição disponível.')}</p>
-                  </div>
-                  <div class="card-body">${character.personality || 'Personalidade não definida.'}</div>
-                  <div class="card-meta">
-                    <span class="badge">${character.name}</span>
-                    <span class="status-pill status-ok">Pronto</span>
+              const col = document.createElement('div');
+              col.className = 'col';
+
+              const thumb = character.avatar_url
+                ? `<img src="${character.avatar_url}" class="card-thumb" alt="Avatar de ${character.name}" />`
+                : `<div class="card-thumb-placeholder"><i class="bi bi-person-circle fs-1 opacity-25"></i></div>`;
+
+              col.innerHTML = `
+                <div class="card glass-card char-card h-100">
+                  ${thumb}
+                  <div class="card-body d-flex flex-column gap-2">
+                    <h5 class="card-title mb-0 fw-semibold">${character.name}</h5>
+                    <p class="text-secondary small mb-0" style="line-height:1.5;">${character.scenario || character.description || 'Sem descrição disponível.'}</p>
+                    <p class="flex-grow-1 mb-0" style="color:#cbd5e1; font-size:.88rem; line-height:1.65;">${character.personality || 'Personalidade não definida.'}</p>
+                    <div class="d-flex align-items-center justify-content-between pt-2 mt-1" style="border-top:1px solid rgba(148,163,184,0.1);">
+                      <span class="badge-blue">${character.name}</span>
+                      <span class="badge-green"><i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Pronto</span>
+                    </div>
                   </div>
                 </div>
               `;
-              grid.appendChild(card);
+
+              col.querySelector('.char-card').addEventListener('click', () => {
+                window.location.href = `/chat/${character.id}`;
+              });
+
+              grid.appendChild(col);
             });
           }
         } catch (err) {
@@ -290,8 +141,8 @@
       }
 
       async function loadSidebar() {
-        const sidebar = await fetch('/sidebar.html');
-        const html = await sidebar.text();
+        const res = await fetch('/sidebar.html');
+        const html = await res.text();
         document.getElementById('sidebar-root').innerHTML = html;
         document.querySelectorAll('.nav-links a').forEach((link) => {
           if (link.dataset.path === window.location.pathname) {
@@ -305,7 +156,5 @@
         loadCharacters();
       });
     </script>
-  </main>
-</div>
   </body>
 </html>

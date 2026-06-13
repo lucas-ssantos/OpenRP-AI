@@ -1,752 +1,388 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configurações — Roleplay API</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+<html lang="pt-BR" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configurações — OpenRP AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .preset-btn {
+        background: rgba(30, 41, 59, 0.8);
+        border: 2px solid rgba(51, 65, 85, 0.8);
+        border-radius: 0.85rem;
+        color: #cbd5e1;
+        padding: 1rem 1.1rem;
+        text-align: left;
+        cursor: pointer;
+        width: 100%;
+        transition: border-color 0.2s, background 0.2s, color 0.2s;
+      }
+      .preset-btn:hover {
+        border-color: rgba(100, 116, 139, 0.8);
+        background: rgba(15, 23, 42, 0.9);
+        color: #e2e8f0;
+      }
+      .preset-btn.active {
+        border-color: #38bdf8;
+        background: rgba(12, 74, 110, 0.45);
+        color: #38bdf8;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.18);
+      }
+      .preset-btn strong { display: block; font-size: .95rem; margin-bottom: .3rem; }
+      .preset-btn small  { font-size: .82rem; color: #64748b; }
+      .preset-btn.active small { color: #7dd3fc; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto Mono', 'Monaco', sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: #e2e8f0;
-      min-height: 100vh;
-      display: flex;
-    }
-
-    .layout {
-      display: flex;
-      width: 100%;
-    }
-
-    #sidebar-root {
-      flex-shrink: 0;
-    }
-
-    .main-content {
-      flex: 1;
-      padding: 2rem;
-      overflow-y: auto;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      margin-bottom: 0.5rem;
-      font-size: 2rem;
-      color: #f1f5f9;
-    }
-
-    .container > p {
-      color: #94a3b8;
-      margin-bottom: 2rem;
-    }
-
-    .presets-section {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2.5rem;
-    }
-
-    .preset-btn {
-      padding: 1.25rem;
-      border: 2px solid #334155;
-      border-radius: 0.5rem;
-      background: #1e293b;
-      color: #cbd5e1;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-align: left;
-    }
-
-    .preset-btn:hover {
-      border-color: #64748b;
-      background: #0f172a;
-    }
-
-    .preset-btn.active {
-      border-color: #38bdf8;
-      background: #0c4a6e;
-      color: #38bdf8;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
-    }
-
-    .preset-btn strong {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 1.05rem;
-    }
-
-    .preset-btn small {
-      color: #94a3b8;
-      font-size: 0.85rem;
-    }
-
-    hr {
-      border: none;
-      border-top: 1px solid #334155;
-      margin: 2rem 0;
-    }
-
-    .settings-form {
-      display: grid;
-      gap: 1.5rem;
-    }
-
-    .form-group {
-      display: grid;
-      gap: 0.5rem;
-    }
-
-    .field-label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 600;
-      color: #f1f5f9;
-    }
-
-    .info-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border: 1.5px solid #64748b;
-      border-radius: 50%;
-      font-size: 0.75rem;
-      color: #94a3b8;
-      cursor: help;
-      position: relative;
-    }
-
-    .info-icon:hover {
-      border-color: #38bdf8;
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
-    }
-
-    .tooltip {
-      display: none;
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #0f172a;
-      border: 1px solid #38bdf8;
-      border-radius: 0.5rem;
-      padding: 0.75rem;
-      margin-bottom: 0.5rem;
-      width: max-content;
-      max-width: 280px;
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      font-weight: normal;
-      z-index: 1000;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    }
-
-    .info-icon:hover .tooltip {
-      display: block;
-    }
-
-    .tooltip::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 6px solid transparent;
-      border-top-color: #38bdf8;
-    }
-
-    input[type="text"],
-    input[type="number"],
-    input[type="url"],
-    textarea,
-    select {
-      padding: 0.625rem;
-      border: 1px solid #334155;
-      border-radius: 0.375rem;
-      background: #0f172a;
-      color: #e2e8f0;
-      font-family: inherit;
-      font-size: 0.95rem;
-      transition: border-color 0.2s ease;
-    }
-
-    select option {
-      background: #1e293b;
-      color: #e2e8f0;
-    }
-
-    select optgroup {
-      background: #0f172a;
-      color: #cbd5e1;
-      font-weight: 600;
-    }
-
-    input[type="text"]:focus,
-    input[type="number"]:focus,
-    input[type="url"]:focus,
-    textarea:focus,
-    select:focus {
-      outline: none;
-      border-color: #38bdf8;
-      background: #0c4a6e;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .form-group label {
-      display: block;
-      color: #cbd5e1;
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
-    }
-
-    .help-text {
-      color: #94a3b8;
-      font-size: 0.8rem;
-      margin-top: 0.25rem;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 1rem;
-      margin-top: 2rem;
-      justify-content: flex-end;
-    }
-
-    button {
-      padding: 0.625rem 1.5rem;
-      border: none;
-      border-radius: 0.375rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-primary {
-      background: #38bdf8;
-      color: #020617;
-    }
-
-    .btn-primary:hover {
-      background: #0ea5e9;
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      background: #334155;
-      color: #e2e8f0;
-    }
-
-    .btn-secondary:hover {
-      background: #475569;
-    }
-
-    .message {
-      padding: 1rem;
-      border-radius: 0.375rem;
-      margin-bottom: 1rem;
-      display: none;
-    }
-
-    .message.success {
-      display: block;
-      background: rgba(76, 175, 80, 0.2);
-      border: 1px solid #4caf50;
-      color: #86efac;
-    }
-
-    .message.error {
-      display: block;
-      background: rgba(244, 67, 54, 0.2);
-      border: 1px solid #f44336;
-      color: #fda4af;
-    }
-
-    .field-group {
-      background: #1e293b;
-      padding: 1.5rem;
-      border-radius: 0.5rem;
-      border: 1px solid #334155;
-    }
-
-    .field-group h3 {
-      color: #cbd5e1;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    @media (max-width: 768px) {
-      .main-content {
-        padding: 1rem;
+      .field-section {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        border-radius: 1rem;
+        padding: 1.25rem;
       }
 
-      .presets-section {
-        grid-template-columns: 1fr;
+      .field-section-title {
+        font-size: .88rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #64748b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
       }
+    </style>
+  </head>
+  <body>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
 
-      .form-row {
-        grid-template-columns: 1fr;
-      }
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+          <div class="mx-auto" style="max-width:860px;">
 
-      .buttons {
-        flex-direction: column-reverse;
-      }
-
-      .info-icon .tooltip {
-        max-width: 200px;
-        font-size: 0.75rem;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="layout">
-    <div id="sidebar-root"></div>
-    <main class="main-content">
-      <div class="container">
-        <h1>Configurações Globais</h1>
-        <p>Configure os parâmetros de geração do Ollama. Escolha um preset ou customize manualmente.</p>
-
-        <div class="presets-section" id="presets"></div>
-
-        <hr>
-
-        <div id="message" class="message"></div>
-
-        <form id="settings-form" class="settings-form">
-          <!-- Modelo -->
-          <div class="form-group">
-            <label class="field-label">
-              Modelo
-              <span class="info-icon">
-                i
-                <span class="tooltip">Modelo Ollama a ser usado para a geração. Modelos 4b = fracos (rápidos, menos VRAM). Modelos 8b+ = fortes (precisos, mais VRAM).</span>
-              </span>
-            </label>
-            <select id="model" name="model" required>
-              <option value="">-- Selecione um modelo --</option>
-              <optgroup label="Modelos Fracos (4b - Rápidos, ~3-4GB)">
-                <option value="qwen3:4b">Qwen3 4B</option>
-                <option value="llama2:4b">Llama2 4B</option>
-                <option value="mistral:4b">Mistral 4B</option>
-              </optgroup>
-              <optgroup label="Modelos Médios (7b - Equilibrado, ~5-6GB)">
-                <option value="qwen3:7b">Qwen3 7B</option>
-                <option value="llama2:7b">Llama2 7B</option>
-                <option value="mistral:7b">Mistral 7B</option>
-              </optgroup>
-              <optgroup label="Modelos Fortes (8b-13b - Precisos, ~6-10GB)">
-                <option value="qwen3:8b">Qwen3 8B (Recomendado)</option>
-                <option value="llama2:8b">Llama2 8B</option>
-                <option value="mistral:8b">Mistral 8B</option>
-                <option value="neural-chat:7b">Neural Chat 7B</option>
-              </optgroup>
-              <optgroup label="Modelos Muito Fortes (13b+ - Premium, ~10-16GB)">
-                <option value="qwen3:13b">Qwen3 13B</option>
-                <option value="llama2:13b">Llama2 13B</option>
-                <option value="mistral:13b">Mistral 13B</option>
-                <option value="neural-chat:13b">Neural Chat 13B</option>
-              </optgroup>
-            </select>
-          </div>
-
-          <!-- Sampling Parameters -->
-          <div class="field-group">
-            <h3>
-              Parâmetros de Sampling
-              <span class="info-icon">
-                i
-                <span class="tooltip">Controlam como o modelo escolhe o próximo token. Sem custo computacional significativo.</span>
-              </span>
-            </h3>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="field-label">
-                  Temperature
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Criatividade geral. Baixo (0.1-0.5) = previsível. Médio (0.6-1.0) = roleplay. Alto (1.1+) = caótico.</span>
-                  </span>
-                </label>
-                <input type="number" id="temperature" name="temperature" min="0" max="2" step="0.01" />
-              </div>
-
-              <div class="form-group">
-                <label class="field-label">
-                  Top P
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Nucleus sampling. Mantém X% mais prováveis. 0.95 = 95% mais prováveis. Sem custo computacional.</span>
-                  </span>
-                </label>
-                <input type="number" id="top_p" name="top_p" min="0" max="1" step="0.01" />
-              </div>
-
-              <div class="form-group">
-                <label class="field-label">
-                  Top K
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Mantém K tokens mais prováveis. Baixo (&lt;20) = repetitivo. Alto (80+) = criativo. Sem custo.</span>
-                  </span>
-                </label>
-                <input type="number" id="top_k" name="top_k" min="0" max="500" step="1" />
-              </div>
+            <div class="mb-4">
+              <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">Configurações globais</h1>
+              <p class="text-secondary mb-0">Parâmetros de geração do Ollama. Escolha um preset ou customize manualmente.</p>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label class="field-label">
-                  Min P
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Filtro adaptativo. Descarta tokens com prob. menor que min_p × max_prob. Mais natural que top_p puro.</span>
-                  </span>
-                </label>
-                <input type="number" id="min_p" name="min_p" min="0" max="1" step="0.01" />
-              </div>
+            <!-- Presets -->
+            <div class="row g-3 mb-4" id="presets"></div>
 
-              <div class="form-group">
-                <label class="field-label">
-                  TFS Z (Tail Free Sampling)
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Remove cauda de baixa probabilidade. 0.90-0.98 = fluido. 1.0 = desativado. Sem custo.</span>
-                  </span>
-                </label>
-                <input type="number" id="tfs_z" name="tfs_z" min="0" max="1" step="0.01" />
-              </div>
-            </div>
-          </div>
+            <hr style="border-color:rgba(148,163,184,0.12); margin: 1.5rem 0;" />
 
-          <!-- Repetition Parameters -->
-          <div class="field-group">
-            <h3>
-              Parâmetros de Repetição
-              <span class="info-icon">
-                i
-                <span class="tooltip">Evitam que o modelo repita palavras/frases. Custo computacional: leve.</span>
-              </span>
-            </h3>
+            <!-- Feedback message -->
+            <div id="feedback-msg" class="mb-4" style="display:none;"></div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label class="field-label">
-                  Repeat Penalty
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">1.0 = sem penalidade. 1.05-1.1 = suave (roleplay). 1.2+ = agressivo (causa efeito oposto).</span>
-                  </span>
-                </label>
-                <input type="number" id="repeat_penalty" name="repeat_penalty" min="1" max="2" step="0.01" />
-              </div>
+            <form id="settings-form" class="d-flex flex-column gap-4">
 
-              <div class="form-group">
-                <label class="field-label">
-                  Repeat Last N
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Quantos tokens passados observar. 128 = ~100 palavras. 192-256 = ~150-200 palavras entre turnos.</span>
-                  </span>
-                </label>
-                <input type="number" id="repeat_last_n" name="repeat_last_n" min="0" max="1000" step="1" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Context & Output -->
-          <div class="field-group">
-            <h3>
-              Contexto e Saída
-              <span class="info-icon">
-                i
-                <span class="tooltip">Impactam memória (VRAM/RAM) e velocidade. context_size tem impacto quadrático na VRAM.</span>
-              </span>
-            </h3>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="field-label">
-                  Context Size
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Tokens de histórico. 4k=6-7GB, 8k=7-8GB, 16k=9-11GB, 32k=13-16GB (Qwen3:8b Q4). IMPACTO QUADRÁTICO.</span>
-                  </span>
-                </label>
-                <input type="number" id="context_size" name="context_size" min="512" max="65536" step="512" />
-              </div>
-
-              <div class="form-group">
-                <label class="field-label">
-                  Max Tokens
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Comprimento máximo por resposta. 256-512 = curto. 800 = cenas completas. 1500+ = ricas. Impacto linear na velocidade.</span>
-                  </span>
-                </label>
-                <input type="number" id="max_tokens" name="max_tokens" min="32" max="4096" step="1" />
-              </div>
-
-              <div class="form-group">
-                <label class="field-label">
-                  Stream
-                  <span class="info-icon">
-                    i
-                    <span class="tooltip">Se true, tokens chegam em tempo real (efeito digitando). Se false, tudo de uma vez. Sem impacto de velocidade total.</span>
-                  </span>
-                </label>
-                <select id="stream" name="stream">
-                  <option value="1">Ativo (streaming)</option>
-                  <option value="0">Inativo</option>
+              <!-- Modelo -->
+              <div class="glass-card card p-4">
+                <div class="field-section-title"><i class="bi bi-cpu"></i> Modelo</div>
+                <select id="model" name="model" class="form-select" required>
+                  <option value="">— Selecione um modelo —</option>
+                  <optgroup label="Fracos (4b · ~3-4 GB VRAM)">
+                    <option value="qwen3:4b">Qwen3 4B</option>
+                    <option value="llama2:4b">Llama2 4B</option>
+                    <option value="mistral:4b">Mistral 4B</option>
+                  </optgroup>
+                  <optgroup label="Médios (7b · ~5-6 GB VRAM)">
+                    <option value="qwen3:7b">Qwen3 7B</option>
+                    <option value="llama2:7b">Llama2 7B</option>
+                    <option value="mistral:7b">Mistral 7B</option>
+                  </optgroup>
+                  <optgroup label="Fortes (8b-13b · ~6-10 GB VRAM)">
+                    <option value="qwen3:8b">Qwen3 8B (Recomendado)</option>
+                    <option value="llama2:8b">Llama2 8B</option>
+                    <option value="mistral:8b">Mistral 8B</option>
+                    <option value="neural-chat:7b">Neural Chat 7B</option>
+                  </optgroup>
+                  <optgroup label="Premium (13b+ · 10-16+ GB VRAM)">
+                    <option value="qwen3:13b">Qwen3 13B</option>
+                    <option value="llama2:13b">Llama2 13B</option>
+                    <option value="mistral:13b">Mistral 13B</option>
+                  </optgroup>
                 </select>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label class="field-label">
-                Seed
-                <span class="info-icon">
-                  i
-                  <span class="tooltip">-1 = aleatório. Número fixo = reproduz exatamente a mesma resposta. Para roleplay, use -1.</span>
-                </span>
-              </label>
-              <input type="number" id="seed" name="seed" placeholder="-1" />
-            </div>
-          </div>
+              <!-- Sampling -->
+              <div class="glass-card card p-4">
+                <div class="field-section-title"><i class="bi bi-sliders2"></i> Parâmetros de sampling</div>
+                <div class="row g-3">
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Temperature
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Criatividade geral. 0.1–0.5 = previsível. 0.6–1.0 = roleplay ideal. 1.1+ = caótico."></i>
+                    </label>
+                    <input type="number" id="temperature" name="temperature" class="form-control" min="0" max="2" step="0.01" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Top P
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Nucleus sampling. Mantém X% mais prováveis. 0.95 é o padrão para roleplay."></i>
+                    </label>
+                    <input type="number" id="top_p" name="top_p" class="form-control" min="0" max="1" step="0.01" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Top K
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Mantém K tokens mais prováveis. &lt;20 = repetitivo. 80+ = criativo."></i>
+                    </label>
+                    <input type="number" id="top_k" name="top_k" class="form-control" min="0" max="500" step="1" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Min P
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Filtro adaptativo. Descarta tokens com prob. menor que min_p × max_prob."></i>
+                    </label>
+                    <input type="number" id="min_p" name="min_p" class="form-control" min="0" max="1" step="0.01" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      TFS Z
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Tail Free Sampling. Remove cauda de baixa probabilidade. 1.0 = desativado."></i>
+                    </label>
+                    <input type="number" id="tfs_z" name="tfs_z" class="form-control" min="0" max="1" step="0.01" />
+                  </div>
+                </div>
+              </div>
 
-          <!-- Stop Tokens -->
-          <div class="form-group">
-            <label class="field-label">
-              Stop Tokens (separados por vírgula)
-              <span class="info-icon">
-                i
-                <span class="tooltip">Strings que encerram a geração. CRÍTICO para roleplay — evita que o modelo invente a próxima fala do usuário.</span>
-              </span>
-            </label>
-            <textarea id="stop" name="stop" rows="2" placeholder="User:, Human:, ### User"></textarea>
-            <p class="help-text">Separe cada token com vírgula. Ex: User:, Human:, ### User, \n\nUser:</p>
-          </div>
+              <!-- Repetição -->
+              <div class="glass-card card p-4">
+                <div class="field-section-title"><i class="bi bi-arrow-repeat"></i> Parâmetros de repetição</div>
+                <div class="row g-3">
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Repeat Penalty
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="1.0 = sem penalidade. 1.05–1.1 = suave (roleplay). 1.2+ = agressivo."></i>
+                    </label>
+                    <input type="number" id="repeat_penalty" name="repeat_penalty" class="form-control" min="1" max="2" step="0.01" />
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Repeat Last N
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Tokens passados a observar. 128 ≈ 100 palavras. 192-256 ≈ 150-200 palavras."></i>
+                    </label>
+                    <input type="number" id="repeat_last_n" name="repeat_last_n" class="form-control" min="0" max="1000" step="1" />
+                  </div>
+                </div>
+              </div>
 
-          <div class="buttons">
-            <button type="button" class="btn-secondary" onclick="window.history.back()">Cancelar</button>
-            <button type="submit" class="btn-primary">Salvar Configurações</button>
+              <!-- Contexto e saída -->
+              <div class="glass-card card p-4">
+                <div class="field-section-title"><i class="bi bi-layers"></i> Contexto e saída</div>
+                <div class="row g-3">
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Context Size
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Tokens de histórico. 4k≈6-7GB, 8k≈7-8GB, 16k≈9-11GB. Impacto quadrático na VRAM."></i>
+                    </label>
+                    <input type="number" id="context_size" name="context_size" class="form-control" min="512" max="65536" step="512" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Max Tokens
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Comprimento máximo por resposta. 256-512 = curto. 800 = cenas completas."></i>
+                    </label>
+                    <input type="number" id="max_tokens" name="max_tokens" class="form-control" min="32" max="4096" step="1" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Stream
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="Se ativo, tokens chegam em tempo real (efeito digitando). Sem impacto na velocidade total."></i>
+                    </label>
+                    <select id="stream" name="stream" class="form-select">
+                      <option value="1">Ativo (streaming)</option>
+                      <option value="0">Inativo</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Seed
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="-1 = aleatório. Número fixo = reproduz exatamente a mesma resposta."></i>
+                    </label>
+                    <input type="number" id="seed" name="seed" class="form-control" placeholder="-1" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stop tokens -->
+              <div class="glass-card card p-4">
+                <div class="field-section-title"><i class="bi bi-sign-stop"></i> Stop tokens</div>
+                <textarea id="stop" name="stop" class="form-control" rows="2"
+                          placeholder="User:, Human:, ### User"></textarea>
+                <div class="form-text mt-2">
+                  Strings que encerram a geração, separadas por vírgula. Ex: <code>User:, Human:, ### User</code>
+                </div>
+              </div>
+
+              <!-- Buttons -->
+              <div class="d-flex gap-3 justify-content-end">
+                <button type="button" class="btn-muted" onclick="window.history.back()">
+                  <i class="bi bi-arrow-left me-1"></i>Cancelar
+                </button>
+                <button type="submit" class="btn-sky">
+                  <i class="bi bi-floppy me-2"></i>Salvar configurações
+                </button>
+              </div>
+
+            </form>
           </div>
-        </form>
+        </main>
       </div>
-    </main>
-  </div>
+    </div>
 
-  <script>
-    let presetsData = {};
-    const form = document.getElementById('settings-form');
-    const messageEl = document.getElementById('message');
-    const sidebarRoot = document.getElementById('sidebar-root');
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      let presetsData = {};
+      const form      = document.getElementById('settings-form');
+      const feedbackEl = document.getElementById('feedback-msg');
 
-    function showMessage(text, type = 'success') {
-      messageEl.textContent = text;
-      messageEl.className = `message ${type}`;
-      setTimeout(() => {
-        messageEl.className = 'message';
-      }, 4000);
-    }
+      function showFeedback(text, isError = false) {
+        feedbackEl.className = isError ? 'alert-glass-error' : 'alert-glass-success';
+        feedbackEl.innerHTML = `<i class="bi bi-${isError ? 'exclamation-triangle' : 'check-circle'} me-2"></i>${text}`;
+        feedbackEl.style.display = 'block';
+        if (!isError) setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+      }
 
-    async function loadSidebar() {
-      try {
-        const sidebar = await fetch('/sidebar.html');
-        const html = await sidebar.text();
-        sidebarRoot.innerHTML = html;
+      async function loadSidebar() {
+        const res = await fetch('/sidebar.html');
+        document.getElementById('sidebar-root').innerHTML = await res.text();
         document.querySelectorAll('.nav-links a').forEach((link) => {
-          if (link.dataset.path === '/settings') {
-            link.classList.add('active');
-          }
+          if (link.dataset.path === '/settings') link.classList.add('active');
         });
-      } catch (err) {
-        console.error('Erro ao carregar sidebar:', err);
       }
-    }
 
-    async function loadPresets() {
-      try {
-        const res = await fetch('/api/presets');
-        const data = await res.json();
-
-        if (data.ok && data.presets) {
-          presetsData = data.presets;
-          renderPresets();
-        }
-      } catch (err) {
-        console.error('Erro ao carregar presets:', err);
-        showMessage('Erro ao carregar presets.', 'error');
-      }
-    }
-
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/config');
-        const data = await res.json();
-
-        if (data.ok && data.config) {
-          const config = data.config;
-          document.getElementById('model').value = config.model || '';
-          document.getElementById('temperature').value = config.temperature ?? '';
-          document.getElementById('top_p').value = config.top_p ?? '';
-          document.getElementById('top_k').value = config.top_k ?? '';
-          document.getElementById('min_p').value = config.min_p ?? '';
-          document.getElementById('tfs_z').value = config.tfs_z ?? '';
-          document.getElementById('repeat_penalty').value = config.repeat_penalty ?? '';
-          document.getElementById('repeat_last_n').value = config.repeat_last_n ?? '';
-          document.getElementById('context_size').value = config.context_size ?? '';
-          document.getElementById('max_tokens').value = config.max_tokens ?? '';
-          document.getElementById('stream').value = config.stream ? '1' : '0';
-          document.getElementById('seed').value = config.seed ?? '';
-
-          if (config.stop) {
-            const stopStr = Array.isArray(config.stop)
-              ? config.stop.join(', ')
-              : config.stop;
-            document.getElementById('stop').value = stopStr;
+      async function loadPresets() {
+        try {
+          const res  = await fetch('/api/presets');
+          const data = await res.json();
+          if (data.ok && data.presets) {
+            presetsData = data.presets;
+            renderPresets();
           }
-        }
-      } catch (err) {
-        console.error('Erro ao carregar config:', err);
+        } catch { showFeedback('Erro ao carregar presets.', true); }
       }
-    }
 
-    function loadPreset(presetKey) {
-      try {
-        const preset = presetsData[presetKey];
-        if (!preset || !preset.config) {
-          showMessage('Erro ao carregar preset.', 'error');
-          return;
-        }
+      async function loadConfig() {
+        try {
+          const res  = await fetch('/api/config');
+          const data = await res.json();
+          if (data.ok && data.config) fillForm(data.config);
+        } catch { /* silent */ }
+      }
 
-        const config = preset.config;
-        document.getElementById('model').value = config.model || '';
-        document.getElementById('temperature').value = config.temperature ?? '';
-        document.getElementById('top_p').value = config.top_p ?? '';
-        document.getElementById('top_k').value = config.top_k ?? '';
-        document.getElementById('min_p').value = config.min_p ?? '';
-        document.getElementById('tfs_z').value = config.tfs_z ?? '';
+      function fillForm(config) {
+        document.getElementById('model').value          = config.model          || '';
+        document.getElementById('temperature').value    = config.temperature    ?? '';
+        document.getElementById('top_p').value          = config.top_p          ?? '';
+        document.getElementById('top_k').value          = config.top_k          ?? '';
+        document.getElementById('min_p').value          = config.min_p          ?? '';
+        document.getElementById('tfs_z').value          = config.tfs_z          ?? '';
         document.getElementById('repeat_penalty').value = config.repeat_penalty ?? '';
-        document.getElementById('repeat_last_n').value = config.repeat_last_n ?? '';
-        document.getElementById('context_size').value = config.context_size ?? '';
-        document.getElementById('max_tokens').value = config.max_tokens ?? '';
-        document.getElementById('stream').value = config.stream ? '1' : '0';
-        document.getElementById('seed').value = config.seed ?? '';
-
+        document.getElementById('repeat_last_n').value  = config.repeat_last_n  ?? '';
+        document.getElementById('context_size').value   = config.context_size   ?? '';
+        document.getElementById('max_tokens').value     = config.max_tokens     ?? '';
+        document.getElementById('stream').value         = config.stream ? '1' : '0';
+        document.getElementById('seed').value           = config.seed           ?? '';
         if (config.stop) {
-          const stopStr = Array.isArray(config.stop)
-            ? config.stop.join(', ')
-            : config.stop;
-          document.getElementById('stop').value = stopStr;
+          document.getElementById('stop').value =
+            Array.isArray(config.stop) ? config.stop.join(', ') : config.stop;
         }
+      }
 
-        // Update active preset button
+      function loadPreset(key) {
+        const preset = presetsData[key];
+        if (!preset?.config) return showFeedback('Erro ao carregar preset.', true);
+        fillForm(preset.config);
         document.querySelectorAll('.preset-btn').forEach((btn) => {
-          btn.classList.remove('active');
-          if (btn.dataset.preset === presetKey) {
-            btn.classList.add('active');
-          }
+          btn.classList.toggle('active', btn.dataset.preset === key);
         });
-
-        showMessage(`Preset "${preset.name}" carregado com sucesso.`);
-      } catch (err) {
-        showMessage(`Erro ao carregar preset: ${err.message}`, 'error');
+        showFeedback(`Preset "${preset.name}" carregado.`);
       }
-    }
 
-    async function handleSubmit(e) {
-      e.preventDefault();
-      messageEl.className = 'message';
+      function renderPresets() {
+        const el = document.getElementById('presets');
+        el.innerHTML = Object.entries(presetsData).map(([key, p]) => `
+          <div class="col-12 col-sm-4">
+            <button type="button" class="preset-btn" data-preset="${key}" onclick="loadPreset('${key}')">
+              <strong>${p.name}</strong>
+              <small>${p.desc}</small>
+            </button>
+          </div>
+        `).join('');
+      }
 
-      const stopStr = document.getElementById('stop').value.trim();
-      const stop = stopStr
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s);
+      async function handleSubmit(e) {
+        e.preventDefault();
+        feedbackEl.style.display = 'none';
 
-      const config = {
-        model: document.getElementById('model').value.trim(),
-        temperature: parseFloat(document.getElementById('temperature').value) || null,
-        top_p: parseFloat(document.getElementById('top_p').value) || null,
-        top_k: parseInt(document.getElementById('top_k').value) || null,
-        min_p: parseFloat(document.getElementById('min_p').value) || null,
-        tfs_z: parseFloat(document.getElementById('tfs_z').value) || null,
-        repeat_penalty: parseFloat(document.getElementById('repeat_penalty').value) || null,
-        repeat_last_n: parseInt(document.getElementById('repeat_last_n').value) || null,
-        context_size: parseInt(document.getElementById('context_size').value) || null,
-        max_tokens: parseInt(document.getElementById('max_tokens').value) || null,
-        stream: parseInt(document.getElementById('stream').value) || null,
-        seed: parseInt(document.getElementById('seed').value) || -1,
-        stop: stop,
-      };
+        const stopStr = document.getElementById('stop').value.trim();
+        const stop = stopStr.split(',').map(s => s.trim()).filter(Boolean);
 
-      console.log('Enviando config:', config);
+        const config = {
+          model:          document.getElementById('model').value.trim(),
+          temperature:    parseFloat(document.getElementById('temperature').value)    || null,
+          top_p:          parseFloat(document.getElementById('top_p').value)          || null,
+          top_k:          parseInt(document.getElementById('top_k').value)            || null,
+          min_p:          parseFloat(document.getElementById('min_p').value)          || null,
+          tfs_z:          parseFloat(document.getElementById('tfs_z').value)          || null,
+          repeat_penalty: parseFloat(document.getElementById('repeat_penalty').value) || null,
+          repeat_last_n:  parseInt(document.getElementById('repeat_last_n').value)    || null,
+          context_size:   parseInt(document.getElementById('context_size').value)     || null,
+          max_tokens:     parseInt(document.getElementById('max_tokens').value)       || null,
+          stream:         parseInt(document.getElementById('stream').value)           || null,
+          seed:           parseInt(document.getElementById('seed').value)             || -1,
+          stop,
+        };
 
-      try {
-        const res = await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-        
-        console.log('Status da resposta:', res.status);
-        const result = await res.json();
-        console.log('Resultado:', result);
-
-        if (!res.ok || !result.ok) {
-          throw new Error(result.message || 'Erro ao salvar configuração.');
+        try {
+          const res    = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+          });
+          const result = await res.json();
+          if (!res.ok || !result.ok) throw new Error(result.message || 'Erro ao salvar.');
+          showFeedback('Configuração salva com sucesso!');
+        } catch (err) {
+          showFeedback(err.message || 'Erro ao salvar configuração.', true);
         }
-
-        showMessage('Configuração salva com sucesso!');
-      } catch (err) {
-        console.error('Erro:', err);
-        showMessage(err.message || 'Erro ao salvar configuração.', 'error');
       }
-    }
 
-    function renderPresets() {
-      const presetsEl = document.getElementById('presets');
-      presetsEl.innerHTML = Object.entries(presetsData)
-        .map(
-          ([key, preset]) => `
-        <button type="button" class="preset-btn" data-preset="${key}" onclick="loadPreset('${key}')">
-          <strong>${preset.name}</strong>
-          <small>${preset.desc}</small>
-        </button>
-      `
-        )
-        .join('');
-    }
+      window.addEventListener('load', async () => {
+        await loadSidebar();
+        await Promise.all([loadPresets(), loadConfig()]);
+        form.addEventListener('submit', handleSubmit);
 
-    window.addEventListener('load', async () => {
-      await loadSidebar();
-      await loadPresets();
-      await loadConfig();
-      form.addEventListener('submit', handleSubmit);
-    });
-  </script>
-</body>
+        // Bootstrap tooltips
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(
+          (el) => new bootstrap.Tooltip(el)
+        );
+      });
+    </script>
+  </body>
 </html>
