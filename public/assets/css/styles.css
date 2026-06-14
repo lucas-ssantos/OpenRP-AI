@@ -203,3 +203,7 @@ textarea.form-control {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 3px; }
 * { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,.2) transparent; }
+
+/* ── Spin utility ────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin .9s linear infinite; }
