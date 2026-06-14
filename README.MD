@@ -38,23 +38,7 @@ O projeto pretende manter foco em chat/roleplay local, com planos para:
 
 ## Instalação rápida
 
-1) Instale o Node.js (recomendado usar `nvm`):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \ . "$NVM_DIR/nvm.sh"
-nvm install 20
-nvm use 20
-```
-
-2) Instale dependências do projeto:
-
-```bash
-npm install
-```
-
-3) Instale o Ollama (exemplos):
+1) Instale o Ollama (exemplos):
 
 - Leia a documentação oficial em https://ollama.com para instruções atualizadas.
 - Em Arch Linux:
@@ -74,6 +58,22 @@ Placas NVIDIA: ollama-nvidia
 O pacote ollama deve ser instalado junto como dependência.
 
 Se preferir, use um instalador oficial disponibilizado pela equipe do Ollama — o passo acima é um exemplo para Arch.
+
+2) Instale o Node.js (recomendado usar `nvm`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \ . "$NVM_DIR/nvm.sh"
+nvm install 20
+nvm use 20
+```
+
+3) Instale dependências do projeto:
+
+```bash
+npm install
+```
 
 4) Verifique se a API do Ollama está respondendo:
 
