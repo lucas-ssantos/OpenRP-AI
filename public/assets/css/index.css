@@ -1,0 +1,51 @@
+.char-card {
+  cursor: pointer;
+  transition: transform 0.22s ease, border-color 0.22s ease;
+  overflow: hidden;
+}
+.char-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(56, 189, 248, 0.4) !important;
+}
+
+.card-thumb {
+  height: 190px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.card-thumb-placeholder {
+  height: 190px;
+  background: linear-gradient(180deg, rgba(56,189,248,.14), rgba(15,23,42,.9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.add-card {
+  cursor: pointer;
+  border-style: dashed !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  color: #38bdf8;
+  min-height: 320px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.add-card:hover {
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  background: rgba(15, 23, 42, 1) !important;
+}
+
+.add-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  line-height: 1;
+}
