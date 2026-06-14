@@ -3,12 +3,12 @@ import { spawnSync } from "child_process";
 let _webServer = null;
 let _ollamaProcess = null;
 let _saveDB = null;
+let _stopTailscale = false;
 
-export function registerWebServer(server) { _webServer = server;}
-
-export function registerOllamaProcess(proc) { _ollamaProcess = proc;}
-
-export function registerSaveDB(saveFn) { _saveDB = saveFn;}
+export function registerWebServer(server) { _webServer = server; }
+export function registerOllamaProcess(proc) { _ollamaProcess = proc; }
+export function registerSaveDB(saveFn) { _saveDB = saveFn; }
+export function registerTailscale() { _stopTailscale = true; }
 
 export async function shutdown(code = 0)
 {
@@ -102,6 +102,17 @@ export async function shutdown(code = 0)
             catch (e)
             {
                 console.error("Error saving database:", e);
+            }
+        }
+
+        if (_stopTailscale) {
+            console.log("Stopping Tailscale service...");
+            try {
+                const stop = spawnSync("systemctl", ["stop", "tailscaled"]);
+                if (stop.status === 0) console.log("Tailscale service stopped.");
+                else console.warn("Failed to stop tailscaled via systemctl.");
+            } catch (e) {
+                console.warn("Error stopping Tailscale:", e.message || e);
             }
         }
 
