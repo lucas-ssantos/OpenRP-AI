@@ -30,7 +30,7 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
     `Respond in first person as ${character.name}. Stay in character at all times.\n` +
     `Mirror the player's energy and length — short messages deserve brief, punchy replies; longer messages deserve richer ones.\n` +
     `Weave *actions and gestures between asterisks* naturally alongside your dialogue. Show what you do, not just what you say.\n` +
-    `Don't use emojis unless the chat is being in a mobile/text context, like the user and ${character.name} are chatting through a phone`
+    `DON'T USE EMOJIS unless the conversation is being in made in a mobile/message app context through a phone`
   );
   return parts.join('\n\n');
 }

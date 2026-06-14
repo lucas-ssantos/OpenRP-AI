@@ -38,11 +38,12 @@ function estimateTokens(text) {
 }
 
 // Returns a max_tokens value proportional to the user message length.
-// floor = config.min_tokens (configurable, default 60)
-// ceiling = config.max_tokens if > 0, otherwise 500
+// When max_tokens <= 0 (i.e. -1), passes -1 through to Ollama (natural stop).
+// Dynamic capping only applies when the user sets a positive max_tokens ceiling.
 function dynamicMaxTokens(userMessage, config) {
+    if (!config.max_tokens || config.max_tokens <= 0) return -1;
     const FLOOR = config.min_tokens ?? 60;
-    const CEILING = (config.max_tokens > 0) ? config.max_tokens : 500;
+    const CEILING = config.max_tokens;
     const RATIO = 1.4;
     return Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));
 }
