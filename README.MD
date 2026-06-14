@@ -98,9 +98,9 @@ sudo journalctl -u ollama -f
 
 O projeto pretende manter foco em chat/roleplay local, com planos para:
 
-- Web UI local
 - Memórias semânticas e vetores
-- Suporte a múltiplos personagens e chats
+- Adicionar botão de visualizar imagem de trás do chat
+- Adicionar edição de menssagem do chat
 
 ---
 
