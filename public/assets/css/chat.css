@@ -691,6 +691,21 @@ body.immersive .input-area {
   transform: translateX(-50%) translateY(0);
 }
 
+/* ── Mobile adjustments ── */
+@media (max-width: 899px) {
+  .chat-header {
+    padding-top: max(4rem, env(safe-area-inset-top));
+  }
+
+  .input-area {
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom));
+  }
+
+  #immersive-btn {
+    bottom: 5.5rem;
+  }
+}
+
 /* ── Desktop enhancement ── */
 @media (min-width: 900px) {
   .chat-layout {
