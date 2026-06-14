@@ -328,6 +328,59 @@
 
       .edit-cancel-btn:hover { background: rgba(30, 41, 59, 1); }
 
+      /* ── Immersive mode toggle ── */
+      #immersive-btn {
+        position: fixed;
+        bottom: 1.25rem;
+        right: 1.25rem;
+        z-index: 50;
+        width: 2.4rem;
+        height: 2.4rem;
+        border-radius: 50%;
+        background: rgba(2, 6, 23, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #94a3b8;
+        font-size: 1.05rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+      }
+
+      #immersive-btn:hover {
+        background: rgba(15, 23, 42, 0.85);
+        border-color: rgba(148, 163, 184, 0.4);
+        color: #e2e8f0;
+      }
+
+      body.immersive #immersive-btn {
+        background: rgba(2, 6, 23, 0.35);
+        border-color: rgba(148, 163, 184, 0.12);
+        color: rgba(148, 163, 184, 0.5);
+      }
+
+      body.immersive #immersive-btn:hover {
+        background: rgba(2, 6, 23, 0.65);
+        border-color: rgba(148, 163, 184, 0.35);
+        color: #e2e8f0;
+      }
+
+      .chat-header,
+      .messages,
+      .input-area {
+        transition: opacity 0.4s ease;
+      }
+
+      body.immersive .chat-header,
+      body.immersive .messages,
+      body.immersive .input-area {
+        opacity: 0;
+        pointer-events: none;
+      }
+
       /* ── Action text *between asterisks* ── */
       .action-text {
         font-style: italic;
@@ -759,6 +812,10 @@
         </div>
       </div>
     </div>
+
+    <button id="immersive-btn" title="Mostrar/ocultar chat">
+      <i class="bi bi-eye"></i>
+    </button>
 
     <!-- ── Edit confirmation modal ───────────────────────────────────── -->
     <div class="modal fade" id="editConfirmModal" tabindex="-1">
@@ -1338,6 +1395,17 @@
           showError(`Falha ao carregar: ${err.message}`);
         }
       }
+
+      // ── Immersive mode ────────────────────────────────────────────────────
+      (function () {
+        const btn = document.getElementById('immersive-btn');
+        const icon = btn.querySelector('i');
+        btn.addEventListener('click', () => {
+          const on = document.body.classList.toggle('immersive');
+          icon.className = on ? 'bi bi-eye-slash' : 'bi bi-eye';
+          btn.title = on ? 'Mostrar chat' : 'Ocultar chat';
+        });
+      }());
 
       window.addEventListener('load', () => {
         initRollbackModal();
