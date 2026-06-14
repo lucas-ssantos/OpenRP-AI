@@ -11,6 +11,7 @@
 .card-thumb {
   height: 190px;
   object-fit: cover;
+  object-position: top;
   width: 100%;
 }
 
