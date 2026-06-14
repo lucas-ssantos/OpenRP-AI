@@ -22,14 +22,15 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
       : `You are ${character.name}.`,
   ];
   if (character.personality) parts.push(`Personality: ${character.personality}`);
-  if (character.scenario) parts.push(`Scenario: ${character.scenario}`);
+  //if (character.scenario) parts.push(`Scenario: ${character.scenario}`);
   if (persona?.name) {
     parts.push(`The user's name is ${persona.name}.${persona.description ? ' ' + persona.description : ''}`);
   }
   parts.push(
     `Respond in first person as ${character.name}. Stay in character at all times.\n` +
     `Mirror the player's energy and length — short messages deserve brief, punchy replies; longer messages deserve richer ones.\n` +
-    `Weave *actions and gestures between asterisks* naturally alongside your dialogue. Show what you do, not just what you say.`
+    `Weave *actions and gestures between asterisks* naturally alongside your dialogue. Show what you do, not just what you say.\n` +
+    `Don't use emojis unless the chat is being in a mobile/text context, like the user and ${character.name} are chatting through a phone`
   );
   return parts.join('\n\n');
 }
