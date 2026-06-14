@@ -1,10 +1,9 @@
 import initSqlJs from "sql.js";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
+import { appConfig } from "../../config.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, "../../../data/roleplay.db");
+const DB_PATH = path.resolve(process.cwd(), appConfig.dbPath);
 
 let db = null;
 let SQL = null;

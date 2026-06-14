@@ -2,6 +2,7 @@ import { spawnSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { registerOllamaProcess } from "../core/shutdown.js";
+import { appConfig } from "../config.js";
 
 export async function initOllama()
 {
@@ -72,7 +73,7 @@ export async function initOllama()
         // quick health check
         try
         {
-            const resp = await fetch("http://127.0.0.1:11434/api/tags");
+            const resp = await fetch(appConfig.ollama.tagsEndpoint);
             if(resp.ok)
             {
                 console.log("Ollama daemon started and responding (fallback)");

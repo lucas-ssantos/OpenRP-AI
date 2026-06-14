@@ -1,4 +1,5 @@
 import { getDB, saveDB } from "./db.js";
+import { appConfig } from "../../config.js";
 
 export async function migrate() {
   console.log("Running migrations...");
@@ -127,6 +128,21 @@ export async function migrate() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Seed initial row from appConfig.defaults (INSERT OR IGNORE preserves user-saved config)
+  const d = appConfig.defaults;
+  db.run(`
+    INSERT OR IGNORE INTO generation_config
+      (id, model, temperature, top_p, top_k, min_p,
+       repeat_penalty, repeat_last_n, tfs_z, max_tokens,
+       context_size, stream, seed, stop, num_ctx_messages, min_tokens)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
+    d.repeat_penalty, d.repeat_last_n, d.tfs_z, d.max_tokens,
+    d.context_size, d.stream ? 1 : 0, d.seed,
+    JSON.stringify(d.stop), d.num_ctx_messages, d.min_tokens,
+  ]);
 
   // ===== CHARACTER-SPECIFIC CONFIG =====
   db.run(`

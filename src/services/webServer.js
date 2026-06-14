@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { registerWebServer } from "../core/shutdown.js";
+import { appConfig } from "../config.js";
 import { getDB } from "./database/db.js";
 import { createCharacter, getAllCharacters, getCharacter, getPersona, savePersona, getGenerationConfig, setGenerationConfig, getRecentCharactersWithConversations } from "./database/queries.js";
 import chatRouter from "../core/chat.js";
@@ -14,7 +15,7 @@ async function getHealthStatus() {
     };
 
     try {
-        const response = await fetch("http://127.0.0.1:11434/api/tags");
+        const response = await fetch(appConfig.ollama.tagsEndpoint);
         if (response.ok) {
             status.ollama.ok = true;
             status.ollama.message = "Ollama está ativo";
@@ -280,24 +281,7 @@ export async function startWebServer(port = process.env.PORT || 3000)
         try {
             const config = getGenerationConfig('global');
             if (!config) {
-                return res.json({
-                    ok: true,
-                    config: {
-                        model: 'qwen3:8b',
-                        temperature: 0.92,
-                        top_p: 0.90,
-                        top_k: 60,
-                        min_p: 0.04,
-                        repeat_penalty: 1.05,
-                        repeat_last_n: 192,
-                        tfs_z: 0.95,
-                        max_tokens: 800,
-                        context_size: 8192,
-                        stream: true,
-                        seed: -1,
-                        stop: ["User:", "Human:", "### User", "\n\nUser:"],
-                    }
-                });
+                return res.json({ ok: true, config: { ...appConfig.defaults } });
             }
             res.json({ ok: true, config });
         } catch (err) {

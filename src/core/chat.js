@@ -7,24 +7,10 @@ import {
     getMemories, getAllLorebooks,
 } from "../services/database/queries.js";
 import { buildPromptMessages } from "./promptBuilder.js";
+import { appConfig } from "../config.js";
 
-const OLLAMA_URL = "http://127.0.0.1:11434/api/chat";
-
-const DEFAULT_CONFIG = {
-    model: "qwen3:8b",
-    temperature: 0.85,
-    top_p: 0.95,
-    top_k: 40,
-    min_p: 0.05,
-    repeat_penalty: 1.1,
-    repeat_last_n: 64,
-    max_tokens: -1,
-    min_tokens: 60,
-    context_size: 4096,
-    seed: -1,
-    stop: [],
-    num_ctx_messages: 20,
-};
+const OLLAMA_URL = appConfig.ollama.chatEndpoint;
+const DEFAULT_CONFIG = { ...appConfig.defaults };
 
 function resolveConfig(characterId) {
     const globalConfig = getGenerationConfig("global");
@@ -73,7 +59,7 @@ async function streamOllama(res, messages, config, onDone) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            model: config.model || "qwen3:8b",
+            model: config.model,
             messages,
             stream: true,
             think: false,
