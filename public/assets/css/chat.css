@@ -661,6 +661,36 @@ body.immersive .input-area {
   margin-bottom: 0.25rem;
 }
 
+/* ── Pinned memory toast ── */
+.pinned-memory-toast {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(0.6rem);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  font-size: 0.82rem;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  white-space: nowrap;
+}
+
+.pinned-memory-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ── Desktop enhancement ── */
 @media (min-width: 900px) {
   .chat-layout {

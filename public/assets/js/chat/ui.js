@@ -52,3 +52,20 @@ export function setInputEnabled(enabled) {
   dom.inputEl.disabled = !enabled;
   dom.sendBtn.disabled = !enabled;
 }
+
+export function showPinnedMemoryToast(count) {
+  document.getElementById('pinned-memory-toast')?.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'pinned-memory-toast';
+  toast.className = 'pinned-memory-toast';
+  toast.innerHTML = `<i class="bi bi-pin-fill"></i><span>${count === 1 ? 'Nova memória fixada' : `${count} memórias fixadas`}</span>`;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 3500);
+}

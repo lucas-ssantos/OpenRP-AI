@@ -53,21 +53,27 @@ function scoreMemory(memory, contextText) {
  * Retorna as memórias mais relevantes para o contexto fornecido.
  *
  * Regras:
- *  - Pinned: sempre incluídas, independente de score
- *  - Não-pinned: ordenadas por score, limitadas por `limit` e `minScore`
- *  - Ordem final: pinned primeiro, depois não-pinned por score decrescente
+ *  - Pinned: sempre incluídas, mas limitadas por `maxPinned` e ordenadas por relevance_weight DESC.
+ *    Se houver mais pinned do que o limite, as de menor peso são descartadas.
+ *    Isso previne que o prompt estoure por acúmulo de pinned ao longo de conversas longas.
+ *  - Não-pinned: filtradas por score de keyword matching, limitadas por `limit` e `minScore`.
+ *  - Ordem final: pinned primeiro (por peso), depois não-pinned por score decrescente.
  *
  * @param {string}  conversationId
  * @param {string}  contextText - texto de contexto para matching (mensagem atual + histórico recente)
  * @param {object}  [opts]
- * @param {number}  [opts.limit=5]     - max de memórias não-pinned retornadas
- * @param {number}  [opts.minScore=0]  - score mínimo para incluir memória não-pinned
+ * @param {number}  [opts.limit=5]      - max de memórias não-pinned retornadas
+ * @param {number}  [opts.minScore=0]   - score mínimo para incluir memória não-pinned
+ * @param {number}  [opts.maxPinned=10] - cap de memórias pinned injetadas no prompt
  */
-export function getRelevantMemories(conversationId, contextText, { limit = 5, minScore = 0 } = {}) {
-    const pinned    = getPinnedMemories(conversationId);
-    const pinnedIds = new Set(pinned.map(m => m.id));
+export function getRelevantMemories(conversationId, contextText, { limit = 5, minScore = 0, maxPinned = 10 } = {}) {
+    const allPinned = getPinnedMemories(conversationId)
+        .sort((a, b) => (b.relevance_weight ?? 1) - (a.relevance_weight ?? 1))
+        .slice(0, maxPinned);
 
-    const all      = getMemories(conversationId);
+    const pinnedIds = new Set(allPinned.map(m => m.id));
+
+    const all       = getMemories(conversationId);
     const nonPinned = all.filter(m => !pinnedIds.has(m.id));
 
     const scored = nonPinned
@@ -76,7 +82,7 @@ export function getRelevantMemories(conversationId, contextText, { limit = 5, mi
         .sort((a, b) => b._score - a._score)
         .slice(0, limit);
 
-    return [...pinned, ...scored];
+    return [...allPinned, ...scored];
 }
 
 /**

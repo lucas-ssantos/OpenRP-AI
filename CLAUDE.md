@@ -262,9 +262,32 @@ A config tem hierarquia: `appConfig.defaults` (.env) → `generation_config` (gl
 
 `contexto/estrutura_memoria` — tipos de memória:
 - **Auto**: gerada automaticamente pelo summaryService ao ultrapassar o limite de contexto
-- **Manual**: criada/editada pelo usuário
-- **Pinned**: sempre incluída no contexto (fatos permanentes)
+- **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto
+- **Pinned**: sempre injetada no prompt (ver regras abaixo)
 - **Lorebook**: ativada por palavras-chave mencionadas no chat
+
+### Memórias Pinned — critério e garantias
+
+Pinned bypassa o filtro de keyword e é sempre injetada. Use **apenas** para fatos que mudam quem o personagem é estruturalmente, não o que ele sentiu ou sabe situacionalmente.
+
+**Exemplos válidos (✓):**
+- Estado físico permanente: "Perdeu a visão do olho esquerdo na batalha de Ardenmoor."
+- Mudança de relação estrutural: "Passou a considerar o usuário um aliado de confiança."
+- Segredo revelado sem volta: "Sabe que o usuário é o herdeiro legítimo do trono."
+- Regra narrativa fixa: "Nunca pronuncia o nome do irmão morto — chama-o apenas de 'ele'."
+
+**Exemplos inválidos (✗ — use auto/manual com keywords):**
+- Reação situacional: "Ficou com raiva quando mencionaram cavalos."
+- Preferências: "Gosta de chá." → vai em description/personality do personagem.
+- Detalhe de cena: "Estavam no café quando o segredo foi revelado."
+
+**Validações obrigatórias em `createPinnedMemory()`:**
+- `content` com mínimo de 20 caracteres (fatos curtos demais são vagos)
+- `keywords` obrigatório — mesmo sem usar no filtro, serve de referência semântica e auditoria
+- `relevanceWeight` configurável (padrão 1.5) para priorizar entre as próprias pinned
+
+**Cap automático no retrieval:**
+`getRelevantMemories()` limita a 10 pinned por padrão (`maxPinned`), ordenando por `relevance_weight DESC`. Se houver mais de 10 pinned, as de menor peso são descartadas do prompt. Isso previne que o prompt estoure após conversas longas com muitas pinned acumuladas.
 
 ## Config centralizada (`src/config.js`)
 

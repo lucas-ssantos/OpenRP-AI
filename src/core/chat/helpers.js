@@ -120,7 +120,7 @@ export async function streamOllama(res, messages, config, onDone) {
             }
 
             if (parsed.done) {
-                const extra = onDone(fullContent);
+                const extra = await onDone(fullContent);
                 res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
                 res.end();
                 return;
@@ -130,7 +130,7 @@ export async function streamOllama(res, messages, config, onDone) {
 
     // Fallback if stream ended without a parsed.done event
     if (fullContent) {
-        const extra = onDone(fullContent);
+        const extra = await onDone(fullContent);
         res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
     }
     res.end();

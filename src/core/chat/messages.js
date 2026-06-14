@@ -7,7 +7,7 @@ import {
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama } from "./helpers.js";
-import { getMemoriesForPrompt } from "../memory/index.js";
+import { getMemoriesForPrompt, extractAndSavePinnedMemories } from "../memory/index.js";
 
 const router = Router();
 
@@ -47,9 +47,21 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
 
         startSSE(res);
-        await streamOllama(res, ollamaMessages, sendConfig, (fullContent) => {
+        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent) => {
             const asstMsgId = fullContent ? addMessage(conversationId, "assistant", fullContent, nextPos + 1) : null;
-            return { message_id: asstMsgId, user_message_id: userMsgId };
+
+            let pinnedMemoriesCreated = 0;
+            if (fullContent && nextPos % 5 === 0) {
+                const msgsForExtraction = getLastNMessages(conversationId, 10);
+                const created = await extractAndSavePinnedMemories(conversationId, msgsForExtraction, character, config);
+                pinnedMemoriesCreated = created.length;
+            }
+
+            return {
+                message_id: asstMsgId,
+                user_message_id: userMsgId,
+                ...(pinnedMemoriesCreated > 0 ? { pinned_memories_created: pinnedMemoriesCreated } : {}),
+            };
         });
     } catch (err) {
         handleSSEError(res, err, "Chat error");

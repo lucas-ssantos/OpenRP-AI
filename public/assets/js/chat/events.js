@@ -2,6 +2,7 @@ import { state, dom } from './state.js';
 import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
+  showPinnedMemoryToast,
 } from './ui.js';
 
 // ── Rollback state ────────────────────────────────────────────────────
@@ -360,6 +361,7 @@ export async function sendMessage() {
           if (data.message_id && charRow)  attachRollbackBtn(charRow, data.message_id);
           if (data.user_message_id && userRow) attachRollbackBtn(userRow, data.user_message_id);
           updateLastCharRow();
+          if (data.pinned_memories_created > 0) showPinnedMemoryToast(data.pinned_memories_created);
         }
       }
     }
