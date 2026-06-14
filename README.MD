@@ -1,6 +1,6 @@
 # OpenRP AI — Plataforma Local de Roleplay (Web + Chat)
 
-OpenRP AI é uma aplicação local para chat e roleplay com IA utilizando modelos do Ollama, inspirada por TalkieAI, LinkyAI, SillyTavern e TavernAI. O foco é oferecer uma plataforma que rode no navegador, mantendo todos os dados e modelos localmente: sem login centralizado, sem funcionalidades de compartilhamento online e essas baboseiras e ser refem de empresas.
+OpenRP AI é uma aplicação local para chat e roleplay com IA utilizando modelos do Ollama, inspirada por TalkieAI, LinkyAI, SillyTavern e TavernAI. O foco é oferecer uma plataforma que rode no navegador, mantendo todos os dados e modelos localmente: sem login centralizado, sem funcionalidades de compartilhamento online e essas baboseiras de serem refens de empresas.
 
 Principais características:
 
@@ -35,7 +35,7 @@ nvm use 20
 npm install
 ```
 
-3) Instale o Ollama e habilite o serviço (exemplos):
+3) Instale o Ollama (exemplos):
 
 - Leia a documentação oficial em https://ollama.com para instruções atualizadas.
 - Em Arch Linux:
@@ -44,6 +44,15 @@ npm install
 sudo pacman -S ollama
 sudo systemctl enable --now ollama
 ```
+
+**ATENÇÃO**: No Archlinux se possui três pacotes, ```ollama```, ```ollama-rocm``` e ```ollama-nvidia```
+Utilize o pacote correspondente para sua placa de vídeo, usar o pacote errado pode e provavelmente vai acarretar
+em uma velocidade muito inferior do que o esperado.
+
+Placas AMD: ollama-rocm
+Placas NVIDIA: ollama-nvidia
+
+O pacote ollama deve ser instalado junto como dependência.
 
 Se preferir, use um instalador oficial disponibilizado pela equipe do Ollama — o passo acima é um exemplo para Arch.
 
@@ -99,6 +108,8 @@ sudo journalctl -u ollama -f
 O projeto pretende manter foco em chat/roleplay local, com planos para:
 
 - Memórias semânticas e vetores
+- Adicionar um scrip de install
+- Criar um desktop.entry para poder utilizar fora do terminal
 
 ---
 
