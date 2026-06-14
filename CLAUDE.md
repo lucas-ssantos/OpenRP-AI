@@ -7,7 +7,7 @@ Plataforma local de roleplay/chat com IA usando Ollama. Inspirado em TalkieAI, L
 - **Runtime**: Node.js 20+ (ESM — `"type": "module"` no package.json)
 - **Backend**: Express 4 — rotas em `src/services/webServer/routes/`
 - **Banco**: SQLite via `sql.js` (banco em memória, persistido manualmente em disco via `saveDB()`)
-- **IA**: Ollama local em `http://127.0.0.1:11434` (padrão: modelo `qwen3:8b`)
+- **IA**: Ollama local em `http://127.0.0.1:11434` (padrão: modelo `gemma4:e4b`)
 - **Frontend**: HTML/CSS/JS puro em `public/` — sem framework, sem bundler
 - **IDs**: UUIDs v4 via `uuid`
 - **Config centralizada**: `src/config.js` lê o `.env` via `dotenv` e exporta `appConfig`
@@ -28,11 +28,21 @@ src/
       messages.js                   ← POST enviar, POST regenerar, PATCH editar, DELETE rollback
   services/
     ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
+    ollama.models.js                ← garante existência dos modelos customizados (gemma4:e4b-32k / 64k) via Modelfile API
     database/
       db.js                         ← getDB() / saveDB()
       migrations.js                 ← CREATE TABLE IF NOT EXISTS + seed de config inicial
-      queries.js                    ← todas as funções de acesso ao banco
+      queries.js                    ← barrel: re-exporta todas as queries da pasta queries/
       save.js                       ← salva o banco em disco
+      queries/
+        characters.js               ← createCharacter, getCharacter, getAllCharacters, updateCharacter
+        persona.js                  ← getPersona, savePersona
+        conversations.js            ← createConversation, getConversation, getLatestConversationForCharacter, getRecentCharactersWithConversations
+        messages.js                 ← addMessage, updateMessage, deleteLastAssistantMessage, rollbackConversation, resetConversation, getConversationMessages, getLastNMessages
+        memories.js                 ← createMemory, getMemories, getPinnedMemories, getMemoriesByType
+        lorebooks.js                ← createLorebook, getLorebook, getGlobal/CharacterLorebooks, getAllLorebooks, updateLorebook, deleteLorebook, getCharacterLorebookIds, setCharacterLorebooks
+        config.js                   ← getGenerationConfig, setGenerationConfig
+        tokens.js                   ← recordTokenUsage, getTotalTokensInConversation
     webServer/
       webServer.init.js             ← cria Express app, registra middleware e routers, inicia o servidor
       routes/
@@ -41,7 +51,7 @@ src/
         persona.routes.js           ← GET /persona, GET/POST /api/persona
         character.routes.js         ← factory characterRouter(uploadDir) com todas as rotas de personagem
         chat.routes.js              ← GET /chat/:characterId + monta chatRouter de core/chat.js
-        settings.routes.js          ← GET /settings, GET /api/presets, GET/POST /api/config
+        settings.routes.js          ← GET /settings, GET /api/presets, GET/POST /api/config, GET /api/models, POST /api/models/pull
         viewdb.routes.js            ← GET /api/viewdb, GET /api/viewdb/tables, GET /api/viewdb/records
         lorebook.routes.js          ← CRUD /api/lorebooks + GET/PUT /api/characters/:id/lorebooks
 
@@ -73,6 +83,8 @@ public/
         events.js                   ← addBubble, rollback, edição inline, send, regenerate, initInputListeners
         loader.js                   ← init() (carrega personagem/conversa/mensagens), initImmersiveMode()
       check.js / index.js / persona.js / new-character.js / edit-character.js / settings.js / viewdb.js / lorebooks.js
+  core/
+    logger.js                       ← logConversationTurn(): log estruturado por turno — config, memórias injetadas/disponíveis, lorebooks
     uploads/                        ← avatares enviados por upload
 
 data/
@@ -139,6 +151,7 @@ GET  /api/conversations/:id                 → dados da conversa
 GET  /api/conversations/:id/messages        → histórico ordenado por position
 POST /api/conversations/:id/messages        → envia mensagem → streaming SSE
 POST /api/conversations/:id/regenerate      → regenera última resposta → streaming SSE
+POST /api/conversations/:id/reset          → apaga todas as mensagens e memórias, reinsere first_message
 PATCH /api/conversations/:id/messages/:msgId → edita conteúdo de uma mensagem
 DELETE /api/conversations/:id/rollback      → remove mensagens após messageId (body: {messageId})
 ```
@@ -151,6 +164,8 @@ POST /api/persona           → salva persona
 GET  /api/config            → config global de geração
 POST /api/config            → salva config global
 GET  /api/presets           → presets de hardware (low/medium/high)
+GET  /api/models            → lista modelos instalados no Ollama (nome, tamanho, família, parâmetros)
+POST /api/models/pull       → baixa um modelo do Ollama → streaming SSE de progresso
 GET  /api/viewdb/tables     → lista tabelas com contagem
 GET  /api/viewdb/records    → últimas 25 linhas de uma tabela (?table=X)
 GET    /api/lorebooks               → lista todos os lorebooks
@@ -199,6 +214,12 @@ Botão `edit-btn` aparece em hover em qualquer balão (usuário ou personagem).
 Botão `rollback-btn` aparece em hover nos balões do personagem.
 Abre modal de confirmação → DELETE `/api/conversations/:id/rollback` com `{messageId}` no body.
 Remove do DOM todas as mensagens após o ponto de rollback. O banco deleta tudo com `position > position_da_mensagem`.
+
+### Resetar conversa
+Botão "Reiniciar conversa" no offcanvas nav do chat (`#nav-reset-chat`).
+Abre `#resetModal` de confirmação → POST `/api/conversations/:id/reset`.
+Apaga todas as mensagens e memórias da conversa, reinsere `first_message` como `assistant` position=0 e re-renderiza o DOM.
+Implementado em `initResetModal()` — fecha o offcanvas via `hidden.bs.offcanvas` com `{ once: true }` antes de abrir o modal.
 
 ## Padrão do frontend
 
@@ -321,9 +342,11 @@ npm run dev      # watch mode (node --watch)
 - **Ollama é obrigatório** — redireciona para `/check` se não responder
 - `first_message` suporta `{{user}}` que é substituído pelo nome da persona ao criar conversa
 - Config de geração tem hierarquia: `.env defaults` → `global` → `character_config`
-- O modelo padrão é `qwen3:8b` — pode ser alterado em `/settings`
+- O modelo padrão é `gemma4:e4b` — pode ser alterado em `/settings`. Na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-32k` (32k ctx) e `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existirem
 - Avatar upload: enviado como base64 no body JSON, salvo em `public/assets/uploads/` com nome `timestamp-filename`
 - Todos os IDs são UUIDs v4
 - `getLastNMessages` retorna ordenado por `created_at DESC LIMIT n` e depois reverte (mais antigo primeiro)
 - `character.routes.js` usa factory `characterRouter(uploadDir)` porque precisa do caminho de upload injetado pelo `webServer.init.js`
 - `chat.js` frontend usa `type="module"` e ES Modules; os demais JS são scripts regulares
+- `queries.js` é um barrel puro — toda lógica de banco fica em `queries/` (um arquivo por domínio); importar de `queries.js` continua funcionando sem mudança nos consumidores
+- `logConversationTurn()` em `logger.js` recebe `allMemories` e `allLorebooks` (tudo que existe no banco) além do que foi injetado — quando nenhum item é usado, o log lista os disponíveis com seus keywords para diagnóstico
