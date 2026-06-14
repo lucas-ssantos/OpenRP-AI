@@ -14,7 +14,7 @@ Principais características:
 
 - **Configurações de geração** — controle fino de parâmetros como temperature, top-p, top-k, repeat penalty, tamanho do contexto e número de mensagens de histórico enviadas ao modelo. Presets para máquinas fracas, médias e potentes.
 
-- **Integração com Ollama** — usa qualquer modelo disponível localmente via Ollama. Streaming token a token com suporte a reasoning tokens (filtro de `<think>`). Modelo padrão: `qwen3:8b`.
+- **Integração com Ollama** — usa qualquer modelo disponível localmente via Ollama. Streaming token a token com suporte a reasoning tokens (filtro de `<think>`). Modelo padrão: `gemma4:e4b`. Ao iniciar, a aplicação cria automaticamente variantes com contexto expandido (`gemma4-e4b-32k` e `gemma4-e4b-64k`) para uso nos presets de máquina média e potente.
 
 - **100% offline e local** — nenhum dado sai da sua máquina. Sem login, sem nuvem, sem assinatura.
 

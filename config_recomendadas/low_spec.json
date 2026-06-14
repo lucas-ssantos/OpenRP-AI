@@ -1,5 +1,5 @@
 {
-  "model": "qwen3:4b",
+  "model": "gemma4:e4b",
   "temperature": 0.88,
   "top_p": 0.88,
   "top_k": 45,

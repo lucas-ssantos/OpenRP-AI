@@ -1,5 +1,5 @@
 {
-  "model": "qwen3:8b",
+  "model": "gemma4:e4b-32k",
   "temperature": 0.92,
   "top_p": 0.90,
   "top_k": 60,
@@ -9,7 +9,7 @@
   "tfs_z": 0.95,
   "max_tokens": -1,
   "min_tokens": 60,
-  "context_size": 8192,
+  "context_size": 32768,
   "stream": true,
   "seed": -1,
   "stop": ["User:", "Human:", "### User", "\n\nUser:"]
