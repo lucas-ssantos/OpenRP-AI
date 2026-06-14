@@ -435,7 +435,6 @@
         gap: 0.15rem;
         margin-top: 0.2rem;
         padding-left: 0.35rem;
-        margin-top: 0.5rem;
       }
 
       #chatNav .recent-char-link {
@@ -778,7 +777,7 @@
           row.appendChild(regenBtn);
         }
 
-        if (messageId) attachRollbackBtn(row, messageId);
+        if (messageId && !isUser) attachRollbackBtn(row, messageId);
 
         messagesEl.appendChild(row);
         scrollToBottom();
