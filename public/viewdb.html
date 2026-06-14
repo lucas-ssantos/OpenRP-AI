@@ -11,50 +11,103 @@
     <link rel="stylesheet" href="/assets/css/viewdb.css" />
   </head>
   <body>
-    <div class="d-flex min-vh-100">
+    <div class="d-flex" style="height:100vh; overflow:hidden;">
       <div id="sidebar-root" class="flex-shrink-0"></div>
 
-      <div class="flex-grow-1 overflow-auto">
-        <main class="content-main p-3 p-md-4">
-          <div class="mx-auto" style="max-width:1100px;">
+      <div class="vdb-page flex-grow-1">
 
-            <div class="mb-4">
-              <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">Banco de dados</h1>
-              <p class="text-secondary mb-0">Visualize até os 25 últimos registros de cada tabela.</p>
-            </div>
+        <!-- Left: conversation list -->
+        <aside class="vdb-convs-panel">
+          <div class="vdb-panel-header">
+            <span class="fw-semibold">Conversas</span>
+            <span id="conv-count" class="badge-count">0</span>
+          </div>
+          <div id="conv-list" class="vdb-conv-list">
+            <p class="text-secondary small p-3 mb-0">
+              <i class="bi bi-hourglass-split me-1"></i>Carregando…
+            </p>
+          </div>
+        </aside>
 
-            <div class="row g-4">
+        <!-- Right: conversation detail -->
+        <main class="vdb-detail-panel">
 
-              <!-- Tabelas -->
-              <div class="col-12 col-md-4">
-                <div class="glass-card card p-4 h-100">
-                  <div class="d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-database text-info"></i>
-                    <h6 class="mb-0 fw-semibold">Tabelas</h6>
+          <!-- Empty state -->
+          <div id="detail-empty" class="vdb-empty">
+            <i class="bi bi-chat-square-text vdb-empty-icon"></i>
+            <p class="mb-0">Selecione uma conversa para ver os detalhes</p>
+          </div>
+
+          <!-- Loaded detail -->
+          <div id="detail-content" class="vdb-detail-content d-none">
+
+            <!-- Character + Persona -->
+            <div class="vdb-info-grid">
+              <div class="glass-card p-3" id="char-card">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                  <div class="vdb-char-avatar-wrap">
+                    <img id="char-avatar" class="vdb-char-avatar" src="" alt="" />
+                    <div id="char-avatar-placeholder" class="vdb-char-placeholder d-none">
+                      <i class="bi bi-person-fill"></i>
+                    </div>
                   </div>
-                  <div id="status" class="text-secondary small mb-3">
-                    <i class="bi bi-hourglass-split me-1"></i>Carregando tabelas…
+                  <div>
+                    <div id="char-name" class="fw-bold" style="font-size:1.05rem;"></div>
+                    <a id="char-link" href="#" class="text-info" style="font-size:.78rem;">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>Abrir chat
+                    </a>
                   </div>
-                  <div class="d-flex flex-column gap-2" id="table-list"></div>
                 </div>
+                <div class="vdb-fields" id="char-fields"></div>
               </div>
 
-              <!-- Registros -->
-              <div class="col-12 col-md-8">
-                <div class="glass-card card p-4">
-                  <div class="d-flex align-items-center gap-2 mb-3">
-                    <i class="bi bi-table text-info"></i>
-                    <h6 class="mb-0 fw-semibold">Registros</h6>
-                  </div>
-                  <div id="records-container">
-                    <p class="text-secondary small">Selecione uma tabela à esquerda para ver os registros.</p>
-                  </div>
+              <div class="glass-card p-3" id="persona-card">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <i class="bi bi-person-badge text-info"></i>
+                  <span class="fw-semibold">Persona</span>
                 </div>
+                <div class="vdb-fields" id="persona-fields"></div>
               </div>
-
             </div>
+
+            <!-- Messages -->
+            <section class="vdb-section glass-card p-3">
+              <div class="vdb-section-header">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-chat-left-dots text-info"></i>
+                  <span class="fw-semibold">Mensagens</span>
+                </div>
+                <span id="msg-count" class="badge-count">0</span>
+              </div>
+              <div id="messages-container" class="vdb-messages"></div>
+            </section>
+
+            <!-- Memories -->
+            <section class="vdb-section glass-card p-3">
+              <div class="vdb-section-header mb-3">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-brain text-info"></i>
+                  <span class="fw-semibold">Memórias</span>
+                </div>
+                <span id="mem-total" class="badge-count">0</span>
+              </div>
+              <div class="vdb-mem-tabs" id="mem-tabs">
+                <button class="vdb-mem-tab active" data-type="pinned">
+                  <i class="bi bi-pin-fill"></i> Fixadas <span id="count-pinned" class="tab-count">0</span>
+                </button>
+                <button class="vdb-mem-tab" data-type="auto">
+                  <i class="bi bi-cpu"></i> Auto <span id="count-auto" class="tab-count">0</span>
+                </button>
+                <button class="vdb-mem-tab" data-type="manual">
+                  <i class="bi bi-pencil-fill"></i> Manual <span id="count-manual" class="tab-count">0</span>
+                </button>
+              </div>
+              <div id="memories-container"></div>
+            </section>
+
           </div>
         </main>
+
       </div>
     </div>
 
