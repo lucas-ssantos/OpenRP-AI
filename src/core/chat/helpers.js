@@ -41,8 +41,8 @@ export function handleSSEError(res, err, label) {
     }
 }
 
-// Streams Ollama response as SSE. onDone(fullContent) is called when streaming
-// finishes; it should persist the message and return extra fields for the done event.
+// Streams Ollama response as SSE. onDone(filteredContent, rawContent) is called
+// when streaming finishes; it should persist the message and return extra fields for the done event.
 export async function streamOllama(res, messages, config, onDone) {
     const ollamaRes = await fetch(OLLAMA_URL, {
         method: "POST",
@@ -73,7 +73,8 @@ export async function streamOllama(res, messages, config, onDone) {
         return;
     }
 
-    let fullContent = "";
+    let fullContent = "";  // filtered (without <think> blocks) — sent to SSE and saved
+    let rawContent  = "";  // verbatim output from the model — used for logging
     let inThink     = false;
     const reader    = ollamaRes.body.getReader();
     const decoder   = new TextDecoder();
@@ -93,7 +94,10 @@ export async function streamOllama(res, messages, config, onDone) {
             try { parsed = JSON.parse(line); } catch { continue; }
 
             if (parsed.message?.content) {
-                let delta = parsed.message.content;
+                const raw  = parsed.message.content;
+                rawContent += raw;
+
+                let delta = raw;
 
                 if (inThink) {
                     const endIdx = delta.indexOf("</think>");
@@ -120,7 +124,7 @@ export async function streamOllama(res, messages, config, onDone) {
             }
 
             if (parsed.done) {
-                const extra = await onDone(fullContent);
+                const extra = await onDone(fullContent, rawContent);
                 res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
                 res.end();
                 return;
@@ -130,7 +134,7 @@ export async function streamOllama(res, messages, config, onDone) {
 
     // Fallback if stream ended without a parsed.done event
     if (fullContent) {
-        const extra = await onDone(fullContent);
+        const extra = await onDone(fullContent, rawContent);
         res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
     }
     res.end();

@@ -8,6 +8,7 @@ import {
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama } from "./helpers.js";
 import { getMemoriesForPrompt, extractAndSavePinnedMemories } from "../memory/index.js";
+import { logConversationTurn } from "../logger.js";
 
 const router = Router();
 
@@ -47,8 +48,17 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
 
         startSSE(res);
-        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent) => {
+        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent) => {
             const asstMsgId = fullContent ? addMessage(conversationId, "assistant", fullContent, nextPos + 1) : null;
+
+            logConversationTurn({
+                conversationId,
+                character,
+                model: sendConfig.model,
+                messages: ollamaMessages,
+                rawResponse: rawContent,
+                filteredResponse: fullContent,
+            });
 
             let pinnedMemoriesCreated = 0;
             if (fullContent && nextPos % 5 === 0) {
@@ -100,8 +110,19 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };
 
         startSSE(res);
-        await streamOllama(res, ollamaMessages, regenConfig, (fullContent) => {
+        await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent) => {
             const asstMsgId = fullContent ? addMessage(conversationId, "assistant", fullContent, deleted.position) : null;
+
+            logConversationTurn({
+                conversationId,
+                character,
+                model: regenConfig.model,
+                messages: ollamaMessages,
+                rawResponse: rawContent,
+                filteredResponse: fullContent,
+                isRegen: true,
+            });
+
             return { message_id: asstMsgId };
         });
     } catch (err) {
