@@ -466,6 +466,9 @@ async function init() {
       headerAvt.style.display = 'block';
     }
 
+    const editBtn = document.getElementById('edit-char-btn');
+    if (editBtn) editBtn.href = `/character/${characterId}/edit`;
+
     document.getElementById('nav-char-name').textContent = character.name;
     if (character.scenario) {
       document.getElementById('nav-char-scenario').textContent = character.scenario;

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editar Personagem — OpenRP AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/assets/css/styles.css" />
+    <link rel="stylesheet" href="/assets/css/sidebar.css" />
+  </head>
+  <body>
+    <div class="d-flex min-vh-100">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
+
+      <div class="flex-grow-1 overflow-auto">
+        <main class="content-main p-3 p-md-4">
+          <div class="mx-auto" style="max-width:680px;">
+
+            <div class="mb-4 d-flex align-items-start gap-3">
+              <div>
+                <h1 class="fw-bold mb-1" style="font-size:clamp(1.8rem,3vw,2.4rem); letter-spacing:-0.04em;">
+                  Editar personagem
+                </h1>
+                <p class="text-secondary mb-0" id="subtitle">Carregando dados do personagem...</p>
+              </div>
+            </div>
+
+            <div class="glass-card card p-4">
+              <form id="character-form">
+
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label" for="name">Nome <span class="text-danger">*</span></label>
+                    <input id="name" name="name" type="text" class="form-control" placeholder="Nome único do personagem" required />
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label" for="scenario">Cenário</label>
+                    <input id="scenario" name="scenario" type="text" class="form-control" placeholder="Breve situação ou contexto" />
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label" for="description">Descrição</label>
+                  <textarea id="description" name="description" class="form-control" placeholder="Descreva o personagem..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label" for="first_message">Primeira mensagem</label>
+                  <textarea id="first_message" name="first_message" class="form-control" placeholder="Mensagem inicial do personagem... Use {{user}} para o nome do jogador."></textarea>
+                </div>
+
+                <div class="mb-4">
+                  <label class="form-label" for="personality">Personalidade</label>
+                  <textarea id="personality" name="personality" class="form-control" placeholder="Como o personagem age e fala..."></textarea>
+                </div>
+
+                <div class="glass-card card p-3 mb-4" style="border-radius:.85rem !important;">
+                  <p class="fw-semibold mb-3 d-flex align-items-center gap-2" style="color:#cbd5e1; font-size:.9rem;">
+                    <i class="bi bi-image text-info"></i> Imagem do personagem
+                  </p>
+
+                  <div id="avatar-preview-wrap" class="mb-3" style="display:none;">
+                    <p class="text-secondary small mb-2">Imagem atual:</p>
+                    <img id="avatar-preview" src="" alt="Avatar atual" style="width:96px; height:96px; object-fit:cover; border-radius:.75rem; border:1px solid rgba(148,163,184,0.2);" />
+                  </div>
+
+                  <p class="text-secondary small mb-3">Deixe os campos abaixo em branco para manter a imagem atual.</p>
+
+                  <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label" for="avatar_upload">Upload de arquivo</label>
+                      <input id="avatar_upload" name="avatar_upload" type="file" accept="image/*" class="form-control" />
+                      <div class="form-text mt-1">Envie uma nova imagem.</div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label" for="avatar_link">Ou use um link</label>
+                      <input id="avatar_link" name="avatar_link" type="url" class="form-control" placeholder="https://..." />
+                      <div class="form-text mt-1">URL pública de uma imagem.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="msg-error" class="alert-glass-error mb-3" role="status" style="display:none;"></div>
+                <div id="msg-success" class="alert-glass-success mb-3" role="status" style="display:none;"></div>
+
+                <div class="d-flex gap-2">
+                  <button type="button" id="btn-cancel" class="btn btn-outline-secondary flex-shrink-0">
+                    <i class="bi bi-arrow-left me-1"></i>Cancelar
+                  </button>
+                  <button type="submit" class="btn-sky flex-grow-1">
+                    <i class="bi bi-check-circle me-2"></i>Salvar alterações
+                  </button>
+                </div>
+
+              </form>
+            </div>
+
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
+    <script src="/assets/js/edit-character.js"></script>
+  </body>
+</html>

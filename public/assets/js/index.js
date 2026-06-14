@@ -24,7 +24,9 @@ async function loadCharacters() {
               <p class="flex-grow-1 mb-0" style="color:#cbd5e1; font-size:.88rem; line-height:1.65;">${character.personality || 'Personalidade não definida.'}</p>
               <div class="d-flex align-items-center justify-content-between pt-2 mt-1" style="border-top:1px solid rgba(148,163,184,0.1);">
                 <span class="badge-blue">${character.name}</span>
-                <span class="badge-green"><i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Pronto</span>
+                <button class="btn-edit-char" title="Editar personagem" data-id="${character.id}">
+                  <i class="bi bi-pencil"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -32,6 +34,11 @@ async function loadCharacters() {
 
         col.querySelector('.char-card').addEventListener('click', () => {
           window.location.href = `/chat/${character.id}`;
+        });
+
+        col.querySelector('.btn-edit-char').addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/character/${character.id}/edit`;
         });
 
         grid.appendChild(col);

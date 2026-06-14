@@ -6,6 +6,7 @@ import {
     getAllCharacters,
     getCharacter,
     getRecentCharactersWithConversations,
+    updateCharacter,
 } from "../../database/queries.js";
 
 const publicPath = path.resolve(process.cwd(), "public");
@@ -15,6 +16,10 @@ export default function characterRouter(uploadDir) {
 
     router.get("/character/new", (_req, res) => {
         res.sendFile(path.join(publicPath, "new-character.html"));
+    });
+
+    router.get("/character/:id/edit", (_req, res) => {
+        res.sendFile(path.join(publicPath, "edit-character.html"));
     });
 
     router.get("/api/characters", (_req, res) => {
@@ -71,6 +76,43 @@ export default function characterRouter(uploadDir) {
             const character = getCharacter(req.params.id);
             if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
             res.json({ ok: true, character });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    router.put("/api/characters/:id", (req, res) => {
+        try {
+            const { id } = req.params;
+            const existing = getCharacter(id);
+            if (!existing) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
+
+            const { name, description, personality, scenario, first_message, avatar_link, avatar_upload, avatar_filename } = req.body;
+
+            if (name !== undefined && !name.trim()) {
+                return res.status(400).json({ ok: false, message: "O nome do personagem não pode ser vazio." });
+            }
+
+            let avatarUrl;
+            if (avatar_upload && avatar_filename) {
+                const safeName = `${Date.now()}-${avatar_filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+                const destination = path.join(uploadDir, safeName);
+                fs.writeFileSync(destination, Buffer.from(avatar_upload, "base64"));
+                avatarUrl = `/assets/uploads/${safeName}`;
+            } else if (avatar_link) {
+                avatarUrl = avatar_link;
+            }
+
+            updateCharacter(id, {
+                name:          name          !== undefined ? name.trim()          : undefined,
+                description:   description   !== undefined ? description           : undefined,
+                personality:   personality   !== undefined ? personality           : undefined,
+                scenario:      scenario      !== undefined ? scenario              : undefined,
+                first_message: first_message !== undefined ? first_message         : undefined,
+                avatar_url:    avatarUrl,
+            });
+
+            res.json({ ok: true, id });
         } catch (err) {
             res.status(500).json({ ok: false, message: err.message });
         }
