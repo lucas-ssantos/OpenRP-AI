@@ -53,6 +53,16 @@ export function setInputEnabled(enabled) {
   dom.sendBtn.disabled = !enabled;
 }
 
+export function showChatStatus(text) {
+  document.getElementById('chat-status-text').textContent = text;
+  document.getElementById('chat-status').style.display = 'flex';
+}
+
+export function clearChatStatus() {
+  const el = document.getElementById('chat-status');
+  if (el) el.style.display = 'none';
+}
+
 export function showPinnedMemoryToast(count) {
   document.getElementById('pinned-memory-toast')?.remove();
 

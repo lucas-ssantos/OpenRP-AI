@@ -203,16 +203,22 @@
       </div>
 
       <footer class="input-area">
-        <textarea
-          id="msg-input"
-          placeholder="Escreva uma mensagem…"
-          rows="1"
-          autocomplete="off"
-          autocorrect="off"
-        ></textarea>
-        <button class="send-btn" id="send-btn" title="Enviar" disabled>
-          <i class="bi bi-send-fill" style="font-size:.95rem; margin-left:1px;"></i>
-        </button>
+        <div id="chat-status" class="chat-status">
+          <span class="chat-status-spinner"></span>
+          <span id="chat-status-text"></span>
+        </div>
+        <div class="input-row">
+          <textarea
+            id="msg-input"
+            placeholder="Escreva uma mensagem…"
+            rows="1"
+            autocomplete="off"
+            autocorrect="off"
+          ></textarea>
+          <button class="send-btn" id="send-btn" title="Enviar" disabled>
+            <i class="bi bi-send-fill" style="font-size:.95rem; margin-left:1px;"></i>
+          </button>
+        </div>
       </footer>
     </div>
 

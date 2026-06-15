@@ -66,6 +66,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             let autoMemoriesCreated   = 0;
 
             if (fullContent && nextPos % 5 === 0) {
+                res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`);
                 const msgsForExtraction = getLastNMessages(conversationId, 10);
                 const created = await extractAndSavePinnedMemories(conversationId, msgsForExtraction, character, config);
                 pinnedMemoriesCreated = created.length;

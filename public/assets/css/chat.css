@@ -402,13 +402,44 @@ body.immersive .input-area {
 .input-area {
   flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 0.7rem;
+  flex-direction: column;
+  align-items: stretch;
   padding: 0.9rem 1.25rem 1.1rem;
   background: rgba(2, 6, 23, 0.55);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
+}
+
+/* ── Chat status (memória em processamento) ── */
+#chat-status {
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  color: #a5b4fc;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.chat-status-spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid rgba(165, 180, 252, 0.25);
+  border-top-color: #a5b4fc;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 #msg-input {

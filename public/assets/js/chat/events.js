@@ -2,7 +2,7 @@ import { state, dom } from './state.js';
 import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
-  showPinnedMemoryToast,
+  showPinnedMemoryToast, showChatStatus, clearChatStatus,
 } from './ui.js';
 
 // ── Rollback state ────────────────────────────────────────────────────
@@ -393,6 +393,11 @@ export async function sendMessage() {
           return;
         }
 
+        if (data.type === 'memory_processing') {
+          showChatStatus('Criando memória fixada…');
+          continue;
+        }
+
         if (data.delta) {
           if (!charText) {
             removeTypingIndicator();
@@ -425,6 +430,7 @@ export async function sendMessage() {
     showError(`Erro: ${err.message}`);
   } finally {
     removeTypingIndicator();
+    clearChatStatus();
     state.isStreaming = false;
     setInputEnabled(true);
     dom.inputEl.focus();
