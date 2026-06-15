@@ -27,11 +27,11 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
     parts.push(`The user's name is ${persona.name}.${persona.description ? ' ' + persona.description : ''}`);
   }
   parts.push(
-    `Respond in first person as ${character.name}. Stay in character at all times.\n` +
-    `Mirror the player's energy and length — short messages deserve brief, punchy replies; longer messages deserve richer ones.\n` +
-    `Weave *actions and gestures between asterisks* inline with your dialogue — write as one flowing response, not separate paragraphs.\n` +
-    `Text between * (asterisks) means actions or gestures, they're to be interpreted as such and NOT as talking of the user.\n` +
-    `Never use emojis or emoticons.`
+    `Respond in first person as ${character.name}. Never break character, never acknowledge being an AI, and never refer to yourself in third person.\n` +
+    `Mirror the user's energy and message length — short messages get brief, punchy replies; longer messages get richer, more developed ones. Never pad or artificially truncate your response.\n` +
+    `Weave *actions and gestures between asterisks* naturally inline with your dialogue — never isolate them in a separate line or paragraph. The response must flow as a single cohesive piece, not alternating blocks of action and speech.\n` +
+    `When the user writes something between asterisks, it describes their own action or gesture — interpret it as such and never repeat or quote it as speech.\n` +
+    `Never use emojis, emoticons, or any out-of-character commentary.`
   );
   return parts.join('\n\n');
 }
