@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
     getCharacter, getPersona, getGenerationConfig,
     getConversation, addMessage, updateMessage, rollbackConversation,
-    deleteLastAssistantMessage, getLastNMessages,
+    deleteLastAssistantMessage, getLastNMessages, getConversationMessages,
     getAllLorebooks, getMemories,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
@@ -63,19 +63,24 @@ router.post("/conversations/:id/messages", async (req, res) => {
             });
 
             let pinnedMemoriesCreated = 0;
-            let autoMemoriesCreated   = 0;
 
-            if (fullContent && nextPos % 5 === 0) {
-                res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`);
-                const msgsForExtraction = getLastNMessages(conversationId, 10);
-                const created = await extractAndSavePinnedMemories(conversationId, msgsForExtraction, character, config);
-                pinnedMemoriesCreated = created.length;
-            }
+            if (fullContent) {
+                const numCtx      = config.num_ctx_messages || 20;
+                const memInterval = config.memory_interval ?? 5;
 
-            const memInterval = config.memory_interval ?? 5;
-            if (fullContent && nextPos > 0 && nextPos % memInterval === 0) {
-                const msgsForAuto = getLastNMessages(conversationId, memInterval * 2);
-                extractAndSaveAutoMemories(conversationId, msgsForAuto, character, persona, config).catch(() => {});
+                // Mensagens fora da janela de contexto = mensagens que o Ollama não vai mais ver
+                const allNonSystem  = getConversationMessages(conversationId).filter(m => m.role !== "system");
+                const outsideCount  = Math.max(0, allNonSystem.length - numCtx);
+
+                if (outsideCount > 0 && outsideCount % memInterval === 0) {
+                    const batch = allNonSystem.slice(outsideCount - memInterval, outsideCount);
+
+                    res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`);
+                    const pinnedCreated = await extractAndSavePinnedMemories(conversationId, batch, character, config);
+                    pinnedMemoriesCreated = pinnedCreated.length;
+
+                    extractAndSaveAutoMemories(conversationId, batch, character, persona, config).catch(() => {});
+                }
             }
 
             return {
