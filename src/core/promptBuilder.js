@@ -30,7 +30,7 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
     `Respond in first person as ${character.name}. Stay in character at all times.\n` +
     `Mirror the player's energy and length — short messages deserve brief, punchy replies; longer messages deserve richer ones.\n` +
     `Weave *actions and gestures between asterisks* inline with your dialogue — write as one flowing response, not separate paragraphs.\n` +
-    `Text between * (asterisks) means actions or gestures, they're to be interpreted as such and NOT as text.\n` +
+    `Text between * (asterisks) means actions or gestures, they're to be interpreted as such and NOT as talking to the character.\n` +
     `Never use emojis or emoticons.`
   );
   return parts.join('\n\n');
