@@ -4,27 +4,50 @@ import { createPinnedMemory } from "./create.js";
 
 const OLLAMA_URL = appConfig.ollama.chatEndpoint;
 
-const SYSTEM_PROMPT = `You are a memory extraction system for a roleplay application.
-Analyze the conversation excerpt and identify ONLY facts that permanently change WHO the character is.
+function buildSystemPrompt(character) {
+    const name = character?.name || 'the character';
+    const baseline = [
+        character?.description && `Description: ${character.description}`,
+        character?.personality && `Personality: ${character.personality}`,
+    ].filter(Boolean).join('\n\n');
 
-QUALIFY as pinned memory:
-- Permanent physical/state changes: "Lost their right arm in the battle of Ardenmoor"
-- Structural relationship shifts: "Now considers the user a fully trusted ally"
-- Revealed secrets that cannot be un-revealed: "Knows the user is the rightful heir to the throne"
-- Vows or rules that define future behavior: "Swore never to speak their brother's name again"
+    return `You are a strict memory extraction system for a roleplay application.
+Your only job is to identify facts that PERMANENTLY AND IRREVERSIBLY change who ${name} is — things that alter their identity, core relationship structure, or fundamental behavior going forward, and that were NOT already part of their established baseline.
 
-DO NOT qualify:
-- Emotional reactions: "Got angry when horses were mentioned"
-- Preferences: "Likes tea" (belongs in character personality, not memory)
-- Scene or location details: "They were in the café when the secret was revealed"
-- Temporary states: "Is currently nervous about the mission"
+---
+CHARACTER BASELINE — ${name}:
+${baseline || '(no baseline provided)'}
+---
 
-Respond ONLY with a JSON array — no markdown, no explanation. Each object must have:
-  "content": string (clear statement of the permanent fact, at least 20 characters)
-  "keywords": string (comma-separated keywords identifying the topic)
-  "summary": string | null (shorter optional label)
+Use the baseline above as the reference for what is NORMAL for ${name}. Only create a memory if something in the excerpt DEVIATES from or EXTENDS BEYOND that baseline in a way that is permanent and cannot be undone.
+
+QUALIFY as pinned memory (must meet ALL three conditions):
+1. NOT already described or implied in the baseline above
+2. Cannot be reversed — it is a fact that will still be true in future conversations
+3. Changes WHO ${name} IS, not just what happened in this scene
+
+Examples that qualify:
+- Permanent physical or identity change absent from baseline: lost a limb, revealed a hidden power, underwent transformation
+- Relationship structure irreversibly shifted: enemy became a trusted ally, a secret bond was forged
+- Secret revealed with no way back: knows the user's true identity, learned a fact that redefines everything
+- Vow or rule adopted that will govern all future behavior: swore never to do X, made a binding promise
+
+DO NOT qualify (return [] for these):
+- Any behavior, trait, or preference ALREADY described in the baseline — even if shown vividly in the excerpt
+- Emotional reactions, even intense ones: anger, sadness, fear, excitement — they pass
+- Scene details: where they were, what the weather was like
+- Temporary states: tired, nervous, hopeful
+- Preferences or habits that belong in personality, not memory
+
+When in doubt, return []. A false negative (missing a borderline memory) is far less harmful than a false positive (polluting the context with noise that mimics the baseline).
+
+Respond ONLY with a JSON array — no markdown, no explanation. Each object:
+  "content": string (factual statement of the permanent change, minimum 20 characters)
+  "keywords": string (comma-separated keywords)
+  "summary": string | null
 
 If nothing qualifies, respond with exactly: []`;
+}
 
 function isTooSimilar(existing, candidate) {
     const candidateWords = new Set(candidate.toLowerCase().split(/\s+/).filter(w => w.length >= 4));
@@ -62,7 +85,7 @@ export async function extractAndSavePinnedMemories(conversationId, recentMessage
             body: JSON.stringify({
                 model: modelConfig?.model || appConfig.defaults.model,
                 messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'system', content: buildSystemPrompt(character) },
                     { role: 'user', content: `Conversation excerpt:\n\n${excerpt}` },
                 ],
                 stream: false,
