@@ -3,8 +3,8 @@ import { appConfig } from "../config.js";
 const BASE_MODEL = "gemma4:e4b";
 
 const CUSTOM_MODELS = [
-    { name: "gemma4-e4b-32k", numCtx: 32768 },
-    { name: "gemma4-e4b-64k", numCtx: 65536 },
+    { name: "gemma4:e4b-32k", numCtx: 32768 },
+    { name: "gemma4:e4b-64k", numCtx: 65536 },
 ];
 
 async function getAvailableModels() {
