@@ -1,8 +1,13 @@
 /* ── Page layout ─────────────────────────────────────────────────── */
 
+.vdb-outer {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .vdb-page {
   display: flex;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -601,6 +606,12 @@
 /* ── Responsive ──────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+  .vdb-outer {
+    height: auto;
+    overflow: visible;
+    min-height: 100vh;
+  }
+
   .vdb-page {
     flex-direction: column;
     height: auto;
@@ -610,17 +621,39 @@
   .vdb-convs-panel {
     width: 100%;
     height: auto;
-    max-height: 40vh;
+    max-height: 45vh;
     border-right: none;
     border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   }
 
   .vdb-detail-panel {
+    flex: none;
     overflow: visible;
     padding: 1rem;
+    height: auto;
   }
 
   .vdb-info-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Remover clamps de altura — no mobile o usuário faz scroll na página */
+  .vdb-field-value {
+    max-height: none;
+    -webkit-line-clamp: unset;
+    display: block;
+    overflow: visible;
+  }
+
+  .vdb-msg-content {
+    max-height: none;
+    -webkit-line-clamp: unset;
+    display: block;
+    overflow: visible;
+  }
+
+  .vdb-messages {
+    max-height: none;
+    overflow: visible;
   }
 }
