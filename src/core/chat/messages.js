@@ -6,7 +6,7 @@ import {
     getAllLorebooks, getMemories,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
-import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama } from "./helpers.js";
+import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
 import { getMemoriesForPrompt, extractAndSavePinnedMemories, extractAndSaveAutoMemories } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 
@@ -49,7 +49,8 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         startSSE(res);
         await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent) => {
-            const asstMsgId = fullContent ? addMessage(conversationId, "assistant", fullContent, nextPos + 1) : null;
+            const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
+            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, nextPos + 1) : null;
 
             logConversationTurn({
                 conversationId,
@@ -127,7 +128,8 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
 
         startSSE(res);
         await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent) => {
-            const asstMsgId = fullContent ? addMessage(conversationId, "assistant", fullContent, deleted.position) : null;
+            const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
+            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, deleted.position) : null;
 
             logConversationTurn({
                 conversationId,

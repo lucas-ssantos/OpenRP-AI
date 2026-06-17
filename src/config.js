@@ -31,6 +31,7 @@ export const appConfig = {
         num_ctx_messages: parseInt(process.env.DEFAULT_NUM_CTX_MESSAGES)         || 20,
         memory_interval:  parseInt(process.env.MEMORY_INTERVAL)                  || 5,
         seed:             parseInt(process.env.DEFAULT_SEED ?? "-1")             || -1,
+        max_response_chars: parseInt(process.env.DEFAULT_MAX_RESPONSE_CHARS)   || 0,
         stream:           true,
         stop: process.env.DEFAULT_STOP
             ? process.env.DEFAULT_STOP.split(",").map((s) => s.trim())

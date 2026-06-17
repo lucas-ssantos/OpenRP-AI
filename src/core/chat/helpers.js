@@ -24,6 +24,38 @@ export function dynamicMaxTokens(userMessage, config) {
     return Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));
 }
 
+function lastSentenceBoundary(str) {
+    return Math.max(
+        str.lastIndexOf('.'),
+        str.lastIndexOf('!'),
+        str.lastIndexOf('?'),
+        str.lastIndexOf('…'),
+    );
+}
+
+export function trimToLastSentence(text, maxChars) {
+    if (!maxChars || maxChars <= 0 || text.length <= maxChars) return text;
+
+    const truncated = text.slice(0, maxChars);
+    const boundary = lastSentenceBoundary(truncated);
+    if (boundary <= 0) return truncated;
+
+    let result = text.slice(0, boundary + 1).trim();
+
+    // Se sobrou asterisco não fechado, recua até antes da ação incompleta
+    const asteriskCount = (result.match(/\*/g) || []).length;
+    if (asteriskCount % 2 !== 0) {
+        const openAt = result.lastIndexOf('*');
+        const before = result.slice(0, openAt);
+        const prevBoundary = lastSentenceBoundary(before);
+        result = prevBoundary > 0
+            ? text.slice(0, prevBoundary + 1).trim()
+            : before.trim();
+    }
+
+    return result;
+}
+
 export function startSSE(res) {
     res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" });
     res.flushHeaders();
