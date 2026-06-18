@@ -243,6 +243,22 @@ body {
   color: #a5b4fc;
 }
 
+/* Keep edit (and rollback) visible briefly after a save so the cursor can reach them */
+.msg-row.just-edited .edit-btn,
+.msg-row.just-edited .rollback-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* On touch devices there is no hover — always show action buttons */
+@media (hover: none) and (pointer: coarse) {
+  .rollback-btn,
+  .edit-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* ── Inline edit mode ── */
 .edit-textarea {
   width: 100%;

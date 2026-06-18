@@ -181,6 +181,8 @@ function enterEditMode(row, messageId) {
       actions.remove();
       textEl.style.display = '';
       renderBubbleText(textEl, newText);
+      row.classList.add('just-edited');
+      setTimeout(() => row.classList.remove('just-edited'), 2500);
     } catch (err) {
       showError(`Erro ao salvar: ${err.message}`);
       saveBtn.disabled = false;
@@ -216,6 +218,7 @@ export async function regenerateLastMessage(rowEl) {
   const regenBtn = rowEl.querySelector('.regenerate-btn');
   if (regenBtn) regenBtn.disabled = true;
   rowEl.querySelector('.rollback-btn')?.remove();
+  rowEl.querySelector('.edit-btn')?.remove();
 
   bubble.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
   bubble.classList.add('typing-bubble');
@@ -270,6 +273,7 @@ export async function regenerateLastMessage(rowEl) {
 
         if (data.done && data.message_id) {
           attachRollbackBtn(rowEl, data.message_id);
+          attachEditBtn(rowEl, data.message_id);
           rowEl.dataset.messageId = data.message_id;
         }
       }
@@ -414,10 +418,12 @@ export async function sendMessage() {
           if (data.message_id && charRow) {
             attachRollbackBtn(charRow, data.message_id);
             charRow.dataset.messageId = data.message_id;
+            attachEditBtn(charRow, data.message_id);
           }
           if (data.user_message_id && userRow) {
             attachRollbackBtn(userRow, data.user_message_id);
             userRow.dataset.messageId = data.user_message_id;
+            attachEditBtn(userRow, data.user_message_id);
           }
           updateLastCharRow();
           if (data.pinned_memories_created > 0) showPinnedMemoryToast(data.pinned_memories_created);
