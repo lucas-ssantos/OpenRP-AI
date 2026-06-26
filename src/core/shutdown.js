@@ -105,14 +105,33 @@ export async function shutdown(code = 0)
             }
         }
 
-        if (_stopTailscale) {
-            console.log("Stopping Tailscale service...");
-            try {
-                const stop = spawnSync("systemctl", ["stop", "tailscaled"]);
-                if (stop.status === 0) console.log("Tailscale service stopped.");
-                else console.warn("Failed to stop tailscaled via systemctl.");
-            } catch (e) {
-                console.warn("Error stopping Tailscale:", e.message || e);
+        if (_stopTailscale)
+        {
+            // Mesmo padrão do Ollama (systemd): confirma systemctl, checa se está ativo, então para.
+            try
+            {
+                const hasSystemctl = spawnSync("which", ["systemctl"]).status === 0;
+                if (hasSystemctl)
+                {
+                    const isActive = spawnSync("systemctl", ["is-active", "--quiet", "tailscaled"]);
+                    if (isActive.status === 0)
+                    {
+                        console.log("Stopping systemd-managed Tailscale service...");
+                        const stop = spawnSync("systemctl", ["stop", "tailscaled"]);
+                        if (stop.status === 0)
+                        {
+                            console.log("Tailscale systemd service stopped");
+                        }
+                        else
+                        {
+                            console.warn("Failed to stop Tailscale via systemctl — you may need sudo.\nRun: sudo systemctl stop tailscaled");
+                        }
+                    }
+                }
+            }
+            catch (e)
+            {
+                console.warn("Error while attempting to stop systemd Tailscale service:", e.message || e);
             }
         }
 
