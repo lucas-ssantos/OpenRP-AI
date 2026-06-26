@@ -53,6 +53,31 @@ export function getGenerationConfig(level = "global", id = null) {
   return config;
 }
 
+// ── Override de modelo por conversa (model-only) ─────────────────────────────
+// A conversa pode ter um modelo exclusivo; os demais parâmetros continuam
+// herdando de global → personagem (ver resolveConfig).
+export function getConversationModel(conversationId) {
+  const db = getDB();
+  const result = db.exec(
+    `SELECT model FROM conversation_config WHERE conversation_id = ?`,
+    [conversationId]
+  );
+  if (!result.length || !result[0].values.length) return null;
+  return result[0].values[0][0] || null;
+}
+
+export function setConversationModel(conversationId, model) {
+  const db = getDB();
+  const now = localDatetime();
+  // INSERT OR REPLACE grava só o modelo; demais colunas ficam NULL (sem override).
+  db.run(
+    `INSERT OR REPLACE INTO conversation_config (conversation_id, model, updated_at)
+     VALUES (?, ?, ?)`,
+    [conversationId, model?.trim() || null, now]
+  );
+  saveDB();
+}
+
 export function setGenerationConfig(level = "global", id = null, config = {}) {
   const db = getDB();
   const now = localDatetime();

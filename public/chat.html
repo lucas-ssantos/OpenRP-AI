@@ -57,6 +57,9 @@
             <a href="/" id="nav-new-chat" style="color:#38bdf8;">
               <i class="bi bi-chat-left-text"></i> Conversas deste personagem
             </a>
+            <a href="#" id="nav-conv-model" style="color:#a5b4fc;">
+              <i class="bi bi-cpu"></i> Modelo desta conversa
+            </a>
             <a href="#" id="nav-select-messages" style="color:#a5b4fc;">
               <i class="bi bi-ui-checks"></i> Selecionar mensagens
             </a>
@@ -125,6 +128,37 @@
             <button type="button" id="reset-confirm-btn"
                     style="background:rgba(239,68,68,.18); border:1px solid rgba(239,68,68,.4); color:#fca5a5; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
               <i class="bi bi-trash3 me-1"></i>Apagar tudo e reiniciar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Conversation model modal ─────────────────────────────────── -->
+    <div class="modal fade" id="convModelModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="background:rgba(6,12,30,0.98); border:1px solid rgba(148,163,184,0.15); border-radius:1.1rem;">
+          <div class="modal-header" style="border-bottom:1px solid rgba(148,163,184,0.1); padding:1.1rem 1.25rem .85rem;">
+            <h6 class="modal-title mb-0" style="color:#f1f5f9; font-weight:700; font-size:.95rem;">
+              <i class="bi bi-cpu me-2" style="color:#a5b4fc;"></i>Modelo desta conversa
+            </h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size:.8rem;"></button>
+          </div>
+          <div class="modal-body" style="color:#94a3b8; font-size:.88rem; line-height:1.6; padding:1.1rem 1.25rem;">
+            <p class="mb-2" style="font-size:.84rem;">Escolha um modelo exclusivo para esta conversa. <strong style="color:#cbd5e1;">Padrão</strong> usa o modelo global/personagem.</p>
+            <select id="conv-model-select" class="form-select">
+              <option value="">Carregando…</option>
+            </select>
+            <div id="conv-model-error" class="alert-glass-error mt-3" role="status" style="display:none;"></div>
+          </div>
+          <div class="modal-footer" style="border-top:1px solid rgba(148,163,184,0.1); padding:.85rem 1.25rem; gap:.5rem;">
+            <button type="button" data-bs-dismiss="modal"
+                    style="background:rgba(30,41,59,.7); border:1px solid rgba(148,163,184,.2); color:#cbd5e1; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
+              Cancelar
+            </button>
+            <button type="button" id="conv-model-save"
+                    style="background:rgba(99,102,241,.18); border:1px solid rgba(99,102,241,.4); color:#a5b4fc; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
+              <i class="bi bi-check-circle me-1"></i>Salvar
             </button>
           </div>
         </div>

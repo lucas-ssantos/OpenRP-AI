@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { getDB, saveDB } from "./db.js";
 import { appConfig } from "../../config.js";
 
@@ -142,8 +144,15 @@ export async function migrate() {
   // Migration para DBs existentes sem a coluna memory_interval
   try { db.run(`ALTER TABLE generation_config ADD COLUMN memory_interval INTEGER DEFAULT 5`); } catch {}
 
-  // Seed initial row from appConfig.defaults (INSERT OR IGNORE preserves user-saved config)
-  const d = appConfig.defaults;
+  // Seed inicial: usa o preset de "PC médio" (mesclado sobre os defaults do .env, que
+  // preenchem campos que o preset não traz, como num_ctx_messages/memory_interval).
+  // INSERT OR IGNORE preserva qualquer config já salva pelo usuário.
+  let seed = { ...appConfig.defaults };
+  try {
+    const mediumPath = path.join(process.cwd(), "config_recomendadas", "medium_spec.json");
+    seed = { ...seed, ...JSON.parse(fs.readFileSync(mediumPath, "utf8")) };
+  } catch { /* sem o arquivo de preset, mantém os defaults do .env */ }
+  const d = seed;
   db.run(`
     INSERT OR IGNORE INTO generation_config
       (id, model, temperature, top_p, top_k, min_p,

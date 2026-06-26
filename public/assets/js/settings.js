@@ -87,8 +87,11 @@ function ensureModelOption(modelName) {
     const opt = document.createElement('option');
     opt.value = modelName;
     opt.textContent = `${modelName} (configurado)`;
-    // insert after the first placeholder option
-    modelSelect.insertBefore(opt, modelSelect.options[1] ?? null);
+    // Inserir como filho DIRETO do <select>, logo após o placeholder.
+    // Não usar modelSelect.options[1]: com <optgroup>, options[] inclui <option>s
+    // aninhados, e insertBefore com um nó que não é filho direto lança DOMException.
+    const placeholder = [...modelSelect.children].find((c) => c.tagName === 'OPTION');
+    modelSelect.insertBefore(opt, placeholder ? placeholder.nextSibling : modelSelect.firstChild);
   }
   modelSelect.value = modelName;
 }
@@ -319,7 +322,17 @@ window.addEventListener('load', async () => {
   // load models first so #model select is populated before fillForm runs
   const [installedNames] = await Promise.all([loadModels(), loadPresets(), loadConfig()]);
   renderRecommendations(installedNames);
-  if (configData) fillForm(configData);
+
+  if (configData) {
+    fillForm(configData);
+  } else if (presetsData.medium?.config) {
+    // Sem configuração salva → parte do preset "Máquina Média".
+    fillForm(presetsData.medium.config);
+    document.querySelectorAll('.preset-btn').forEach(
+      (btn) => btn.classList.toggle('active', btn.dataset.preset === 'medium')
+    );
+    showFeedback('Nenhuma configuração salva ainda — carregado o preset "Máquina Média". Ajuste se quiser e clique em Salvar.');
+  }
 
   // selecting a recommendation fills the pull input
   document.getElementById('recommended-models').addEventListener('change', (e) => {

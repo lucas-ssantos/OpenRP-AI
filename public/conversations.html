@@ -96,6 +96,13 @@
                 <label class="form-label" for="conv-first-message">Mensagem inicial</label>
                 <textarea id="conv-first-message" class="form-control" rows="3" placeholder="Primeira fala do personagem... Use {{user}} para o nome do jogador."></textarea>
               </div>
+              <div class="mb-2">
+                <label class="form-label" for="conv-model">Modelo desta conversa</label>
+                <select id="conv-model" class="form-select">
+                  <option value="">Padrão (global / personagem)</option>
+                </select>
+                <div class="form-text mt-1">Opcional. Escolha um modelo exclusivo para esta conversa.</div>
+              </div>
               <div id="conv-error" class="alert-glass-error mt-3" role="status" style="display:none;"></div>
             </div>
             <div class="modal-footer" style="border-top:1px solid rgba(148,163,184,0.1);">

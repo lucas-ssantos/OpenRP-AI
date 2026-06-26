@@ -1,13 +1,22 @@
-import { getGenerationConfig } from "../../services/database/queries.js";
+import { getGenerationConfig, getConversationModel } from "../../services/database/queries.js";
 import { appConfig } from "../../config.js";
 
 const OLLAMA_URL    = appConfig.ollama.chatEndpoint;
 const DEFAULT_CONFIG = { ...appConfig.defaults };
 
-export function resolveConfig(characterId) {
+// Hierarquia: defaults (.env) → global → character_config (se tiver model) →
+// override de modelo da conversa (model-only). Só o campo `model` é sobreposto
+// pela conversa; os demais parâmetros continuam herdados.
+export function resolveConfig(characterId, conversationId = null) {
     const globalConfig = getGenerationConfig("global");
     const charConfig   = getGenerationConfig("character", characterId);
-    return { ...DEFAULT_CONFIG, ...globalConfig, ...(charConfig?.model ? charConfig : {}) };
+    const config = { ...DEFAULT_CONFIG, ...globalConfig, ...(charConfig?.model ? charConfig : {}) };
+
+    if (conversationId) {
+        const convModel = getConversationModel(conversationId);
+        if (convModel) config.model = convModel;
+    }
+    return config;
 }
 
 function estimateTokens(text) {

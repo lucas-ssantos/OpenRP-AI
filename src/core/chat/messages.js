@@ -26,7 +26,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
         const persona    = getPersona();
-        const config     = resolveConfig(conv.character_id);
+        const config     = resolveConfig(conv.character_id, conversationId);
         const charConfig = getGenerationConfig("character", conv.character_id);
 
         const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
@@ -109,7 +109,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         if (!deleted) return res.status(400).json({ ok: false, message: "Nenhuma mensagem do personagem para regenerar." });
 
         const persona    = getPersona();
-        const config     = resolveConfig(conv.character_id);
+        const config     = resolveConfig(conv.character_id, conversationId);
         const charConfig = getGenerationConfig("character", conv.character_id);
 
         const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);

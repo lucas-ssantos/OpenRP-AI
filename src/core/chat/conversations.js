@@ -3,6 +3,7 @@ import {
     getCharacter, getPersona,
     createConversation, getConversation, getConversationsForCharacter,
     addMessage, getConversationMessages, resetConversation,
+    getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
 import { resolveConfig } from "./helpers.js";
 import { extractAndSaveAutoMemories } from "../memory/index.js";
@@ -26,7 +27,7 @@ router.get("/characters/:id/conversations", (req, res) => {
 // Cria uma nova conversa com cenário + mensagem inicial próprios.
 router.post("/conversations", (req, res) => {
     try {
-        const { character_id, title, scenario, first_message } = req.body;
+        const { character_id, title, scenario, first_message, model } = req.body;
         if (!character_id) return res.status(400).json({ ok: false, message: "character_id é obrigatório." });
 
         const character = getCharacter(character_id);
@@ -45,6 +46,9 @@ router.post("/conversations", (req, res) => {
             const userName = persona?.name || "você";
             addMessage(convId, "assistant", first_message.trim().replace(/\{\{user\}\}/gi, userName), 0);
         }
+
+        // Modelo exclusivo da conversa (opcional)
+        if (model?.trim()) setConversationModel(convId, model);
 
         res.json({ ok: true, id: convId });
     } catch (err) {
@@ -67,6 +71,35 @@ router.get("/conversations/:id", (req, res) => {
 router.get("/conversations/:id/messages", (req, res) => {
     try {
         res.json({ ok: true, messages: getConversationMessages(req.params.id) });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
+// ── GET /api/conversations/:id/model ─────────────────────────────────────────
+// Retorna o override de modelo da conversa (ou null) e o modelo herdado (global/personagem).
+router.get("/conversations/:id/model", (req, res) => {
+    try {
+        const conv = getConversation(req.params.id);
+        if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+        res.json({
+            ok: true,
+            model: getConversationModel(req.params.id),
+            inherited_model: resolveConfig(conv.character_id).model,
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
+// ── POST /api/conversations/:id/model ────────────────────────────────────────
+// Define (ou limpa, com model vazio) o modelo exclusivo da conversa.
+router.post("/conversations/:id/model", (req, res) => {
+    try {
+        const conv = getConversation(req.params.id);
+        if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+        setConversationModel(req.params.id, req.body?.model || null);
+        res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -107,7 +140,7 @@ router.post("/conversations/:id/memories/generate", async (req, res) => {
 
         const character = getCharacter(conv.character_id);
         const persona   = getPersona();
-        const config    = resolveConfig(conv.character_id);
+        const config    = resolveConfig(conv.character_id, req.params.id);
 
         const created = await extractAndSaveAutoMemories(req.params.id, messages, character, persona, config);
         res.json({ ok: true, created: created.length });

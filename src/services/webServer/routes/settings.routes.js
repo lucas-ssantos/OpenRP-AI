@@ -107,9 +107,8 @@ router.post("/api/models/pull", async (req, res) => {
 
 router.get("/api/config", (_req, res) => {
     try {
-        const config = getGenerationConfig("global");
-        if (!config) return res.json({ ok: true, config: { ...appConfig.defaults } });
-        res.json({ ok: true, config });
+        // config null → o front carrega o preset "Máquina Média" como ponto de partida.
+        res.json({ ok: true, config: getGenerationConfig("global") || null });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

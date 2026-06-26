@@ -57,6 +57,17 @@ async function loadConversations() {
   `).join('');
 }
 
+async function loadModels() {
+  const select = document.getElementById('conv-model');
+  try {
+    const res = await fetch('/api/models');
+    const data = await res.json();
+    if (!res.ok || !data.ok || !data.models?.length) return;
+    const opts = data.models.map(m => `<option value="${escHtml(m.name)}">${escHtml(m.name)}</option>`).join('');
+    select.insertAdjacentHTML('beforeend', opts);
+  } catch { /* Ollama indisponível — fica só o padrão */ }
+}
+
 function initNewConvForm() {
   const form = document.getElementById('new-conv-form');
   const errEl = document.getElementById('conv-error');
@@ -68,6 +79,7 @@ function initNewConvForm() {
     const title        = document.getElementById('conv-title').value.trim();
     const scenario     = document.getElementById('conv-scenario').value.trim();
     const firstMessage = document.getElementById('conv-first-message').value.trim();
+    const model        = document.getElementById('conv-model').value;
 
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
@@ -76,7 +88,7 @@ function initNewConvForm() {
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ character_id: characterId, title, scenario, first_message: firstMessage }),
+        body: JSON.stringify({ character_id: characterId, title, scenario, first_message: firstMessage, model }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao criar conversa.');
@@ -93,6 +105,7 @@ function initNewConvForm() {
 window.addEventListener('load', async () => {
   await loadSidebar();
   initNewConvForm();
+  loadModels();
   try {
     await loadCharacter();
     await loadConversations();
