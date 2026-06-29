@@ -273,6 +273,7 @@ body {
   resize: vertical;
   outline: none;
   margin-bottom: .5rem;
+  min-height: 6rem;
 }
 
 .edit-actions {
@@ -817,6 +818,11 @@ body.selection-mode .msg-row.selected .bubble-user {
 
   #immersive-btn {
     bottom: 5.5rem;
+  }
+
+  .edit-textarea {
+    min-height: 9rem;
+    font-size: 1rem;
   }
 }
 

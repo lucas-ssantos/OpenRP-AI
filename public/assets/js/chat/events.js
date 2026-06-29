@@ -163,6 +163,9 @@ function enterEditMode(row, messageId) {
   bubble.appendChild(actions);
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
+  // Ajusta a altura ao conteúdo já na abertura (não só ao digitar).
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
 
   cancelBtn.addEventListener('click', () => {
     ta.remove();
