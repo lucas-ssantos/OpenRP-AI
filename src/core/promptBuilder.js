@@ -7,6 +7,22 @@ function matchesKeywords(keywords, contextText) {
   return kws.some(kw => lower.includes(kw));
 }
 
+// Builds the fixed behavioral instruction block — returned as its own dedicated
+// `system` message so the Ollama API interprets it as a standalone instruction,
+// separate from the character identity/persona content.
+function buildInstructionPrompt(character) {
+  return (
+    `Respond in first person as ${character.name}. Never break character, never acknowledge being an AI, and never refer to yourself in third person.\n` +
+    `Stay truthfull and strict all times on the personality and the likes and deslikes of ${character.name}.\n` +
+    `Your answer MUST HAVE between 300 and 500 characters.\n` +
+    `Keep responses SHORT and grounded — one brief action beat and one or two lines of dialogue at most. Real conversation is terse. Resist the urge to over-explain or describe every emotion.\n` +
+    `Keep actions more short and brief.\n` +
+    `Weave *actions and gestures between asterisks* naturally inline with your dialogue — never isolate them in a separate line or paragraph. The response must flow as a single cohesive piece, not alternating blocks of action and speech.\n` +
+    `When the user writes something between asterisks, it describes their own action or gesture — interpret it as such and never repeat or quote it as speech.\n` +
+    `Never use emojis, emoticons, or any out-of-character commentary.`
+  );
+}
+
 // Builds the base character system prompt.
 // If charConfig has a custom system_prompt, uses it with {{char}}/{{user}} substitution.
 function buildBaseSystemPrompt(character, persona, charConfig) {
@@ -17,16 +33,6 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
   }
 
   const parts = [
-    `Respond in first person as ${character.name}. Never break character, never acknowledge being an AI, and never refer to yourself in third person.\n` +
-    `Stay truthfull and strict all times on the personality and the likes and deslikes of ${character.name}.\n` +
-    `${character.name} slowly starts to like, get attached to ${persona.name}\n` +
-    `Your answer MUST HAVE between 300 and 500 characters.\n` +
-    `Keep responses SHORT and grounded — one brief action beat and one or two lines of dialogue at most. Real conversation is terse. Resist the urge to over-explain or describe every emotion.\n` +
-    `Keep actions more short and brief.\n` +
-    `Weave *actions and gestures between asterisks* naturally inline with your dialogue — never isolate them in a separate line or paragraph. The response must flow as a single cohesive piece, not alternating blocks of action and speech.\n` +
-    `When the user writes something between asterisks, it describes their own action or gesture — interpret it as such and never repeat or quote it as speech.\n` +
-    `Never use emojis, emoticons, or any out-of-character commentary.`,
-
     character.description
       ? `You are ${character.name}. ${character.description}`
       : `You are ${character.name}.`,
@@ -94,6 +100,10 @@ export function buildPromptMessages({
     ...historyMessages.slice(-5).map(m => m.content),
   ].join(' ');
 
+  // ── [0] Fixed behavioral instruction (own system message) ──────────────────
+  // Skipped when a custom system_prompt override is provided — that fully replaces it.
+  const instructionPrompt = charConfig?.system_prompt ? null : buildInstructionPrompt(character);
+
   // ── [1] Base system prompt ─────────────────────────────────────────────────
   const basePrompt = buildBaseSystemPrompt(character, persona, charConfig);
 
@@ -139,5 +149,9 @@ export function buildPromptMessages({
     bodyMessages = allMessages;
   }
 
-  return [{ role: 'system', content: systemContent }, ...bodyMessages];
+  const systemMessages = [];
+  if (instructionPrompt) systemMessages.push({ role: 'system', content: instructionPrompt });
+  systemMessages.push({ role: 'system', content: systemContent });
+
+  return [...systemMessages, ...bodyMessages];
 }
