@@ -100,7 +100,7 @@ export async function streamOllama(res, messages, config, onDone) {
                 min_p:         config.min_p,
                 repeat_penalty: config.repeat_penalty,
                 repeat_last_n: config.repeat_last_n,
-                num_ctx:       config.context_size,
+                num_ctx:       config.context_size || undefined,
                 num_predict:   config.max_tokens,
                 seed:          (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
                 stop:          config.stop?.length ? config.stop : undefined,

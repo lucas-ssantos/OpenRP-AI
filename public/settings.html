@@ -164,6 +164,17 @@
               <!-- Contexto e saída -->
               <div class="glass-card card p-4">
                 <div class="field-section-title"><i class="bi bi-layers"></i> Contexto e saída</div>
+
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" id="context_auto" role="switch" />
+                  <label class="form-check-label d-flex align-items-center gap-1" for="context_auto">
+                    Deixar o Ollama gerenciar o contexto automaticamente
+                    <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                       data-bs-toggle="tooltip"
+                       title="Quando ativo, o tamanho do contexto (num_ctx) não é enviado ao Ollama — o modelo usa seu próprio padrão. Útil para modelos com contexto já embutido (ex: gemma4:e4b-32k)."></i>
+                  </label>
+                </div>
+
                 <div class="row g-3">
                   <div class="col-12 col-sm-6 col-lg-4">
                     <label class="form-label d-flex align-items-center gap-1">

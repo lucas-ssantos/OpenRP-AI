@@ -237,7 +237,10 @@ function fillForm(config) {
   document.getElementById('tfs_z').value          = config.tfs_z          ?? '';
   document.getElementById('repeat_penalty').value = config.repeat_penalty ?? '';
   document.getElementById('repeat_last_n').value  = config.repeat_last_n  ?? '';
-  document.getElementById('context_size').value      = config.context_size      ?? '';
+  const ctxAuto = config.context_size == null || config.context_size === 0;
+  document.getElementById('context_auto').checked     = ctxAuto;
+  document.getElementById('context_size').value       = ctxAuto ? '' : config.context_size;
+  document.getElementById('context_size').disabled    = ctxAuto;
   document.getElementById('num_ctx_messages').value  = config.num_ctx_messages  ?? '';
   document.getElementById('min_tokens').value        = config.min_tokens        ?? '';
   document.getElementById('memory_interval').value   = config.memory_interval   ?? 5;
@@ -281,6 +284,9 @@ async function handleSubmit(e) {
   const stopStr = document.getElementById('stop').value.trim();
   const stop    = stopStr.split(',').map(s => s.trim()).filter(Boolean);
 
+  // Contexto automático → não envia num_ctx ao Ollama (context_size = null).
+  const contextAuto = document.getElementById('context_auto').checked;
+
   const config = {
     model:            document.getElementById('model').value.trim(),
     temperature:      parseFloat(document.getElementById('temperature').value)    || null,
@@ -290,7 +296,7 @@ async function handleSubmit(e) {
     tfs_z:            parseFloat(document.getElementById('tfs_z').value)          || null,
     repeat_penalty:   parseFloat(document.getElementById('repeat_penalty').value) || null,
     repeat_last_n:    parseInt(document.getElementById('repeat_last_n').value)    || null,
-    context_size:     parseInt(document.getElementById('context_size').value)     || null,
+    context_size:     contextAuto ? null : (parseInt(document.getElementById('context_size').value) || null),
     num_ctx_messages: parseInt(document.getElementById('num_ctx_messages').value) || null,
     min_tokens:       parseInt(document.getElementById('min_tokens').value)       || null,
     max_tokens:       parseInt(document.getElementById('max_tokens').value)       || null,
@@ -337,6 +343,13 @@ window.addEventListener('load', async () => {
   // selecting a recommendation fills the pull input
   document.getElementById('recommended-models').addEventListener('change', (e) => {
     if (e.target.value) document.getElementById('pull-model-input').value = e.target.value;
+  });
+
+  // Toggle "contexto automático" habilita/desabilita o campo Context Size.
+  document.getElementById('context_auto').addEventListener('change', (e) => {
+    const input = document.getElementById('context_size');
+    input.disabled = e.target.checked;
+    if (e.target.checked) input.value = '';
   });
 
   document.getElementById('pull-model-btn').addEventListener('click', pullModel);
