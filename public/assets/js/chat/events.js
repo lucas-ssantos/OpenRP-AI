@@ -3,6 +3,7 @@ import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
   showPinnedMemoryToast, showChatStatus, clearChatStatus,
+  updateAffectionBadge, showAffectionToast,
 } from './ui.js';
 
 // ── Rollback state ────────────────────────────────────────────────────
@@ -354,6 +355,7 @@ export function initResetModal() {
         addBubble('assistant', data.first_message.content, data.first_message.id);
       }
 
+      if (data.affection) updateAffectionBadge(data.affection);
       updateLastCharRow();
     } catch (err) {
       showError(`Erro ao reiniciar conversa: ${err.message}`);
@@ -423,6 +425,12 @@ export async function sendMessage() {
           removeTypingIndicator();
           showError(`Erro: ${data.error}`);
           return;
+        }
+
+        if (data.type === 'affection') {
+          updateAffectionBadge(data);
+          if (data.leveled_up) showAffectionToast(data.name);
+          continue;
         }
 
         if (data.type === 'memory_processing') {

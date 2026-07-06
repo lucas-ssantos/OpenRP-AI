@@ -6,6 +6,7 @@ import {
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
 import { resolveConfig } from "./helpers.js";
+import { getAffectionLevel } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
 
 const router = Router();
@@ -61,7 +62,7 @@ router.get("/conversations/:id", (req, res) => {
     try {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
-        res.json({ ok: true, conversation: conv });
+        res.json({ ok: true, conversation: conv, affection: getAffectionLevel(conv.affection_points) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -122,7 +123,7 @@ router.post("/conversations/:id/reset", (req, res) => {
             firstMsg = { id: msgId, role: "assistant", content };
         }
 
-        res.json({ ok: true, first_message: firstMsg });
+        res.json({ ok: true, first_message: firstMsg, affection: getAffectionLevel(0) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

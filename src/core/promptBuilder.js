@@ -1,3 +1,5 @@
+import { buildAffectionPrompt } from './affection.js';
+
 // Returns true if any of the comma-separated keywords appears in contextText (case-insensitive)
 function matchesKeywords(keywords, contextText) {
   if (!keywords) return false;
@@ -91,6 +93,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {string}   opts.userMessage      - current user message; null for regenerate
  * @param {object[]} opts.memories         - memories already selected by the retrieval layer
  * @param {object[]} opts.lorebooks        - global + character lorebooks
+ * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
  * @param {number}   opts.authorNoteDepth  - how many messages from the end to inject the author's note (default 4)
  * @returns {{ role: string, content: string }[]}
  */
@@ -103,6 +106,7 @@ export function buildPromptMessages({
   userMessage = null,
   memories = [],
   lorebooks = [],
+  affection = null,
   authorNoteDepth = 4,
 }) {
   // Context text for keyword matching: current message + last 5 history messages
@@ -127,6 +131,8 @@ export function buildPromptMessages({
 
   // Compose final system content by joining the sections
   const systemParts = [basePrompt];
+  const affectionBlock = buildAffectionPrompt(affection, character, persona);
+  if (affectionBlock) systemParts.push(affectionBlock);
   if (coreMems.length > 0) {
     const memText = coreMems.map(m => `- ${m.content}`).join('\n');
     systemParts.push(`[Core memories — defining events and feelings; these are always true for ${character.name}]\n${memText}`);

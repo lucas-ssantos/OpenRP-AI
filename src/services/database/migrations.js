@@ -52,6 +52,7 @@ export async function migrate() {
       scenario TEXT,
       first_message TEXT,
       last_memory_position INTEGER DEFAULT 0,
+      affection_points INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -60,6 +61,8 @@ export async function migrate() {
 
   // Migration para DBs criados antes do cursor de extração de memórias
   try { db.run(`ALTER TABLE conversations ADD COLUMN last_memory_position INTEGER DEFAULT 0`); } catch {}
+  // Migration para DBs criados antes do sistema de afeto
+  try { db.run(`ALTER TABLE conversations ADD COLUMN affection_points INTEGER DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`

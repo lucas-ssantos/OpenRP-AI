@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, created_at, updated_at`;
+const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, affection_points, created_at, updated_at`;
 
 function mapConversationRow(row) {
   return {
@@ -13,8 +13,9 @@ function mapConversationRow(row) {
     scenario: row[4],
     first_message: row[5],
     last_memory_position: row[6] ?? 0,
-    created_at: row[7],
-    updated_at: row[8],
+    affection_points: row[7] ?? 0,
+    created_at: row[8],
+    updated_at: row[9],
   };
 }
 
@@ -60,6 +61,19 @@ export function setLastMemoryPosition(conversationId, position) {
   const db = getDB();
   db.run(`UPDATE conversations SET last_memory_position = ? WHERE id = ?`, [position, conversationId]);
   saveDB();
+}
+
+// Soma pontos de afeto e retorna o total atualizado.
+export function addAffectionPoints(conversationId, delta) {
+  const db = getDB();
+  db.run(
+    `UPDATE conversations SET affection_points = MAX(0, affection_points + ?) WHERE id = ?`,
+    [delta, conversationId]
+  );
+  const result = db.exec(`SELECT affection_points FROM conversations WHERE id = ?`, [conversationId]);
+  saveDB();
+  if (result.length === 0 || result[0].values.length === 0) return 0;
+  return result[0].values[0][0] ?? 0;
 }
 
 // Lista todas as conversas de um personagem, mais recentes (por última atividade) primeiro.

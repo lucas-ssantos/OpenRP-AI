@@ -63,6 +63,36 @@ export function clearChatStatus() {
   if (el) el.style.display = 'none';
 }
 
+export function updateAffectionBadge(aff) {
+  if (!aff) return;
+  const wrap = document.getElementById('header-affection');
+  if (!wrap) return;
+  const label = document.getElementById('affection-label');
+  const fill  = document.getElementById('affection-bar-fill');
+  label.textContent = aff.next_threshold !== null
+    ? `${aff.name} · ${aff.points}/${aff.next_threshold}`
+    : aff.name;
+  fill.style.width = `${Math.round((aff.progress ?? 0) * 100)}%`;
+  wrap.style.display = 'flex';
+}
+
+export function showAffectionToast(levelName) {
+  document.getElementById('affection-toast')?.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'affection-toast';
+  toast.className = 'pinned-memory-toast affection-toast';
+  toast.innerHTML = `<i class="bi bi-heart-fill"></i><span>Vocês agora são <strong>${levelName}</strong>!</span>`;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 4500);
+}
+
 export function showPinnedMemoryToast(count) {
   document.getElementById('pinned-memory-toast')?.remove();
 

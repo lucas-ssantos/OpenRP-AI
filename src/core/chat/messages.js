@@ -3,10 +3,11 @@ import {
     getCharacter, getPersona, getGenerationConfig,
     getConversation, addMessage, updateMessage, rollbackConversation,
     deleteLastAssistantMessage, getLastNMessages,
-    getAllLorebooks, getMemories,
+    getAllLorebooks, getMemories, addAffectionPoints,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
+import { getAffectionLevel, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 
@@ -33,11 +34,16 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const memories   = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
         const lorebooks  = getAllLorebooks(conv.character_id);
 
+        // Afeto: cada mensagem do usuário rende pontos; a resposta já reflete o nível atualizado
+        const prevAffection = getAffectionLevel(conv.affection_points);
+        const newPoints     = addAffectionPoints(conversationId, computeAffectionGain(content));
+        const affection     = getAffectionLevel(newPoints);
+
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv, charConfig,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
-            memories, lorebooks,
+            memories, lorebooks, affection,
         });
 
         const nextPos   = recentMsgs.length > 0
@@ -68,6 +74,12 @@ router.post("/conversations/:id/messages", async (req, res) => {
             return { message_id: asstMsgId, user_message_id: userMsgId };
         }, async (res) => {
             // Roda após o evento done — o input do usuário já foi liberado no frontend
+            res.write(`data: ${JSON.stringify({
+                type: "affection",
+                ...affection,
+                leveled_up: affection.level > prevAffection.level,
+            })}\n\n`);
+
             if (!turnSaved) return;
             const counts = await processMemoryBacklogIfDue(conversationId, {
                 character, persona, config,
@@ -109,6 +121,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             historyMessages: recentMsgs,
             userMessage: null,
             memories, lorebooks,
+            affection: getAffectionLevel(conv.affection_points),
         });
 
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };

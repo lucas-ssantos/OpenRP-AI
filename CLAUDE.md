@@ -21,6 +21,7 @@ src/
   core/
     shutdown.js                     ← graceful shutdown + registro de processos
     promptBuilder.js                ← monta array de mensagens para o Ollama
+    affection.js                    ← sistema de afeto: escala de níveis, ganho de pontos, bloco [Relationship] do prompt
     chat.js                         ← entry point do router de chat (monta sub-routers)
     chat/
       helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama (com afterDone pós-`done`)
@@ -113,7 +114,7 @@ contexto/
 | Tabela | Descrição |
 |--------|-----------|
 | `characters` | id, name, description, personality, avatar_url, scenario, first_message |
-| `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
+| `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias), affection_points (pontos de afeto acumulados) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |
 | `persona` | id='self', name, description, avatar_url (única linha) |
 | `memories` | id, conversation_id, type (auto/manual/pinned), content, summary, keywords, is_pinned, relevance_weight |
@@ -339,6 +340,16 @@ Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **moment
 - Matching por keyword com **fronteira de palavra** e **insensível a acentos** ("coração" ≡ "coracao"; "ana" não casa em "banana").
 - Score não-pinned = `(hits / total_keywords) * relevance_weight`; empate → mais recente. Top 5 por padrão.
 - O `promptBuilder` **não re-filtra** — recebe as memórias já selecionadas pelo retrieval e injeta o `content` completo em dois blocos: `[Core memories …]` (pinned) e `[Relevant memories …]` (contextuais).
+
+## Sistema de afeto (`src/core/affection.js`)
+
+Pontos de afeto por conversa (`conversations.affection_points`) definem o estágio da relação personagem↔usuário:
+
+- **Ganho**: cada mensagem do usuário rende 1 ponto; +1 se ≥240 chars; +1 se contém `*ações*` de roleplay (máx 3). Aplicado em `POST /messages` antes da montagem do prompt — a resposta já reflete o nível novo.
+- **Escala** (thresholds cumulativos, gaps crescentes): Estranhos 0 → Conhecidos 10 → Amigos 30 → Amigos próximos 65 → Melhores amigos 120 → Paquera 200 → Namorados 320 → Apaixonados 500 → Almas gêmeas 750.
+- **Prompt**: `buildPromptMessages({ affection })` injeta o bloco `[Relationship — how X currently feels about Y]` logo após o character card, com orientação de comportamento por nível e instrução explícita de não forçar o estágio em toda resposta nem mencionar níveis/pontos.
+- **SSE**: após o `done`, o backend emite `{type:"affection", points, level, name, next_threshold, progress, leveled_up}` — o frontend atualiza o badge no header (`#header-affection`, coração + nome do nível + barra de progresso) e mostra toast em level-up.
+- **Reset** da conversa zera os pontos; rollback não mexe neles. `GET /api/conversations/:id` e `POST .../reset` retornam `affection` no payload.
 
 ## Config centralizada (`src/config.js`)
 

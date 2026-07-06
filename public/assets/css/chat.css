@@ -109,6 +109,48 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ── Afeto (nível da relação) ── */
+.header-affection {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #f9a8d4;
+  white-space: nowrap;
+}
+
+.header-affection i {
+  font-size: 0.65rem;
+  color: #f472b6;
+}
+
+.affection-bar {
+  width: 56px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.affection-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f472b6, #fb7185);
+  transition: width 0.5s ease;
+}
+
+.affection-toast {
+  border-color: rgba(244, 114, 182, 0.4);
+  color: #f9a8d4;
+}
+
+.affection-toast i {
+  color: #f472b6;
+}
+
 /* ── Messages ── */
 .messages {
   flex: 1;

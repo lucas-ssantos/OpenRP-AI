@@ -1,5 +1,5 @@
 import { conversationId, state, dom } from './state.js';
-import { showError, setInputEnabled, scrollToBottom, updateLastCharRow } from './ui.js';
+import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge } from './ui.js';
 import { addBubble, initInputListeners } from './events.js';
 
 export async function init() {
@@ -17,6 +17,7 @@ export async function init() {
     const conversation = convData.conversation;
     state.conversationId = conversation.id;
     state.characterId    = conversation.character_id;
+    if (convData.affection) updateAffectionBadge(convData.affection);
 
     // 2) Dados do personagem.
     const charRes  = await fetch(`/api/characters/${state.characterId}`);

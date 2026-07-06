@@ -62,7 +62,7 @@ export function resetConversation(conversationId) {
   const db = getDB();
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
-  db.run(`UPDATE conversations SET last_memory_position = 0 WHERE id = ?`, [conversationId]);
+  db.run(`UPDATE conversations SET last_memory_position = 0, affection_points = 0 WHERE id = ?`, [conversationId]);
   saveDB();
 }
 
