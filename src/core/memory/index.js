@@ -1,4 +1,4 @@
 export { createAutoMemory, createManualMemory, createPinnedMemory } from './create.js';
 export { parseKeywords, extractKeywordsFromText, getRelevantMemories, getMemoriesForPrompt } from './retrieval.js';
-export { extractAndSavePinnedMemories } from './extractor.js';
-export { extractAndSaveAutoMemories } from './autoExtractor.js';
+export { extractAndSaveMemories } from './extraction.js';
+export { processMemoryBacklogIfDue } from './trigger.js';

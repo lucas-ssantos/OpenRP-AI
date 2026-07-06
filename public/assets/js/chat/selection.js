@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { showPinnedMemoryToast } from './ui.js';
 
 const selectedMessages = new Map(); // messageId -> { role, content }
 
@@ -94,6 +95,7 @@ async function generateFromSelected() {
 
     exitSelectionMode();
     showToast(data.created);
+    if (data.pinned > 0) setTimeout(() => showPinnedMemoryToast(data.pinned), 3800);
   } catch {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-brain"></i> Gerar memória';

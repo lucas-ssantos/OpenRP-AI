@@ -2,12 +2,12 @@ import { Router } from "express";
 import {
     getCharacter, getPersona, getGenerationConfig,
     getConversation, addMessage, updateMessage, rollbackConversation,
-    deleteLastAssistantMessage, getLastNMessages, getConversationMessages,
+    deleteLastAssistantMessage, getLastNMessages,
     getAllLorebooks, getMemories,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
-import { getMemoriesForPrompt, extractAndSavePinnedMemories, extractAndSaveAutoMemories } from "../memory/index.js";
+import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 
 const router = Router();
@@ -48,9 +48,11 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
 
         startSSE(res);
+        let turnSaved = false;
         await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, nextPos + 1) : null;
+            turnSaved = !!fullContent;
 
             logConversationTurn({
                 conversationId,
@@ -63,32 +65,17 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 allLorebooks: lorebooks,
             });
 
-            let pinnedMemoriesCreated = 0;
-
-            if (fullContent) {
-                const numCtx      = config.num_ctx_messages || 20;
-                const memInterval = config.memory_interval ?? 5;
-
-                // Mensagens fora da janela de contexto = mensagens que o Ollama não vai mais ver
-                const allNonSystem  = getConversationMessages(conversationId).filter(m => m.role !== "system");
-                const outsideCount  = Math.max(0, allNonSystem.length - numCtx);
-
-                if (outsideCount > 0 && outsideCount % memInterval === 0) {
-                    const batch = allNonSystem.slice(outsideCount - memInterval, outsideCount);
-
-                    res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`);
-                    const pinnedCreated = await extractAndSavePinnedMemories(conversationId, batch, character, config);
-                    pinnedMemoriesCreated = pinnedCreated.length;
-
-                    extractAndSaveAutoMemories(conversationId, batch, character, persona, config).catch(() => {});
-                }
+            return { message_id: asstMsgId, user_message_id: userMsgId };
+        }, async (res) => {
+            // Roda após o evento done — o input do usuário já foi liberado no frontend
+            if (!turnSaved) return;
+            const counts = await processMemoryBacklogIfDue(conversationId, {
+                character, persona, config,
+                onStart: () => res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`),
+            });
+            if (counts) {
+                res.write(`data: ${JSON.stringify({ type: "memories_created", auto: counts.auto, pinned: counts.pinned })}\n\n`);
             }
-
-            return {
-                message_id: asstMsgId,
-                user_message_id: userMsgId,
-                ...(pinnedMemoriesCreated > 0 ? { pinned_memories_created: pinnedMemoriesCreated } : {}),
-            };
         });
     } catch (err) {
         handleSSEError(res, err, "Chat error");

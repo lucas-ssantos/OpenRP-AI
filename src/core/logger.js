@@ -90,10 +90,15 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
         return lines.join("\n") + "\n";
     }
 
-    const [systemMsg, ...restMsgs] = messages;
+    // O promptBuilder pode enviar duas mensagens system no início (instruções fixas +
+    // identidade/memórias/lorebook) — separa o bloco system inicial do restante.
+    let systemCount = 0;
+    while (systemCount < messages.length && messages[systemCount].role === "system") systemCount++;
+    const systemMsgs = messages.slice(0, Math.max(1, systemCount));
+    const restMsgs   = messages.slice(Math.max(1, systemCount));
 
     // ── [1] System prompt — separado pelas seções do promptBuilder ────────────
-    const systemParts = (systemMsg?.content || "").split("\n\n---\n\n");
+    const systemParts = systemMsgs.flatMap(m => (m.content || "").split("\n\n---\n\n"));
 
     lines.push(section("[1] SYSTEM PROMPT — base (descrição + personalidade + persona + regras a serem seguidas)"));
     lines.push(systemParts[0] || "(vazio)");
@@ -103,14 +108,21 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
 
     for (let i = 1; i < systemParts.length; i++) {
         const part = systemParts[i];
-        if (part.startsWith("[Relevant memories]")) {
+        if (part.startsWith("[Core memories") || part.startsWith("[Relevant memories")) {
+            const label = part.startsWith("[Core memories")
+                ? "[2] MEMÓRIAS CORE (pinned — sempre injetadas)"
+                : "[2] MEMÓRIAS CONTEXTUAIS (injetadas por relevância)";
             memoriesInjected = true;
-            lines.push(section("[2] MEMÓRIAS (injetadas no prompt)"));
-            lines.push(part.replace(/^\[Relevant memories\]\n/, ""));
+            lines.push(section(label));
+            lines.push(part.replace(/^\[[^\]]*\]\n/, ""));
         } else if (part.startsWith("[World info]")) {
             lorebookInjected = true;
             lines.push(section("[3] LOREBOOK / WORLD INFO (injetado)"));
             lines.push(part.replace(/^\[World info\]\n/, ""));
+        } else if (!part.startsWith("[")) {
+            // Continuação do system prompt (ex.: identidade do personagem na 2ª mensagem system)
+            lines.push(SEP);
+            lines.push(part);
         } else {
             lines.push(section("[?] SEÇÃO EXTRA"));
             lines.push(part);

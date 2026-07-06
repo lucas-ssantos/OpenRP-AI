@@ -23,9 +23,15 @@ src/
     promptBuilder.js                ← monta array de mensagens para o Ollama
     chat.js                         ← entry point do router de chat (monta sub-routers)
     chat/
-      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama
-      conversations.js              ← GET /characters/:id/conversation, POST/GET /conversations, GET messages
+      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama (com afterDone pós-`done`)
+      conversations.js              ← GET /characters/:id/conversation, POST/GET /conversations, GET messages, POST memories/generate
       messages.js                   ← POST enviar, POST regenerar, PATCH editar, DELETE rollback
+    memory/
+      index.js                      ← barrel do módulo de memória
+      create.js                     ← createAutoMemory, createManualMemory, createPinnedMemory (validações)
+      extraction.js                 ← extractAndSaveMemories(): UMA chamada Ollama → memórias auto + pinned classificadas
+      trigger.js                    ← processMemoryBacklogIfDue(): gatilho por cursor (last_memory_position)
+      retrieval.js                  ← getRelevantMemories/getMemoriesForPrompt: score por keyword (word-boundary, sem acentos)
   services/
     ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
     ollama.models.js                ← garante existência dos modelos customizados (gemma4:e4b-32k / 64k) via Modelfile API
@@ -107,10 +113,10 @@ contexto/
 | Tabela | Descrição |
 |--------|-----------|
 | `characters` | id, name, description, personality, avatar_url, scenario, first_message |
-| `conversations` | id, character_id, user_persona, title |
+| `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |
 | `persona` | id='self', name, description, avatar_url (única linha) |
-| `memories` | id, conversation_id, type (auto/manual/pinned), content, keywords, is_pinned |
+| `memories` | id, conversation_id, type (auto/manual/pinned), content, summary, keywords, is_pinned, relevance_weight |
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
 | `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, min_tokens, context_size, stream, seed, stop, num_ctx_messages |
@@ -293,33 +299,46 @@ A config tem hierarquia: `appConfig.defaults` (.env) → `generation_config` (gl
 6. Author's Note (injetado perto do fim)
 
 `contexto/estrutura_memoria` — tipos de memória:
-- **Auto**: gerada automaticamente pelo summaryService ao ultrapassar o limite de contexto
+- **Auto**: gerada pelo extrator unificado (`memory/extraction.js`) quando mensagens saem da janela de contexto — o registro episódico da conversa; recuperada por keyword/score
 - **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto
 - **Pinned**: sempre injetada no prompt (ver regras abaixo)
 - **Lorebook**: ativada por palavras-chave mencionadas no chat
 
+### Geração automática de memórias (extrator unificado)
+
+- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez.
+- **Cursor**: `last_memory_position` só avança se a extração concluir com sucesso — falha de Ollama vira retry natural; rollback clampeia o cursor, reset zera. Nunca pula janelas.
+- Extração (`memory/extraction.js`): **UMA chamada Ollama** com CHARACTER BASELINE (nunca reafirma a ficha), structured outputs (`format` JSON Schema) + parsing defensivo. Cada item vem com `pinned` (bool) e `importance` (1-5) → `relevance_weight` graduado: pinned 1.2–2.0, auto 0.8–1.2. Dedup por overlap de palavras (>0.55); auto também deduplica contra pinned. Keywords ausentes são derivadas do content (`extractKeywordsFromText`).
+- Eventos SSE após o `done`: `{type:"memory_processing"}` → `{type:"memories_created", auto, pinned}` — o frontend mostra status e toast de pinned.
+
 ### Memórias Pinned — critério e garantias
 
-Pinned bypassa o filtro de keyword e é sempre injetada. Use **apenas** para fatos que mudam quem o personagem é estruturalmente, não o que ele sentiu ou sabe situacionalmente.
+Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **momentos que definem o personagem ou a relação daqui em diante** — o que uma pessoa ainda lembraria anos depois.
 
 **Exemplos válidos (✓):**
-- Estado físico permanente: "Perdeu a visão do olho esquerdo na batalha de Ardenmoor."
-- Mudança de relação estrutural: "Passou a considerar o usuário um aliado de confiança."
-- Segredo revelado sem volta: "Sabe que o usuário é o herdeiro legítimo do trono."
-- Regra narrativa fixa: "Nunca pronuncia o nome do irmão morto — chama-o apenas de 'ele'."
+- Evento muito forte: "Quase morreu no incêndio do teatro; foi salva pelo usuário."
+- Sentimento intenso declarado: "Confessou estar apaixonada pelo usuário."
+- Grande virada emocional: "Deixou de confiar no usuário após descobrir a mentira sobre a carta."
+- Mudança física: "Perdeu a visão do olho esquerdo na batalha de Ardenmoor."
 
 **Exemplos inválidos (✗ — use auto/manual com keywords):**
-- Reação situacional: "Ficou com raiva quando mencionaram cavalos."
+- Variação de humor passageira: "Ficou com raiva quando mencionaram cavalos."
 - Preferências: "Gosta de chá." → vai em description/personality do personagem.
 - Detalhe de cena: "Estavam no café quando o segredo foi revelado."
 
 **Validações obrigatórias em `createPinnedMemory()`:**
 - `content` com mínimo de 20 caracteres (fatos curtos demais são vagos)
 - `keywords` obrigatório — mesmo sem usar no filtro, serve de referência semântica e auditoria
-- `relevanceWeight` configurável (padrão 1.5) para priorizar entre as próprias pinned
+- `relevanceWeight` gradua a prioridade entre pinned (extrator usa 1.2–2.0 conforme `importance`)
 
 **Cap automático no retrieval:**
 `getRelevantMemories()` limita a 10 pinned por padrão (`maxPinned`), ordenando por `relevance_weight DESC`. Se houver mais de 10 pinned, as de menor peso são descartadas do prompt. Isso previne que o prompt estoure após conversas longas com muitas pinned acumuladas.
+
+### Retrieval e injeção
+
+- Matching por keyword com **fronteira de palavra** e **insensível a acentos** ("coração" ≡ "coracao"; "ana" não casa em "banana").
+- Score não-pinned = `(hits / total_keywords) * relevance_weight`; empate → mais recente. Top 5 por padrão.
+- O `promptBuilder` **não re-filtra** — recebe as memórias já selecionadas pelo retrieval e injeta o `content` completo em dois blocos: `[Core memories …]` (pinned) e `[Relevant memories …]` (contextuais).
 
 ## Config centralizada (`src/config.js`)
 

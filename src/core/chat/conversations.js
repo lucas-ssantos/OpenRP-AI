@@ -6,7 +6,7 @@ import {
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
 import { resolveConfig } from "./helpers.js";
-import { extractAndSaveAutoMemories } from "../memory/index.js";
+import { extractAndSaveMemories } from "../memory/index.js";
 
 const router = Router();
 
@@ -142,8 +142,9 @@ router.post("/conversations/:id/memories/generate", async (req, res) => {
         const persona   = getPersona();
         const config    = resolveConfig(conv.character_id, req.params.id);
 
-        const created = await extractAndSaveAutoMemories(req.params.id, messages, character, persona, config);
-        res.json({ ok: true, created: created.length });
+        const result = await extractAndSaveMemories(req.params.id, messages, { character, persona, config });
+        if (result === null) return res.status(502).json({ ok: false, message: "Falha ao gerar memórias — verifique o Ollama." });
+        res.json({ ok: true, created: result.auto.length + result.pinned.length, pinned: result.pinned.length });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

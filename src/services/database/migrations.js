@@ -51,11 +51,15 @@ export async function migrate() {
       title TEXT,
       scenario TEXT,
       first_message TEXT,
+      last_memory_position INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
     );
   `);
+
+  // Migration para DBs criados antes do cursor de extração de memórias
+  try { db.run(`ALTER TABLE conversations ADD COLUMN last_memory_position INTEGER DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`

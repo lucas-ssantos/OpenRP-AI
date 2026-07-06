@@ -47,15 +47,6 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
   return parts.join('\n\n');
 }
 
-// Returns pinned memories first, then keyword-matched memories sorted by relevance_weight DESC
-function filterMemories(memories, contextText) {
-  const pinned = memories.filter(m => m.is_pinned);
-  const relevant = memories
-    .filter(m => !m.is_pinned && matchesKeywords(m.keywords, contextText))
-    .sort((a, b) => (b.relevance_weight ?? 1) - (a.relevance_weight ?? 1));
-  return [...pinned, ...relevant];
-}
-
 // Returns lorebook entries with matching keywords, or no keywords (always-on), sorted by insertion_order
 function filterLorebooks(lorebooks, contextText) {
   return lorebooks
@@ -67,7 +58,8 @@ function filterLorebooks(lorebooks, contextText) {
  * Builds the Ollama messages array using the following structure:
  *
  *  [1] SYSTEM PROMPT   — character identity + persona + custom system_prompt override
- *  [2] MEMORIES        — pinned first, then keyword-matched (appended to system prompt)
+ *  [2] MEMORIES        — already selected by the retrieval layer (getMemoriesForPrompt);
+ *                        split into [Core memories] (pinned) and [Relevant memories] (contextual)
  *  [3] LOREBOOK        — keyword-activated world-info entries (appended to system prompt)
  *  [4] HISTORY         — recent conversation messages
  *  [5] AUTHOR'S NOTE   — charConfig.jailbreak injected `authorNoteDepth` messages from the end
@@ -79,7 +71,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object}   opts.charConfig       - character_config row (may be null); provides system_prompt + jailbreak
  * @param {object[]} opts.historyMessages  - recent messages from DB (role !== 'system' are forwarded)
  * @param {string}   opts.userMessage      - current user message; null for regenerate
- * @param {object[]} opts.memories         - all memories for this conversation
+ * @param {object[]} opts.memories         - memories already selected by the retrieval layer
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {number}   opts.authorNoteDepth  - how many messages from the end to inject the author's note (default 4)
  * @returns {{ role: string, content: string }[]}
@@ -107,17 +99,22 @@ export function buildPromptMessages({
   // ── [1] Base system prompt ─────────────────────────────────────────────────
   const basePrompt = buildBaseSystemPrompt(character, persona, charConfig);
 
-  // ── [2] Relevant memories ──────────────────────────────────────────────────
-  const relevantMems = filterMemories(memories, contextText);
+  // ── [2] Memories — already selected by the retrieval layer; split by weight ─
+  const coreMems       = memories.filter(m => m.is_pinned);
+  const contextualMems = memories.filter(m => !m.is_pinned);
 
   // ── [3] Lorebook entries ───────────────────────────────────────────────────
   const activeEntries = filterLorebooks(lorebooks, contextText);
 
-  // Compose final system content by joining the three sections
+  // Compose final system content by joining the sections
   const systemParts = [basePrompt];
-  if (relevantMems.length > 0) {
-    const memText = relevantMems.map(m => m.summary || m.content).join('\n');
-    systemParts.push(`[Relevant memories]\n${memText}`);
+  if (coreMems.length > 0) {
+    const memText = coreMems.map(m => `- ${m.content}`).join('\n');
+    systemParts.push(`[Core memories — defining events and feelings; these are always true for ${character.name}]\n${memText}`);
+  }
+  if (contextualMems.length > 0) {
+    const memText = contextualMems.map(m => `- ${m.content}`).join('\n');
+    systemParts.push(`[Relevant memories — recalled because they relate to the current scene]\n${memText}`);
   }
   if (activeEntries.length > 0) {
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');

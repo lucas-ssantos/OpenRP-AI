@@ -1,40 +1,59 @@
 Histórico completo da conversa
          │
          ▼
-┌─────────────────────┐
-│   contextService    │  ← conta tokens estimados
-└─────────┬───────────┘
+┌──────────────────────────────┐
+│  trigger (memory/trigger.js) │  ← cursor: conversations.last_memory_position
+└─────────┬────────────────────┘
           │
-     Ultrapassa o limite?
+   Mensagens fora da janela de contexto (num_ctx_messages)
+   ainda não processadas ≥ memory_interval?
      /            \
    NÃO            SIM
     │               │
-    │        summaryService  ← resume as msgs antigas
-    │               │        e salva como memória
+    │      extrator unificado (memory/extraction.js)
+    │      ← UMA chamada Ollama após o evento SSE `done`
+    │        (não trava o input do usuário)
+    │        · memórias contextuais → type=auto
+    │        · momentos marcantes   → type=pinned
+    │        · importance 1-5 → relevance_weight
+    │        · cursor só avança se a extração deu certo
     ▼               ▼
-┌─────────────────────────────────┐
-│         promptService           │
-│                                 │
-│  [System prompt do personagem]  │
-│  [Memórias relevantes]          │  ← injetadas aqui
-│  [World Info / Lorebook]        │
-│  [Últimas N mensagens]          │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│    promptBuilder + memory/retrieval.js      │
+│                                             │
+│  [System prompt do personagem]              │
+│  [Core memories]      ← pinned, sempre      │
+│  [Relevant memories]  ← por keyword/score   │
+│  [World Info / Lorebook]                    │
+│  [Últimas N mensagens]                      │
+└─────────────────────────────────────────────┘
+
+Retrieval (memory/retrieval.js):
+- matching por keyword com fronteira de palavra e insensível a acentos
+- score = (hits / total_keywords) * relevance_weight; empate → mais recente
+- pinned: sempre injetadas, cap de 10 por relevance_weight DESC
 
 
 
 Tipos de Memória
 >Auto
-Gerada pelo summaryService automaticamente
-Ex: "Na sessão anterior, o usuário revelou seu nome"manual
+Gerada pelo extrator unificado quando mensagens saem da janela de contexto
+(a cada memory_interval mensagens não processadas), ou sob demanda ao
+selecionar mensagens no chat. Recuperada quando keywords batem no contexto.
+Ex: "Na sessão anterior, o usuário revelou seu nome"
 
 >Manual
 Criada/editada pelo usuário
 Ex: "Ele adora café, odeia segunda-feira"
 
 >Pinned
-Sempre incluída no contexto
-Ex: Fatos permanentes do personagem
+Sempre incluída no contexto. Reservada para momentos que definem o personagem
+ou a relação daqui em diante — o que alguém lembraria anos depois:
+· eventos muito fortes (morte, violência, resgate, traição, primeira intimidade)
+· sentimentos intensos declarados (confissão de amor, ódio profundo, luto)
+· grandes viradas emocionais (amor↔ódio, confiança↔traição, estranho→amante)
+· mudanças físicas (ferimento, cicatriz, transformação, gravidez)
+NÃO entra: variação de humor passageira, preferências, detalhes de cena.
 
 >Lorebook
 Ativada por palavras-chave no chat

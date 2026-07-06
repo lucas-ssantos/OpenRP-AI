@@ -426,7 +426,13 @@ export async function sendMessage() {
         }
 
         if (data.type === 'memory_processing') {
-          showChatStatus('Criando memória fixada…');
+          showChatStatus('Gerando memórias…');
+          continue;
+        }
+
+        if (data.type === 'memories_created') {
+          clearChatStatus();
+          if (data.pinned > 0) showPinnedMemoryToast(data.pinned);
           continue;
         }
 
@@ -454,7 +460,11 @@ export async function sendMessage() {
             attachEditBtn(userRow, data.user_message_id);
           }
           updateLastCharRow();
-          if (data.pinned_memories_created > 0) showPinnedMemoryToast(data.pinned_memories_created);
+          // Libera o input imediatamente — a extração de memórias continua no
+          // mesmo stream depois do done, sem travar o usuário
+          state.isStreaming = false;
+          setInputEnabled(true);
+          dom.inputEl.focus();
         }
       }
     }

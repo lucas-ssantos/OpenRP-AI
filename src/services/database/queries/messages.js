@@ -47,6 +47,12 @@ export function rollbackConversation(conversationId, messageId) {
     `DELETE FROM messages WHERE conversation_id = ? AND position > ?`,
     [conversationId, position]
   );
+  // Clampeia o cursor de extração de memórias: mensagens reescritas após o
+  // rollback não podem ser consideradas "já processadas"
+  db.run(
+    `UPDATE conversations SET last_memory_position = MIN(last_memory_position, ?) WHERE id = ?`,
+    [position, conversationId]
+  );
   saveDB();
   return true;
 }
@@ -56,6 +62,7 @@ export function resetConversation(conversationId) {
   const db = getDB();
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
+  db.run(`UPDATE conversations SET last_memory_position = 0 WHERE id = ?`, [conversationId]);
   saveDB();
 }
 

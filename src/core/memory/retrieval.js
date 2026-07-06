@@ -4,48 +4,63 @@ import { getMemories, getPinnedMemories } from "../../services/database/queries.
 const STOP_WORDS = new Set([
     // PT
     'de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas',
-    'ao', 'aos', 'por', 'para', 'com', 'sem', 'sob', 'que', 'não',
+    'ao', 'aos', 'por', 'para', 'com', 'sem', 'sob', 'que', 'nao',
     'uma', 'uns', 'umas', 'isso', 'este', 'esta', 'esse', 'essa',
-    'ele', 'ela', 'nós', 'eles', 'elas', 'você', 'vocês', 'lhe',
-    'ser', 'ter', 'foi', 'era', 'são', 'tem', 'há', 'mas', 'mais',
+    'ele', 'ela', 'nos', 'eles', 'elas', 'voce', 'voces', 'lhe',
+    'ser', 'ter', 'foi', 'era', 'sao', 'tem', 'ha', 'mas', 'mais',
     // EN
     'the', 'and', 'for', 'with', 'are', 'was', 'were', 'have', 'has',
     'had', 'does', 'did', 'this', 'that', 'they', 'from', 'been',
 ]);
+
+// Normaliza para matching: minúsculas + remoção de acentos ("coração" ≡ "coracao")
+function normalize(str) {
+    return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Match com fronteira de palavra — "ana" não casa em "banana"; suporta keywords multi-palavra
+function keywordInText(keyword, normalizedText) {
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(keyword)}(?=$|[^\\p{L}\\p{N}])`, 'u');
+    return re.test(normalizedText);
+}
 
 /**
  * Converte a string de keywords armazenada no banco (csv) em array normalizado.
  */
 export function parseKeywords(str) {
     if (!str) return [];
-    return str.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    return str.split(',').map(k => normalize(k.trim())).filter(Boolean);
 }
 
 /**
  * Extrai termos relevantes de um texto livre para usar na busca por memórias.
- * Remove stop words e palavras curtas, retorna array de palavras únicas.
+ * Remove stop words e palavras curtas, retorna array de palavras únicas (sem acentos).
  */
 export function extractKeywordsFromText(text) {
     if (!text) return [];
     return [...new Set(
-        text.toLowerCase()
-            .replace(/[^\wáàâãéèêíïóôõúüç\s]/gi, ' ')
+        normalize(text)
+            .replace(/[^\w\s]/gi, ' ')
             .split(/\s+/)
             .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
     )];
 }
 
 /**
- * Pontua uma memória contra um texto de contexto.
+ * Pontua uma memória contra o texto de contexto já normalizado.
  * Score = (hits / total_keywords) * relevance_weight
- * Memórias com keywords que cobrem mais do contexto recebem score maior.
+ * Memórias com keywords que cobrem mais do contexto recebem score maior;
+ * o relevance_weight (graduado pela importância na extração) modula o resultado.
  * Retorna 0 se a memória não tiver keywords cadastradas.
  */
-function scoreMemory(memory, contextText) {
+function scoreMemory(memory, normalizedContext) {
     const keywords = parseKeywords(memory.keywords);
     if (keywords.length === 0) return 0;
-    const lower = contextText.toLowerCase();
-    const hits = keywords.filter(kw => lower.includes(kw)).length;
+    const hits = keywords.filter(kw => keywordInText(kw, normalizedContext)).length;
     return (hits / keywords.length) * (memory.relevance_weight ?? 1);
 }
 
@@ -56,7 +71,9 @@ function scoreMemory(memory, contextText) {
  *  - Pinned: sempre incluídas, mas limitadas por `maxPinned` e ordenadas por relevance_weight DESC.
  *    Se houver mais pinned do que o limite, as de menor peso são descartadas.
  *    Isso previne que o prompt estoure por acúmulo de pinned ao longo de conversas longas.
- *  - Não-pinned: filtradas por score de keyword matching, limitadas por `limit` e `minScore`.
+ *  - Não-pinned: filtradas por score de keyword matching (fronteira de palavra,
+ *    insensível a acentos), limitadas por `limit` e `minScore`; empate resolvido
+ *    pela mais recente.
  *  - Ordem final: pinned primeiro (por peso), depois não-pinned por score decrescente.
  *
  * @param {string}  conversationId
@@ -76,10 +93,14 @@ export function getRelevantMemories(conversationId, contextText, { limit = 5, mi
     const all       = getMemories(conversationId);
     const nonPinned = all.filter(m => !pinnedIds.has(m.id));
 
+    const normalizedContext = normalize(contextText || '');
+
     const scored = nonPinned
-        .map(m => ({ ...m, _score: scoreMemory(m, contextText) }))
+        .map(m => ({ ...m, _score: scoreMemory(m, normalizedContext) }))
         .filter(m => m._score > minScore)
-        .sort((a, b) => b._score - a._score)
+        .sort((a, b) =>
+            b._score - a._score
+            || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
         .slice(0, limit);
 
     return [...allPinned, ...scored];

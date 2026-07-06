@@ -84,7 +84,10 @@ export function handleSSEError(res, err, label) {
 
 // Streams Ollama response as SSE. onDone(filteredContent, rawContent) is called
 // when streaming finishes; it should persist the message and return extra fields for the done event.
-export async function streamOllama(res, messages, config, onDone) {
+// afterDone(res) runs AFTER the done event is written but before res.end() — for background
+// work (e.g. memory extraction) that may still push SSE events without blocking the client's
+// perception of completion (the frontend unlocks the input on `done`).
+export async function streamOllama(res, messages, config, onDone, afterDone = null) {
     const ollamaRes = await fetch(OLLAMA_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -167,6 +170,7 @@ export async function streamOllama(res, messages, config, onDone) {
             if (parsed.done) {
                 const extra = await onDone(fullContent, rawContent);
                 res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
+                if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
                 res.end();
                 return;
             }
@@ -177,6 +181,7 @@ export async function streamOllama(res, messages, config, onDone) {
     if (fullContent) {
         const extra = await onDone(fullContent, rawContent);
         res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
+        if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
     }
     res.end();
 }

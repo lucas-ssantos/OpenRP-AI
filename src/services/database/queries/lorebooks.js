@@ -62,14 +62,16 @@ export function getAllLorebooks(characterId) {
   );
   const hasAssignments = countResult.length > 0 && countResult[0].values[0][0] > 0;
 
-  const sql = hasAssignments
-    ? `SELECT l.* FROM lorebooks l
-       INNER JOIN character_lorebooks cl ON l.id = cl.lorebook_id
-       WHERE cl.character_id = ?
-       ORDER BY l.insertion_order ASC`
-    : `SELECT * FROM lorebooks ORDER BY insertion_order ASC`;
-
-  const result = db.exec(sql, [characterId]);
+  // Sem placeholder no SQL do fallback — passar params vazios evita "column index out of range" no sql.js
+  const result = hasAssignments
+    ? db.exec(
+        `SELECT l.* FROM lorebooks l
+         INNER JOIN character_lorebooks cl ON l.id = cl.lorebook_id
+         WHERE cl.character_id = ?
+         ORDER BY l.insertion_order ASC`,
+        [characterId]
+      )
+    : db.exec(`SELECT * FROM lorebooks ORDER BY insertion_order ASC`);
   if (result.length === 0) return [];
   return result[0].values.map(mapLorebook);
 }
