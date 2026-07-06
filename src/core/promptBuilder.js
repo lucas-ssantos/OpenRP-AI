@@ -10,22 +10,37 @@ function matchesKeywords(keywords, contextText) {
 // Builds the fixed behavioral instruction block — returned as its own dedicated
 // `system` message so the Ollama API interprets it as a standalone instruction,
 // separate from the character identity/persona content.
-function buildInstructionPrompt(character) {
+// Style target: immersive companion chat (TalkieAI/LinkyAI) — short in-character
+// replies, inline *actions*, never controlling the user, always a hook to continue.
+function buildInstructionPrompt(character, persona) {
+  const name     = character.name;
+  const userName = persona?.name || 'the user';
+
   return (
-    `Respond in first person as ${character.name}. Never break character, never acknowledge being an AI, and never refer to yourself in third person.\n` +
-    `Stay truthfull and strict all times on the personality and the likes and deslikes of ${character.name}.\n` +
-    `Your answer MUST HAVE between 300 and 500 characters.\n` +
-    `Keep responses SHORT and grounded — one brief action beat and one or two lines of dialogue at most. Real conversation is terse. Resist the urge to over-explain or describe every emotion.\n` +
-    `Keep actions more short and brief.\n` +
-    `Weave *actions and gestures between asterisks* naturally inline with your dialogue — never isolate them in a separate line or paragraph. The response must flow as a single cohesive piece, not alternating blocks of action and speech.\n` +
-    `When the user writes something between asterisks, it describes their own action or gesture — interpret it as such and never repeat or quote it as speech.\n` +
-    `Never use emojis, emoticons, or any out-of-character commentary.`
+    `You are roleplaying as ${name} in an ongoing, immersive chat with ${userName}.\n` +
+    `\n` +
+    `CHARACTER\n` +
+    `- Speak and act only as ${name}, in first person. Never break character, never mention being an AI, never add out-of-character commentary.\n` +
+    `- Stay strictly faithful to ${name}'s personality, speech style, likes and dislikes — even when it means disagreeing with or refusing ${userName}.\n` +
+    `- Treat the memories and world info provided as established facts of the story. Never contradict them or the conversation history.\n` +
+    `\n` +
+    `STYLE\n` +
+    `- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
+    `- Weave *actions, gestures and feelings between asterisks* inline with the dialogue, as one flowing piece — never in separate lines or alternating blocks.\n` +
+    `- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
+    `- Never use emojis, emoticons, lists or headings.\n` +
+    `\n` +
+    `INTERACTION\n` +
+    `- NEVER speak, act, think or decide for ${userName}. Their words and actions belong to them alone.\n` +
+    `- When ${userName} writes *text between asterisks*, that is their own action — react to it naturally; never repeat or quote it as speech.\n` +
+    `- Keep the scene alive: react to what ${userName} just said or did, add one new detail from ${name}'s side, and when it feels natural leave a hook — a question, an invitation, a tease or a challenge.\n` +
+    `- Let feelings show through concrete actions and tone, not explanations of emotions.`
   );
 }
 
-// Builds the base character system prompt.
+// Builds the base character system prompt (the "character card").
 // If charConfig has a custom system_prompt, uses it with {{char}}/{{user}} substitution.
-function buildBaseSystemPrompt(character, persona, charConfig) {
+function buildBaseSystemPrompt(character, persona, charConfig, conversation) {
   if (charConfig?.system_prompt) {
     return charConfig.system_prompt
       .replace(/\{\{char\}\}/gi, character.name)
@@ -40,9 +55,11 @@ function buildBaseSystemPrompt(character, persona, charConfig) {
   if (character.personality) parts.push(`Personality: ${character.personality}`);
   if (character.likes)    parts.push(`Likes: ${character.likes}`);
   if (character.dislikes) parts.push(`Dislikes: ${character.dislikes}`);
-  //if (character.scenario) parts.push(`Scenario: ${character.scenario}`);
+  if (conversation?.scenario) {
+    parts.push(`Current scenario: ${conversation.scenario}\nEverything in the conversation happens inside this scenario — keep the setting, time and circumstances consistent with it.`);
+  }
   if (persona?.name) {
-    parts.push(`The user's name is ${persona.name}.${persona.description ? ' ' + persona.description : ''}`);
+    parts.push(`You are talking with ${persona.name}.${persona.description ? ' About ' + persona.name + ': ' + persona.description : ''}`);
   }
   return parts.join('\n\n');
 }
@@ -68,6 +85,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object} opts
  * @param {object}   opts.character        - character row from DB
  * @param {object}   opts.persona          - persona row from DB (may be null)
+ * @param {object}   opts.conversation     - conversation row from DB (may be null); provides scenario
  * @param {object}   opts.charConfig       - character_config row (may be null); provides system_prompt + jailbreak
  * @param {object[]} opts.historyMessages  - recent messages from DB (role !== 'system' are forwarded)
  * @param {string}   opts.userMessage      - current user message; null for regenerate
@@ -79,6 +97,7 @@ function filterLorebooks(lorebooks, contextText) {
 export function buildPromptMessages({
   character,
   persona,
+  conversation = null,
   charConfig = null,
   historyMessages = [],
   userMessage = null,
@@ -94,10 +113,10 @@ export function buildPromptMessages({
 
   // ── [0] Fixed behavioral instruction (own system message) ──────────────────
   // Skipped when a custom system_prompt override is provided — that fully replaces it.
-  const instructionPrompt = charConfig?.system_prompt ? null : buildInstructionPrompt(character);
+  const instructionPrompt = charConfig?.system_prompt ? null : buildInstructionPrompt(character, persona);
 
-  // ── [1] Base system prompt ─────────────────────────────────────────────────
-  const basePrompt = buildBaseSystemPrompt(character, persona, charConfig);
+  // ── [1] Base system prompt (character card + scenario + persona) ───────────
+  const basePrompt = buildBaseSystemPrompt(character, persona, charConfig, conversation);
 
   // ── [2] Memories — already selected by the retrieval layer; split by weight ─
   const coreMems       = memories.filter(m => m.is_pinned);

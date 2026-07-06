@@ -34,7 +34,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const lorebooks  = getAllLorebooks(conv.character_id);
 
         const ollamaMessages = buildPromptMessages({
-            character, persona, charConfig,
+            character, persona, conversation: conv, charConfig,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
             memories, lorebooks,
@@ -105,7 +105,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const lorebooks  = getAllLorebooks(conv.character_id);
 
         const ollamaMessages = buildPromptMessages({
-            character, persona, charConfig,
+            character, persona, conversation: conv, charConfig,
             historyMessages: recentMsgs,
             userMessage: null,
             memories, lorebooks,
