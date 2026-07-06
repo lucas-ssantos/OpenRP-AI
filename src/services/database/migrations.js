@@ -134,7 +134,6 @@ export async function migrate() {
       min_p REAL DEFAULT 0.05,
       repeat_penalty REAL DEFAULT 1.1,
       repeat_last_n INTEGER DEFAULT 64,
-      tfs_z REAL DEFAULT 1.0,
       max_tokens INTEGER DEFAULT -1,
       context_size INTEGER DEFAULT 4096,
       stream INTEGER DEFAULT 1,
@@ -160,17 +159,20 @@ export async function migrate() {
     seed = { ...seed, ...JSON.parse(fs.readFileSync(mediumPath, "utf8")) };
   } catch { /* sem o arquivo de preset, mantém os defaults do .env */ }
   const d = seed;
+  // stop é armazenado como CSV (mesmo formato que setGenerationConfig grava e
+  // parseStop lê) — nunca como JSON, senão os tokens chegam corrompidos ao Ollama.
+  const stopCsv = Array.isArray(d.stop) ? d.stop.join(", ") : (d.stop || "");
   db.run(`
     INSERT OR IGNORE INTO generation_config
       (id, model, temperature, top_p, top_k, min_p,
-       repeat_penalty, repeat_last_n, tfs_z, max_tokens,
+       repeat_penalty, repeat_last_n, max_tokens,
        context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
-    d.repeat_penalty, d.repeat_last_n, d.tfs_z, d.max_tokens,
+    d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
-    JSON.stringify(d.stop), d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5,
+    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5,
   ]);
 
   // ===== CHARACTER-SPECIFIC CONFIG =====
@@ -184,7 +186,6 @@ export async function migrate() {
       min_p REAL,
       repeat_penalty REAL,
       repeat_last_n INTEGER,
-      tfs_z REAL,
       max_tokens INTEGER,
       context_size INTEGER,
       stream INTEGER,
@@ -200,39 +201,14 @@ export async function migrate() {
   `);
 
   // ===== CONVERSATION-SPECIFIC CONFIG =====
+  // Override por conversa é model-only (ver resolveConfig / setConversationModel).
   db.run(`
     CREATE TABLE IF NOT EXISTS conversation_config (
       conversation_id TEXT PRIMARY KEY,
       model TEXT,
-      temperature REAL,
-      top_p REAL,
-      top_k INTEGER,
-      min_p REAL,
-      repeat_penalty REAL,
-      repeat_last_n INTEGER,
-      tfs_z REAL,
-      max_tokens INTEGER,
-      context_size INTEGER,
-      stream INTEGER,
-      seed INTEGER,
-      stop TEXT,
-      num_ctx_messages INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id)
-    );
-  `);
-
-  // ===== TOKEN TRACKING (para context management) =====
-  db.run(`
-    CREATE TABLE IF NOT EXISTS token_usage (
-      id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL,
-      message_id TEXT,
-      estimated_tokens INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-      FOREIGN KEY (message_id) REFERENCES messages(id)
     );
   `);
 
@@ -256,7 +232,6 @@ export async function migrate() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_pinned ON memories(is_pinned);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_scope ON lorebooks(scope);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_char ON lorebooks(character_id, scope);`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_token_conv ON token_usage(conversation_id);`);
 
   saveDB();
   console.log("Migrations completed successfully.");

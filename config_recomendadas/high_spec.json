@@ -6,7 +6,6 @@
   "min_p": 0.03,
   "repeat_penalty": 1.04,
   "repeat_last_n": 256,
-  "tfs_z": 0.97,
   "max_tokens": -1,
   "min_tokens": 80,
   "context_size": 65536,

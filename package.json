@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "test": "node --test",
     "db:init": "node src/config/database.js",
     "db:reset": "node src/config/database.js --reset"
   },

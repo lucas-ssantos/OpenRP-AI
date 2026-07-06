@@ -1,4 +1,5 @@
 import { createMemory } from "../../services/database/queries.js";
+import { extractKeywordsFromText } from "./retrieval.js";
 
 /**
  * Memória gerada automaticamente pelo extrator unificado (extraction.js) quando
@@ -17,10 +18,16 @@ export function createAutoMemory(conversationId, content, { keywords = null, sum
  * Memória criada manualmente pelo usuário.
  * Para fatos relevantes mas situacionais — aparecem só quando keywords batem com o contexto.
  * Ex: "Ele adora café e odeia segunda-feira." / "Ficou com raiva quando mencionaram cavalos."
+ *
+ * Sem keywords a memória nunca seria recuperada (score 0 no retrieval) —
+ * quando não informadas, são derivadas do próprio content.
  */
 export function createManualMemory(conversationId, content, { keywords = null, summary = null } = {}) {
     if (!content?.trim()) throw new Error("Memória manual requer conteúdo.");
-    return createMemory(conversationId, 'manual', content.trim(), keywords, 1.0, false, summary);
+    const kws = keywords?.trim()
+        || extractKeywordsFromText(content).slice(0, 6).join(', ')
+        || null;
+    return createMemory(conversationId, 'manual', content.trim(), kws, 1.0, false, summary);
 }
 
 /**

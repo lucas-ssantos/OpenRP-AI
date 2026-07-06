@@ -13,12 +13,33 @@ import settingsRouter  from "./routes/settings.routes.js";
 import viewdbRouter    from "./routes/viewdb.routes.js";
 import lorebookRouter  from "./routes/lorebook.routes.js";
 
+// Basic auth opcional: ativo apenas se AUTH_PASSWORD estiver definido no .env.
+// Importante quando o app é exposto via Tailscale — sem isso, qualquer
+// dispositivo do tailnet acessa tudo (chat, config, viewdb).
+function basicAuthMiddleware(req, res, next) {
+    const { user, password } = appConfig.auth;
+
+    const header = req.headers.authorization || "";
+    if (header.startsWith("Basic ")) {
+        const [reqUser, ...rest] = Buffer.from(header.slice(6), "base64").toString().split(":");
+        if (reqUser === user && rest.join(":") === password) return next();
+    }
+
+    res.set("WWW-Authenticate", 'Basic realm="OpenRP AI"');
+    res.status(401).send("Autenticação necessária.");
+}
+
 export async function startWebServer(port = appConfig.port) {
     const app = express();
     const publicPath = path.resolve(process.cwd(), "public");
     const uploadDir  = path.join(publicPath, "assets/uploads");
 
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    if (appConfig.auth.password) {
+        app.use(basicAuthMiddleware);
+        console.log("Basic auth habilitado (AUTH_PASSWORD definido).");
+    }
 
     app.use(express.json({ limit: "10mb" }));
 

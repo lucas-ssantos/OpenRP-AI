@@ -89,23 +89,6 @@ Isso o torna mais natural que `top_p` puro para roleplay — o personagem é pre
 
 ---
 
-### `tfs_z` — Tail Free Sampling
-
-**O que faz:** Remove os tokens da "cauda" de baixa probabilidade de forma mais sofisticada que `top_p`, analisando a segunda derivada da distribuição em vez de apenas o acúmulo de probabilidade.
-
-- Valores próximos de 1.0 (0.90–0.98) cortam apenas os tokens de qualidade muito baixa.
-- Valor 1.0 = desativado.
-
-Produz texto mais fluido e orgânico, especialmente em conversas longas. Ótimo complemento ao `top_p`.
-
-**Custo computacional:** Nenhum.
-
-```json
-"tfs_z": 0.95
-```
-
----
-
 ### `typical_p`
 
 **O que faz:** Sampling baseado em "tipicidade" em vez de probabilidade bruta. Prefere tokens que são "típicos" daquele contexto, mesmo que não sejam os mais prováveis.
@@ -324,7 +307,6 @@ Use quantização leve (`q2_k` ou `q3_k_m`) para o modelo caber na VRAM. Alterna
   "min_p": 0.05,
   "repeat_penalty": 1.06,
   "repeat_last_n": 128,
-  "tfs_z": 0.95,
   "max_tokens": 512,
   "context_size": 4096,
   "stream": true,
@@ -350,7 +332,6 @@ Config padrão com Q4_K_M. Context de 8k é o teto seguro com 8 GB de VRAM.
   "min_p": 0.04,
   "repeat_penalty": 1.05,
   "repeat_last_n": 192,
-  "tfs_z": 0.95,
   "max_tokens": 800,
   "context_size": 8192,
   "stream": true,
@@ -378,7 +359,6 @@ Com 16 GB de VRAM, o modelo (~5.5 GB) deixa ~10 GB livres para KV Cache. Context
   "min_p": 0.03,
   "repeat_penalty": 1.04,
   "repeat_last_n": 256,
-  "tfs_z": 0.97,
   "max_tokens": 1200,
   "context_size": 32768,
   "stream": true,
@@ -427,7 +407,6 @@ You stay fully in character at all times. You do not break character, add discla
 | `top_p` | Nenhum | Nenhum |
 | `top_k` | Nenhum | Nenhum |
 | `min_p` | Nenhum | Nenhum |
-| `tfs_z` | Nenhum | Nenhum |
 | `repeat_penalty` | Nenhum | Leve |
 | `repeat_last_n` | Nenhum | Leve |
 | `mirostat` | Nenhum | Leve |

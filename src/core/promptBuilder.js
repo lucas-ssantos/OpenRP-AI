@@ -1,12 +1,13 @@
 import { buildAffectionPrompt } from './affection.js';
+import { parseKeywords, keywordInText, normalize } from './memory/retrieval.js';
 
-// Returns true if any of the comma-separated keywords appears in contextText (case-insensitive)
-function matchesKeywords(keywords, contextText) {
-  if (!keywords) return false;
-  const kws = keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+// Returns true if any of the comma-separated keywords appears in normalizedContext.
+// Same matcher as memory retrieval: word boundary + accent-insensitive
+// ("ana" não casa em "banana"; "coração" ≡ "coracao").
+function matchesKeywords(keywords, normalizedContext) {
+  const kws = parseKeywords(keywords);
   if (!kws.length) return false;
-  const lower = contextText.toLowerCase();
-  return kws.some(kw => lower.includes(kw));
+  return kws.some(kw => keywordInText(kw, normalizedContext));
 }
 
 // Builds the fixed behavioral instruction block — returned as its own dedicated
@@ -68,8 +69,9 @@ function buildBaseSystemPrompt(character, persona, charConfig, conversation) {
 
 // Returns lorebook entries with matching keywords, or no keywords (always-on), sorted by insertion_order
 function filterLorebooks(lorebooks, contextText) {
+  const normalizedContext = normalize(contextText || '');
   return lorebooks
-    .filter(lb => !lb.keywords || matchesKeywords(lb.keywords, contextText))
+    .filter(lb => !lb.keywords || matchesKeywords(lb.keywords, normalizedContext))
     .sort((a, b) => (a.insertion_order ?? 0) - (b.insertion_order ?? 0));
 }
 

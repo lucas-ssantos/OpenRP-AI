@@ -14,7 +14,7 @@ const STOP_WORDS = new Set([
 ]);
 
 // Normaliza para matching: minúsculas + remoção de acentos ("coração" ≡ "coracao")
-function normalize(str) {
+export function normalize(str) {
     return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
@@ -23,7 +23,7 @@ function escapeRegex(str) {
 }
 
 // Match com fronteira de palavra — "ana" não casa em "banana"; suporta keywords multi-palavra
-function keywordInText(keyword, normalizedText) {
+export function keywordInText(keyword, normalizedText) {
     const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(keyword)}(?=$|[^\\p{L}\\p{N}])`, 'u');
     return re.test(normalizedText);
 }

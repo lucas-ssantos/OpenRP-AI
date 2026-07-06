@@ -86,8 +86,8 @@ router.get("/api/viewdb/conversation/:id", (req, res) => {
                    ch.id, ch.name, ch.description, ch.personality, ch.likes, ch.dislikes, ch.avatar_url
             FROM conversations c
             JOIN characters ch ON ch.id = c.character_id
-            WHERE c.id = '${convId}'
-        `);
+            WHERE c.id = ?
+        `, [convId]);
         if (!convRows.length || !convRows[0].values.length)
             return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
 
@@ -100,18 +100,18 @@ router.get("/api/viewdb/conversation/:id", (req, res) => {
 
         const msgRows = db.exec(`
             SELECT id, role, content, position, created_at
-            FROM messages WHERE conversation_id = '${convId}'
+            FROM messages WHERE conversation_id = ?
             ORDER BY position ASC, created_at ASC
-        `);
+        `, [convId]);
         const messages = msgRows.length
             ? msgRows[0].values.map(r => ({ id: r[0], role: r[1], content: r[2], position: r[3], created_at: r[4] }))
             : [];
 
         const memRows = db.exec(`
             SELECT id, type, content, summary, keywords, is_pinned, relevance_weight, created_at
-            FROM memories WHERE conversation_id = '${convId}'
+            FROM memories WHERE conversation_id = ?
             ORDER BY type ASC, created_at DESC
-        `);
+        `, [convId]);
         const allMem = memRows.length
             ? memRows[0].values.map(r => ({
                 id: r[0], type: r[1], content: r[2], summary: r[3], keywords: r[4],

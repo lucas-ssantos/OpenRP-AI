@@ -37,19 +37,18 @@ src/
     ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
     ollama.models.js                ← garante existência dos modelos customizados (gemma4:e4b-32k / 64k) via Modelfile API
     database/
-      db.js                         ← getDB() / saveDB()
+      db.js                         ← getDB() / saveDB() (debounced) / flushDB()
       migrations.js                 ← CREATE TABLE IF NOT EXISTS + seed de config inicial
       queries.js                    ← barrel: re-exporta todas as queries da pasta queries/
-      save.js                       ← salva o banco em disco
+      save.js                       ← flush do banco em disco (usado pelo shutdown)
       queries/
         characters.js               ← createCharacter, getCharacter, getAllCharacters, updateCharacter
         persona.js                  ← getPersona, savePersona
         conversations.js            ← createConversation, getConversation, getLatestConversationForCharacter, getRecentCharactersWithConversations
-        messages.js                 ← addMessage, updateMessage, deleteLastAssistantMessage, rollbackConversation, resetConversation, getConversationMessages, getLastNMessages
+        messages.js                 ← addMessage, updateMessage, getLastMessage, deleteMessage, rollbackConversation, resetConversation, getConversationMessages, getLastNMessages, getMemoryBacklog
         memories.js                 ← createMemory, getMemories, getPinnedMemories, getMemoriesByType
         lorebooks.js                ← createLorebook, getLorebook, getGlobal/CharacterLorebooks, getAllLorebooks, updateLorebook, deleteLorebook, getCharacterLorebookIds, setCharacterLorebooks
-        config.js                   ← getGenerationConfig, setGenerationConfig
-        tokens.js                   ← recordTokenUsage, getTotalTokensInConversation
+        config.js                   ← getGenerationConfig, setGenerationConfig, get/setConversationModel
     webServer/
       webServer.init.js             ← cria Express app, registra middleware e routers, inicia o servidor
       routes/
@@ -120,12 +119,11 @@ contexto/
 | `memories` | id, conversation_id, type (auto/manual/pinned), content, summary, keywords, is_pinned, relevance_weight |
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
-| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, tfs_z, max_tokens, min_tokens, context_size, stream, seed, stop, num_ctx_messages |
+| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval |
 | `character_config` | override por personagem (mesmos campos + system_prompt, jailbreak) |
-| `conversation_config` | override por conversa |
-| `token_usage` | estimativas de tokens por mensagem |
+| `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel) |
 
-**Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita.
+**Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita. `saveDB()` é **debounced** (~500ms); a gravação imediata é `flushDB()`, chamada no shutdown. A coluna `stop` é CSV (o parseStop ainda lê o formato JSON legado de bancos antigos).
 
 ## Rotas da API
 
@@ -199,6 +197,8 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 10. Final: `data: {"delta":"","done":true,"message_id":"...","user_message_id":"..."}`
 11. Filtra `<think>...</think>` (reasoning tokens do qwen3) durante o stream
 12. Salva resposta completa no banco ao final
+
+Robustez do streaming (`streamOllama`): se o cliente desconectar, a geração no Ollama é **abortada** (AbortController) e o conteúdo parcial é persistido; há timeout de inatividade de 120s (stream travado → abort + evento de erro). O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
 
 ## Eventos do chat (frontend)
 
@@ -276,13 +276,12 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `top_p` | Nucleus sampling — mantém tokens que somam X% de probabilidade | Nenhum |
 | `top_k` | Mantém apenas os K tokens mais prováveis | Nenhum |
 | `min_p` | Filtro dinâmico — descarta tokens abaixo de X% do token mais provável | Nenhum |
-| `tfs_z` | Tail Free Sampling — remove cauda de baixa probabilidade | Nenhum |
 | `repeat_penalty` | Penaliza tokens já usados no contexto recente | Leve |
 | `repeat_last_n` | Janela de tokens observados pelo repeat_penalty | Leve |
 | `max_tokens` | Comprimento máximo de cada resposta | Alto (linear) |
 | `min_tokens` | Mínimo de tokens na resposta (evita respostas curtíssimas) | Alto (linear) |
 | `context_size` | Janela de contexto total (KV Cache) — maior = mais memória do personagem | **Alto (quadrático)** |
-| `num_ctx_messages` | Quantas mensagens do histórico enviar ao Ollama | Indireto |
+| `num_ctx_messages` | Quantas mensagens do histórico enviar ao Ollama (total, user+assistant) | Indireto |
 | `seed` | Semente do RNG (`-1` = aleatório) | Nenhum |
 | `stop` | Tokens de parada que encerram a geração | Nenhum |
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
@@ -301,13 +300,13 @@ A config tem hierarquia: `appConfig.defaults` (.env) → `generation_config` (gl
 
 `contexto/estrutura_memoria` — tipos de memória:
 - **Auto**: gerada pelo extrator unificado (`memory/extraction.js`) quando mensagens saem da janela de contexto — o registro episódico da conversa; recuperada por keyword/score
-- **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto
+- **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto (sem keywords informadas, são derivadas do content — memória sem keywords seria irrecuperável)
 - **Pinned**: sempre injetada no prompt (ver regras abaixo)
 - **Lorebook**: ativada por palavras-chave mencionadas no chat
 
 ### Geração automática de memórias (extrator unificado)
 
-- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez.
+- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez. Backlog vem de `getMemoryBacklog()` (SQL, sem carregar a conversa inteira); um lock por conversa (Set em memória) impede extração dupla em turnos rápidos; a chamada Ollama da extração tem timeout de 120s.
 - **Cursor**: `last_memory_position` só avança se a extração concluir com sucesso — falha de Ollama vira retry natural; rollback clampeia o cursor, reset zera. Nunca pula janelas.
 - Extração (`memory/extraction.js`): **UMA chamada Ollama** com CHARACTER BASELINE (nunca reafirma a ficha), structured outputs (`format` JSON Schema) + parsing defensivo. Cada item vem com `pinned` (bool) e `importance` (1-5) → `relevance_weight` graduado: pinned 1.2–2.0, auto 0.8–1.2. Dedup por overlap de palavras (>0.55); auto também deduplica contra pinned. Keywords ausentes são derivadas do content (`extractKeywordsFromText`).
 - Eventos SSE após o `done`: `{type:"memory_processing"}` → `{type:"memories_created", auto, pinned}` — o frontend mostra status e toast de pinned.
@@ -345,8 +344,8 @@ Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **moment
 
 Pontos de afeto por conversa (`conversations.affection_points`) definem o estágio da relação personagem↔usuário:
 
-- **Ganho**: cada mensagem do usuário rende 1 ponto; +1 se ≥240 chars; +1 se contém `*ações*` de roleplay (máx 3). Aplicado em `POST /messages` antes da montagem do prompt — a resposta já reflete o nível novo.
-- **Escala** (thresholds cumulativos, gaps crescentes): Estranhos 0 → Conhecidos 10 → Amigos 30 → Amigos próximos 65 → Melhores amigos 120 → Paquera 200 → Namorados 320 → Apaixonados 500 → Almas gêmeas 750.
+- **Ganho**: cada mensagem do usuário rende 1 ponto; +1 se ≥240 chars; +1 se contém `*ações*` de roleplay (máx 3). O prompt já reflete o nível novo (pontos prospectivos), mas a persistência (`addAffectionPoints`) só ocorre no `onDone` se a geração produziu resposta — falha de Ollama não pontua, e o evento SSE de afeição só é emitido em turno salvo.
+- **Escala** (thresholds cumulativos, gaps crescentes): Estranhos 0 → Conhecidos 10 → Amigos 30 → Amigos próximos 95 → Melhores amigos 180 → Paquera 320 → Namorados 470 → Apaixonados 650 → Almas gêmeas 900.
 - **Prompt**: `buildPromptMessages({ affection })` injeta o bloco `[Relationship — how X currently feels about Y]` logo após o character card, com orientação de comportamento por nível e instrução explícita de não forçar o estágio em toda resposta nem mencionar níveis/pontos.
 - **SSE**: após o `done`, o backend emite `{type:"affection", points, level, name, next_threshold, progress, leveled_up}` — o frontend atualiza o badge no header (`#header-affection`, coração + nome do nível + barra de progresso) e mostra toast em level-up.
 - **Reset** da conversa zera os pontos; rollback não mexe neles. `GET /api/conversations/:id` e `POST .../reset` retornam `affection` no payload.
@@ -357,6 +356,7 @@ Todas as variáveis de ambiente são lidas aqui via `dotenv`. Demais arquivos im
 - `appConfig.port` / `appConfig.nodeEnv`
 - `appConfig.ollama.host` / `.chatEndpoint` / `.tagsEndpoint`
 - `appConfig.dbPath`
+- `appConfig.auth` — basic auth opcional: definir `AUTH_PASSWORD` no .env ativa o middleware (usuário padrão `openrp`, muda com `AUTH_USER`); sem ela, acesso livre. Importante quando exposto via Tailscale.
 - `appConfig.defaults` — valores padrão de todos os parâmetros de geração
 
 ## Comandos
@@ -364,18 +364,20 @@ Todas as variáveis de ambiente são lidas aqui via `dotenv`. Demais arquivos im
 ```bash
 npm start        # produção
 npm run dev      # watch mode (node --watch)
+npm test         # testes (node:test, pasta tests/ — lógica pura: affection, helpers, retrieval, promptBuilder)
 ```
 
 ## Observações importantes
 
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
 - **Ollama é obrigatório** — redireciona para `/check` se não responder
-- `first_message` suporta `{{user}}` que é substituído pelo nome da persona ao criar conversa
 - Config de geração tem hierarquia: `.env defaults` → `global` → `character_config`
 - O modelo padrão é `gemma4:e4b` — pode ser alterado em `/settings`. Na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-32k` (32k ctx) e `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existirem
-- Avatar upload: enviado como base64 no body JSON, salvo em `public/assets/uploads/` com nome `timestamp-filename`
+- Avatar upload: enviado como base64 no body JSON, validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx 8MB — a extensão salva vem do tipo detectado, nunca do nome enviado) e salvo em `public/assets/uploads/` como `timestamp-nome.ext`
 - Todos os IDs são UUIDs v4
-- `getLastNMessages` retorna ordenado por `created_at DESC LIMIT n` e depois reverte (mais antigo primeiro)
+- `getLastNMessages` retorna as últimas N mensagens **totais** (user+assistant, exclui system) por `position DESC LIMIT n`, revertidas (mais antiga primeiro) — mesma definição de janela usada pelo gatilho de memórias
+- `first_message` suporta `{{user}}` (nome da persona) e `{{char}}` (nome do personagem)
+- Frontend: todo dado do banco interpolado em `innerHTML` passa por escape (`escHtml`/`sidebarEscHtml`)
 - `character.routes.js` usa factory `characterRouter(uploadDir)` porque precisa do caminho de upload injetado pelo `webServer.init.js`
 - `chat.js` frontend usa `type="module"` e ES Modules; os demais JS são scripts regulares
 - `queries.js` é um barrel puro — toda lógica de banco fica em `queries/` (um arquivo por domínio); importar de `queries.js` continua funcionando sem mudança nos consumidores

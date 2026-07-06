@@ -3,7 +3,7 @@
 // (com bônus por engajamento) e os thresholds crescem a cada nível — subir de
 // nível fica progressivamente mais demorado.
 
-// Thresholds cumulativos — gaps: 10, 20, 35, 55, 80, 120, 180, 250
+// Thresholds cumulativos — gaps crescentes: 10, 20, 65, 85, 140, 150, 180, 250
 export const AFFECTION_LEVELS = [
   { level: 0, name: "Estranhos",       threshold: 0 },
   { level: 1, name: "Conhecidos",      threshold: 10 },
@@ -11,7 +11,7 @@ export const AFFECTION_LEVELS = [
   { level: 3, name: "Amigos próximos", threshold: 95 },
   { level: 4, name: "Melhores amigos", threshold: 180 },
   { level: 5, name: "Paquera",         threshold: 320 },
-  { level: 6, name: "Namorados",       threshold: 450 },
+  { level: 6, name: "Namorados",       threshold: 470 },
   { level: 7, name: "Apaixonados",     threshold: 650 },
   { level: 8, name: "Almas gêmeas",    threshold: 900 },
 ];

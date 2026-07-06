@@ -92,10 +92,15 @@ function importanceToWeight(importance, pinned) {
     return pinned ? 1.0 + 0.2 * level : 0.7 + 0.1 * level;
 }
 
+// Timeout da chamada de extração — sem isso uma travada do Ollama seguraria a
+// promise (e o lock do trigger) indefinidamente.
+const EXTRACTION_TIMEOUT_MS = 120_000;
+
 async function callOllama(model, systemPrompt, excerpt, withFormat) {
     return fetch(OLLAMA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(EXTRACTION_TIMEOUT_MS),
         body: JSON.stringify({
             model,
             messages: [

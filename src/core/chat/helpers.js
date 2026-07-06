@@ -82,106 +82,153 @@ export function handleSSEError(res, err, label) {
     }
 }
 
+// Sem nenhum chunk do Ollama por este tempo, o stream é abortado (modelo travado).
+const STREAM_STALL_TIMEOUT_MS = 120_000;
+
 // Streams Ollama response as SSE. onDone(filteredContent, rawContent) is called
 // when streaming finishes; it should persist the message and return extra fields for the done event.
 // afterDone(res) runs AFTER the done event is written but before res.end() — for background
 // work (e.g. memory extraction) that may still push SSE events without blocking the client's
 // perception of completion (the frontend unlocks the input on `done`).
+//
+// Se o cliente desconectar no meio do stream, a geração no Ollama é abortada
+// (libera a GPU); o conteúdo parcial já gerado ainda é persistido via onDone.
 export async function streamOllama(res, messages, config, onDone, afterDone = null) {
-    const ollamaRes = await fetch(OLLAMA_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: config.model,
-            messages,
-            stream: true,
-            think: false,
-            options: {
-                temperature:   config.temperature,
-                top_p:         config.top_p,
-                top_k:         config.top_k,
-                min_p:         config.min_p,
-                repeat_penalty: config.repeat_penalty,
-                repeat_last_n: config.repeat_last_n,
-                num_ctx:       config.context_size || undefined,
-                num_predict:   config.max_tokens,
-                seed:          (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
-                stop:          config.stop?.length ? config.stop : undefined,
-            },
-        }),
-    });
+    const controller = new AbortController();
+    let clientGone   = false;
+    let stallTimer   = null;
 
-    if (!ollamaRes.ok) {
-        res.write(`data: ${JSON.stringify({ error: `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}` })}\n\n`);
-        res.end();
-        return;
-    }
+    const onClientClose = () => { clientGone = true; controller.abort(); };
+    res.on("close", onClientClose);
+
+    const resetStallTimer = () => {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => controller.abort(), STREAM_STALL_TIMEOUT_MS);
+        stallTimer.unref?.();
+    };
+    const cleanup = () => {
+        if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+        res.off("close", onClientClose);
+    };
 
     let fullContent = "";  // filtered (without <think> blocks) — sent to SSE and saved
     let rawContent  = "";  // verbatim output from the model — used for logging
-    let inThink     = false;
-    const reader    = ollamaRes.body.getReader();
-    const decoder   = new TextDecoder();
-    let buffer      = "";
 
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            let parsed;
-            try { parsed = JSON.parse(line); } catch { continue; }
-
-            if (parsed.message?.content) {
-                const raw  = parsed.message.content;
-                rawContent += raw;
-
-                let delta = raw;
-
-                if (inThink) {
-                    const endIdx = delta.indexOf("</think>");
-                    if (endIdx !== -1) { inThink = false; delta = delta.slice(endIdx + 8); }
-                    else continue;
-                }
-
-                while (delta.includes("<think>")) {
-                    const startIdx = delta.indexOf("<think>");
-                    const before   = delta.slice(0, startIdx);
-                    if (before) {
-                        fullContent += before;
-                        res.write(`data: ${JSON.stringify({ delta: before, done: false })}\n\n`);
-                    }
-                    const endIdx = delta.indexOf("</think>", startIdx);
-                    if (endIdx !== -1) { delta = delta.slice(endIdx + 8); }
-                    else { inThink = true; delta = ""; }
-                }
-
-                if (delta) {
-                    fullContent += delta;
-                    res.write(`data: ${JSON.stringify({ delta, done: false })}\n\n`);
-                }
-            }
-
-            if (parsed.done) {
-                const extra = await onDone(fullContent, rawContent);
-                res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
-                if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
-                res.end();
-                return;
-            }
-        }
-    }
-
-    // Fallback if stream ended without a parsed.done event
-    if (fullContent) {
+    const finish = async () => {
+        cleanup();
         const extra = await onDone(fullContent, rawContent);
+        if (clientGone) return;
         res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
         if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
+        res.end();
+    };
+
+    try {
+        resetStallTimer();
+        const ollamaRes = await fetch(OLLAMA_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+                model: config.model,
+                messages,
+                stream: true,
+                think: false,
+                options: {
+                    temperature:   config.temperature,
+                    top_p:         config.top_p,
+                    top_k:         config.top_k,
+                    min_p:         config.min_p,
+                    repeat_penalty: config.repeat_penalty,
+                    repeat_last_n: config.repeat_last_n,
+                    num_ctx:       config.context_size || undefined,
+                    num_predict:   config.max_tokens,
+                    seed:          (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
+                    stop:          config.stop?.length ? config.stop : undefined,
+                },
+            }),
+        });
+
+        if (!ollamaRes.ok) {
+            cleanup();
+            res.write(`data: ${JSON.stringify({ error: `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}` })}\n\n`);
+            res.end();
+            return;
+        }
+
+        let inThink   = false;
+        const reader  = ollamaRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer    = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            resetStallTimer();
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                let parsed;
+                try { parsed = JSON.parse(line); } catch { continue; }
+
+                if (parsed.message?.content) {
+                    const raw  = parsed.message.content;
+                    rawContent += raw;
+
+                    let delta = raw;
+
+                    if (inThink) {
+                        const endIdx = delta.indexOf("</think>");
+                        if (endIdx !== -1) { inThink = false; delta = delta.slice(endIdx + 8); }
+                        else continue;
+                    }
+
+                    while (delta.includes("<think>")) {
+                        const startIdx = delta.indexOf("<think>");
+                        const before   = delta.slice(0, startIdx);
+                        if (before) {
+                            fullContent += before;
+                            res.write(`data: ${JSON.stringify({ delta: before, done: false })}\n\n`);
+                        }
+                        const endIdx = delta.indexOf("</think>", startIdx);
+                        if (endIdx !== -1) { delta = delta.slice(endIdx + 8); }
+                        else { inThink = true; delta = ""; }
+                    }
+
+                    if (delta) {
+                        fullContent += delta;
+                        res.write(`data: ${JSON.stringify({ delta, done: false })}\n\n`);
+                    }
+                }
+
+                if (parsed.done) {
+                    await finish();
+                    return;
+                }
+            }
+        }
+
+        // Fallback if stream ended without a parsed.done event
+        if (fullContent) { await finish(); return; }
+        cleanup();
+        res.end();
+    } catch (err) {
+        cleanup();
+        if (err?.name === "AbortError") {
+            // Cliente desconectou (ou o stream travou): persiste o parcial e encerra.
+            if (fullContent) { try { await onDone(fullContent, rawContent); } catch { /* já estamos encerrando */ } }
+            if (!clientGone) {
+                try {
+                    res.write(`data: ${JSON.stringify({ error: "Geração interrompida — o Ollama parou de responder." })}\n\n`);
+                    res.end();
+                } catch { /* conexão já fechada */ }
+            }
+            return;
+        }
+        throw err;
     }
-    res.end();
 }

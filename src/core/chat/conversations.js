@@ -11,6 +11,13 @@ import { extractAndSaveMemories } from "../memory/index.js";
 
 const router = Router();
 
+// Placeholders do first_message: {{user}} → nome da persona, {{char}} → nome do personagem.
+function renderFirstMessage(template, character, persona) {
+    return template
+        .replace(/\{\{user\}\}/gi, persona?.name || "você")
+        .replace(/\{\{char\}\}/gi, character?.name || "");
+}
+
 // ── GET /api/characters/:id/conversations ────────────────────────────────────
 // Lista as conversas de um personagem (cada uma com seu cenário e mensagem inicial).
 router.get("/characters/:id/conversations", (req, res) => {
@@ -44,8 +51,7 @@ router.post("/conversations", (req, res) => {
         );
 
         if (first_message?.trim()) {
-            const userName = persona?.name || "você";
-            addMessage(convId, "assistant", first_message.trim().replace(/\{\{user\}\}/gi, userName), 0);
+            addMessage(convId, "assistant", renderFirstMessage(first_message.trim(), character, persona), 0);
         }
 
         // Modelo exclusivo da conversa (opcional)
@@ -116,9 +122,9 @@ router.post("/conversations/:id/reset", (req, res) => {
 
         let firstMsg = null;
         if (conv.first_message) {
+            const character = getCharacter(conv.character_id);
             const persona   = getPersona();
-            const userName  = persona?.name || "você";
-            const content   = conv.first_message.replace(/\{\{user\}\}/gi, userName);
+            const content   = renderFirstMessage(conv.first_message, character, persona);
             const msgId     = addMessage(req.params.id, "assistant", content, 0);
             firstMsg = { id: msgId, role: "assistant", content };
         }

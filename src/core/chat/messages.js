@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
     getCharacter, getPersona, getGenerationConfig,
     getConversation, addMessage, updateMessage, rollbackConversation,
-    deleteLastAssistantMessage, getLastNMessages,
+    getLastMessage, deleteMessage, getLastNMessages,
     getAllLorebooks, getMemories, addAffectionPoints,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
@@ -34,10 +34,12 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const memories   = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
         const lorebooks  = getAllLorebooks(conv.character_id);
 
-        // Afeto: cada mensagem do usuário rende pontos; a resposta já reflete o nível atualizado
+        // Afeto: cada mensagem do usuário rende pontos. O prompt já reflete o nível
+        // novo, mas os pontos só são persistidos se a geração produzir resposta —
+        // falha de Ollama não pontua.
+        const gained        = computeAffectionGain(content);
         const prevAffection = getAffectionLevel(conv.affection_points);
-        const newPoints     = addAffectionPoints(conversationId, computeAffectionGain(content));
-        const affection     = getAffectionLevel(newPoints);
+        const affection     = getAffectionLevel(conv.affection_points + gained);
 
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv, charConfig,
@@ -46,10 +48,8 @@ router.post("/conversations/:id/messages", async (req, res) => {
             memories, lorebooks, affection,
         });
 
-        const nextPos   = recentMsgs.length > 0
-            ? (recentMsgs[recentMsgs.length - 1].position ?? recentMsgs.length) + 1
-            : 1;
-        const userMsgId = addMessage(conversationId, "user", content.trim(), nextPos);
+        // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
+        const userMsgId = addMessage(conversationId, "user", content.trim());
 
         const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
 
@@ -57,8 +57,9 @@ router.post("/conversations/:id/messages", async (req, res) => {
         let turnSaved = false;
         await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
-            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, nextPos + 1) : null;
+            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent) : null;
             turnSaved = !!fullContent;
+            if (turnSaved) addAffectionPoints(conversationId, gained);
 
             logConversationTurn({
                 conversationId,
@@ -74,13 +75,14 @@ router.post("/conversations/:id/messages", async (req, res) => {
             return { message_id: asstMsgId, user_message_id: userMsgId };
         }, async (res) => {
             // Roda após o evento done — o input do usuário já foi liberado no frontend
+            if (!turnSaved) return;
+
             res.write(`data: ${JSON.stringify({
                 type: "affection",
                 ...affection,
                 leveled_up: affection.level > prevAffection.level,
             })}\n\n`);
 
-            if (!turnSaved) return;
             const counts = await processMemoryBacklogIfDue(conversationId, {
                 character, persona, config,
                 onStart: () => res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`),
@@ -104,8 +106,17 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const character = getCharacter(conv.character_id);
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
-        const deleted = deleteLastAssistantMessage(conversationId);
-        if (!deleted) return res.status(400).json({ ok: false, message: "Nenhuma mensagem do personagem para regenerar." });
+        // Só remove a última resposta se ela for de fato a ÚLTIMA mensagem da
+        // conversa — se a última for do usuário (ex.: geração anterior falhou),
+        // nada é apagado e a nova resposta entra no fim, sem reordenar o histórico.
+        const lastMsg = getLastMessage(conversationId);
+        if (!lastMsg) return res.status(400).json({ ok: false, message: "Nenhuma mensagem para regenerar." });
+
+        let insertPos = null; // null → MAX(position)+1 no insert
+        if (lastMsg.role === "assistant") {
+            deleteMessage(lastMsg.id);
+            insertPos = lastMsg.position;
+        }
 
         const persona    = getPersona();
         const config     = resolveConfig(conv.character_id, conversationId);
@@ -129,7 +140,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         startSSE(res);
         await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
-            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, deleted.position) : null;
+            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, insertPos) : null;
 
             logConversationTurn({
                 conversationId,
@@ -155,7 +166,8 @@ router.patch("/conversations/:id/messages/:msgId", (req, res) => {
     try {
         const { content } = req.body;
         if (!content?.trim()) return res.status(400).json({ ok: false, message: "Conteúdo não pode ser vazio." });
-        updateMessage(req.params.msgId, content.trim());
+        const updated = updateMessage(req.params.msgId, content.trim(), req.params.id);
+        if (!updated) return res.status(404).json({ ok: false, message: "Mensagem não encontrada nesta conversa." });
         res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });

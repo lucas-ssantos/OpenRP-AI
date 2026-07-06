@@ -16,6 +16,13 @@ export const appConfig = {
 
     dbPath: process.env.DB_PATH || "./data/roleplay.db",
 
+    // Basic auth opcional — importante quando exposto via Tailscale.
+    // Defina AUTH_PASSWORD no .env para exigir login; sem ela, acesso livre.
+    auth: {
+        user:     process.env.AUTH_USER || "openrp",
+        password: process.env.AUTH_PASSWORD || null,
+    },
+
     defaults: {
         model:            process.env.OLLAMA_DEFAULT_MODEL                       || "qwen3:8b",
         temperature:      parseFloat(process.env.DEFAULT_TEMPERATURE)            || 0.92,
@@ -24,7 +31,6 @@ export const appConfig = {
         min_p:            parseFloat(process.env.DEFAULT_MIN_P)                  || 0.04,
         repeat_penalty:   parseFloat(process.env.DEFAULT_REPEAT_PENALTY)         || 1.05,
         repeat_last_n:    parseInt(process.env.DEFAULT_REPEAT_LAST_N)            || 192,
-        tfs_z:            parseFloat(process.env.DEFAULT_TFS_Z)                  || 0.95,
         max_tokens:       parseInt(process.env.DEFAULT_MAX_TOKENS ?? "-1")       || -1,
         min_tokens:       parseInt(process.env.DEFAULT_MIN_TOKENS)               || 60,
         context_size:     parseInt(process.env.DEFAULT_CONTEXT_SIZE)             || 8192,

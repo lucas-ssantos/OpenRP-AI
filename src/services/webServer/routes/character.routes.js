@@ -11,6 +11,38 @@ import {
 
 const publicPath = path.resolve(process.cwd(), "public");
 
+// O arquivo vai parar em public/ e é servido pelo Express — sem validação de
+// tipo, um .html/.svg enviado como "avatar" viraria página executável (XSS).
+// A extensão vem do tipo real detectado (magic bytes), nunca do nome enviado.
+const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+
+function detectImageType(buffer) {
+    if (buffer.length < 12) return null;
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "png";
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "jpg";
+    if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") return "webp";
+    if (buffer.toString("ascii", 0, 4) === "GIF8") return "gif";
+    return null;
+}
+
+// Decodifica, valida e grava o avatar. Retorna a URL pública ou lança com
+// mensagem amigável para a rota devolver 400.
+function saveAvatarUpload(uploadDir, base64Data, filename) {
+    const buffer = Buffer.from(base64Data, "base64");
+    if (buffer.length > MAX_AVATAR_BYTES) {
+        throw new Error("Imagem muito grande — o avatar deve ter no máximo 8MB.");
+    }
+    const type = detectImageType(buffer);
+    if (!type) {
+        throw new Error("Arquivo de avatar inválido — envie uma imagem PNG, JPEG, WebP ou GIF.");
+    }
+    const base = path.basename(filename || "avatar", path.extname(filename || ""))
+        .replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeName = `${Date.now()}-${base}.${type}`;
+    fs.writeFileSync(path.join(uploadDir, safeName), buffer);
+    return `/assets/uploads/${safeName}`;
+}
+
 export default function characterRouter(uploadDir) {
     const router = Router();
 
@@ -42,11 +74,12 @@ export default function characterRouter(uploadDir) {
 
             let avatarUrl = null;
 
-            if (avatar_upload && avatar_filename) {
-                const safeName = `${Date.now()}-${avatar_filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-                const destination = path.join(uploadDir, safeName);
-                fs.writeFileSync(destination, Buffer.from(avatar_upload, "base64"));
-                avatarUrl = `/assets/uploads/${safeName}`;
+            if (avatar_upload) {
+                try {
+                    avatarUrl = saveAvatarUpload(uploadDir, avatar_upload, avatar_filename);
+                } catch (e) {
+                    return res.status(400).json({ ok: false, message: e.message });
+                }
             } else if (avatar_link) {
                 avatarUrl = avatar_link;
             } else {
@@ -99,11 +132,12 @@ export default function characterRouter(uploadDir) {
             }
 
             let avatarUrl;
-            if (avatar_upload && avatar_filename) {
-                const safeName = `${Date.now()}-${avatar_filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-                const destination = path.join(uploadDir, safeName);
-                fs.writeFileSync(destination, Buffer.from(avatar_upload, "base64"));
-                avatarUrl = `/assets/uploads/${safeName}`;
+            if (avatar_upload) {
+                try {
+                    avatarUrl = saveAvatarUpload(uploadDir, avatar_upload, avatar_filename);
+                } catch (e) {
+                    return res.status(400).json({ ok: false, message: e.message });
+                }
             } else if (avatar_link) {
                 avatarUrl = avatar_link;
             }

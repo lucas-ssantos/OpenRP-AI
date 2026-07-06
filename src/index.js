@@ -70,8 +70,10 @@ async function main()
         await startWebServer();
     }
     catch (err)
-    {    
+    {
+        // Sem exit aqui o processo ficaria vivo sem servidor nem banco funcionando
         console.error("Error during initialization:", err);
+        process.exit(1);
     }
 
 }

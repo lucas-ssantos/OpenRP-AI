@@ -1,7 +1,11 @@
 import {
-    getConversationMessages, getLastMemoryPosition, setLastMemoryPosition,
+    getMemoryBacklog, getLastMemoryPosition, setLastMemoryPosition,
 } from "../../services/database/queries.js";
 import { extractAndSaveMemories } from "./extraction.js";
+
+// Conversas com extração em andamento — evita processar o mesmo backlog duas
+// vezes quando turnos chegam em sequência rápida.
+const processing = new Set();
 
 /**
  * Verifica se há backlog de mensagens fora da janela de contexto ainda não
@@ -20,25 +24,29 @@ import { extractAndSaveMemories } from "./extraction.js";
  * @returns {Promise<{auto: number, pinned: number} | null>} null se nada era devido ou a extração falhou
  */
 export async function processMemoryBacklogIfDue(conversationId, { character, persona, config, onStart } = {}) {
+    if (processing.has(conversationId)) return null;
+
     const numCtx      = config?.num_ctx_messages || 20;
     const memInterval = Math.max(1, config?.memory_interval ?? 5);
 
-    // Mensagens fora da janela de contexto = o que o Ollama não vai mais ver
-    const allNonSystem  = getConversationMessages(conversationId).filter(m => m.role !== "system");
-    const outside       = allNonSystem.slice(0, Math.max(0, allNonSystem.length - numCtx));
-    const lastProcessed = getLastMemoryPosition(conversationId);
-    const backlog       = outside.filter(m => (m.position ?? 0) > lastProcessed);
-
-    if (backlog.length < memInterval) return null;
-
+    // Mensagens fora da janela de contexto (o que o Ollama não vai mais ver) e
+    // após o cursor — direto no SQL, sem carregar a conversa inteira.
     // Cap contra backlogs longos (ex.: usuário reduziu num_ctx_messages):
     // processa os mais antigos primeiro; o resto entra nos próximos turnos.
-    const batch = backlog.slice(0, memInterval * 3);
+    const lastProcessed = getLastMemoryPosition(conversationId);
+    const batch = getMemoryBacklog(conversationId, numCtx, lastProcessed, memInterval * 3);
 
-    onStart?.();
-    const result = await extractAndSaveMemories(conversationId, batch, { character, persona, config });
-    if (result === null) return null;
+    if (batch.length < memInterval) return null;
 
-    setLastMemoryPosition(conversationId, Math.max(...batch.map(m => m.position ?? 0)));
-    return { auto: result.auto.length, pinned: result.pinned.length };
+    processing.add(conversationId);
+    try {
+        onStart?.();
+        const result = await extractAndSaveMemories(conversationId, batch, { character, persona, config });
+        if (result === null) return null;
+
+        setLastMemoryPosition(conversationId, Math.max(...batch.map(m => m.position ?? 0)));
+        return { auto: result.auto.length, pinned: result.pinned.length };
+    } finally {
+        processing.delete(conversationId);
+    }
 }

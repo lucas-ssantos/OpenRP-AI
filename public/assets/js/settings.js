@@ -234,7 +234,6 @@ function fillForm(config) {
   document.getElementById('top_p').value          = config.top_p          ?? '';
   document.getElementById('top_k').value          = config.top_k          ?? '';
   document.getElementById('min_p').value          = config.min_p          ?? '';
-  document.getElementById('tfs_z').value          = config.tfs_z          ?? '';
   document.getElementById('repeat_penalty').value = config.repeat_penalty ?? '';
   document.getElementById('repeat_last_n').value  = config.repeat_last_n  ?? '';
   const ctxAuto = config.context_size == null || config.context_size === 0;
@@ -293,7 +292,6 @@ async function handleSubmit(e) {
     top_p:            parseFloat(document.getElementById('top_p').value)          || null,
     top_k:            parseInt(document.getElementById('top_k').value)            || null,
     min_p:            parseFloat(document.getElementById('min_p').value)          || null,
-    tfs_z:            parseFloat(document.getElementById('tfs_z').value)          || null,
     repeat_penalty:   parseFloat(document.getElementById('repeat_penalty').value) || null,
     repeat_last_n:    parseInt(document.getElementById('repeat_last_n').value)    || null,
     context_size:     contextAuto ? null : (parseInt(document.getElementById('context_size').value) || null),
