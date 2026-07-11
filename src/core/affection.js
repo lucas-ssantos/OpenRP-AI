@@ -1,7 +1,7 @@
-// Sistema de afeto: pontos acumulados por conversa que definem o estágio da
-// relação entre o personagem e o usuário. Cada mensagem do usuário rende pontos
-// (com bônus por engajamento) e os thresholds crescem a cada nível — subir de
-// nível fica progressivamente mais demorado.
+// Sistema de afeto: pontos acumulados por personagem (compartilhados entre todas
+// as conversas dele) que definem o estágio da relação com o usuário. Cada mensagem
+// do usuário rende pontos (com bônus por engajamento) e os thresholds crescem a
+// cada nível — subir de nível fica progressivamente mais demorado.
 
 // Thresholds cumulativos — gaps crescentes: 10, 20, 65, 85, 140, 150, 180, 250
 export const AFFECTION_LEVELS = [

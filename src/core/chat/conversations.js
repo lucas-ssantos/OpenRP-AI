@@ -68,7 +68,8 @@ router.get("/conversations/:id", (req, res) => {
     try {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
-        res.json({ ok: true, conversation: conv, affection: getAffectionLevel(conv.affection_points) });
+        const character = getCharacter(conv.character_id);
+        res.json({ ok: true, conversation: conv, affection: getAffectionLevel(character?.affection_points ?? 0) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -120,16 +121,17 @@ router.post("/conversations/:id/reset", (req, res) => {
 
         resetConversation(req.params.id);
 
+        const character = getCharacter(conv.character_id);
         let firstMsg = null;
         if (conv.first_message) {
-            const character = getCharacter(conv.character_id);
-            const persona   = getPersona();
-            const content   = renderFirstMessage(conv.first_message, character, persona);
-            const msgId     = addMessage(req.params.id, "assistant", content, 0);
+            const persona = getPersona();
+            const content = renderFirstMessage(conv.first_message, character, persona);
+            const msgId   = addMessage(req.params.id, "assistant", content, 0);
             firstMsg = { id: msgId, role: "assistant", content };
         }
 
-        res.json({ ok: true, first_message: firstMsg, affection: getAffectionLevel(0) });
+        // A afeição pertence ao personagem — resetar a conversa não a zera.
+        res.json({ ok: true, first_message: firstMsg, affection: getAffectionLevel(character?.affection_points ?? 0) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

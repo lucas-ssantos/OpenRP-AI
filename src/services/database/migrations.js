@@ -32,6 +32,7 @@ export async function migrate() {
       likes TEXT,
       dislikes TEXT,
       avatar_url TEXT,
+      affection_points INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -40,6 +41,24 @@ export async function migrate() {
   // Migration para DBs criados antes das colunas likes/dislikes
   try { db.run(`ALTER TABLE characters ADD COLUMN likes TEXT`); } catch {}
   try { db.run(`ALTER TABLE characters ADD COLUMN dislikes TEXT`); } catch {}
+
+  // Migration: afeição passou de conversa → personagem. Se a coluna acabou de ser
+  // criada num DB antigo, herda o maior valor entre as conversas do personagem
+  // (a relação mais avançada já alcançada).
+  let affectionColumnAdded = false;
+  try {
+    db.run(`ALTER TABLE characters ADD COLUMN affection_points INTEGER DEFAULT 0`);
+    affectionColumnAdded = true;
+  } catch {}
+  if (affectionColumnAdded) {
+    try {
+      db.run(`
+        UPDATE characters SET affection_points = COALESCE(
+          (SELECT MAX(affection_points) FROM conversations WHERE character_id = characters.id), 0
+        )
+      `);
+    } catch { /* DB antigo sem affection_points em conversations — começa em 0 */ }
+  }
 
   // ===== CONVERSATIONS =====
   // Cada conversa pertence a um personagem e carrega seu próprio cenário + mensagem inicial.
@@ -52,7 +71,6 @@ export async function migrate() {
       scenario TEXT,
       first_message TEXT,
       last_memory_position INTEGER DEFAULT 0,
-      affection_points INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -61,8 +79,6 @@ export async function migrate() {
 
   // Migration para DBs criados antes do cursor de extração de memórias
   try { db.run(`ALTER TABLE conversations ADD COLUMN last_memory_position INTEGER DEFAULT 0`); } catch {}
-  // Migration para DBs criados antes do sistema de afeto
-  try { db.run(`ALTER TABLE conversations ADD COLUMN affection_points INTEGER DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`

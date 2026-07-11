@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, avatar_url, created_at, updated_at`;
+const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, avatar_url, affection_points, created_at, updated_at`;
 
 function mapCharacterRow(row) {
   return {
@@ -13,8 +13,9 @@ function mapCharacterRow(row) {
     likes: row[4],
     dislikes: row[5],
     avatar_url: row[6],
-    created_at: row[7],
-    updated_at: row[8],
+    affection_points: row[7] ?? 0,
+    created_at: row[8],
+    updated_at: row[9],
   };
 }
 
@@ -65,4 +66,17 @@ export function updateCharacter(id, { name, description, personality, likes, dis
   db.run(`UPDATE characters SET ${sets.join(", ")} WHERE id = ?`, vals);
   saveDB();
   return true;
+}
+
+// Soma pontos de afeto ao personagem e retorna o total atualizado.
+export function addAffectionPoints(characterId, delta) {
+  const db = getDB();
+  db.run(
+    `UPDATE characters SET affection_points = MAX(0, affection_points + ?) WHERE id = ?`,
+    [delta, characterId]
+  );
+  const result = db.exec(`SELECT affection_points FROM characters WHERE id = ?`, [characterId]);
+  saveDB();
+  if (result.length === 0 || result[0].values.length === 0) return 0;
+  return result[0].values[0][0] ?? 0;
 }

@@ -34,12 +34,13 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const memories   = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
         const lorebooks  = getAllLorebooks(conv.character_id);
 
-        // Afeto: cada mensagem do usuário rende pontos. O prompt já reflete o nível
-        // novo, mas os pontos só são persistidos se a geração produzir resposta —
-        // falha de Ollama não pontua.
+        // Afeto: cada mensagem do usuário rende pontos ao personagem (compartilhados
+        // entre todas as conversas dele). O prompt já reflete o nível novo, mas os
+        // pontos só são persistidos se a geração produzir resposta — falha de Ollama
+        // não pontua.
         const gained        = computeAffectionGain(content);
-        const prevAffection = getAffectionLevel(conv.affection_points);
-        const affection     = getAffectionLevel(conv.affection_points + gained);
+        const prevAffection = getAffectionLevel(character.affection_points);
+        const affection     = getAffectionLevel(character.affection_points + gained);
 
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv, charConfig,
@@ -59,7 +60,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent) : null;
             turnSaved = !!fullContent;
-            if (turnSaved) addAffectionPoints(conversationId, gained);
+            if (turnSaved) addAffectionPoints(conv.character_id, gained);
 
             logConversationTurn({
                 conversationId,
@@ -132,7 +133,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             historyMessages: recentMsgs,
             userMessage: null,
             memories, lorebooks,
-            affection: getAffectionLevel(conv.affection_points),
+            affection: getAffectionLevel(character.affection_points),
         });
 
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };
