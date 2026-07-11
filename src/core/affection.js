@@ -6,14 +6,14 @@
 // Thresholds cumulativos — gaps crescentes: 10, 20, 65, 85, 140, 150, 180, 250
 export const AFFECTION_LEVELS = [
   { level: 0, name: "Estranhos",       threshold: 0 },
-  { level: 1, name: "Conhecidos",      threshold: 10 },
-  { level: 2, name: "Amigos",          threshold: 30 },
-  { level: 3, name: "Amigos próximos", threshold: 95 },
-  { level: 4, name: "Melhores amigos", threshold: 180 },
-  { level: 5, name: "Paquera",         threshold: 320 },
-  { level: 6, name: "Namorados",       threshold: 470 },
-  { level: 7, name: "Apaixonados",     threshold: 650 },
-  { level: 8, name: "Almas gêmeas",    threshold: 900 },
+  { level: 1, name: "Conhecidos",      threshold: 100 },
+  { level: 2, name: "Amigos",          threshold: 190 },
+  { level: 3, name: "Amigos próximos", threshold: 500 },
+  { level: 4, name: "Melhores amigos", threshold: 1500 },
+  { level: 5, name: "Paquera",         threshold: 5000 },
+  { level: 6, name: "Namorados",       threshold: 7000 },
+  { level: 7, name: "Apaixonados",     threshold: 10000 },
+  { level: 8, name: "Almas gêmeas",    threshold: 15000 },
 ];
 
 // Orientação de comportamento por nível — injetada no system prompt.
