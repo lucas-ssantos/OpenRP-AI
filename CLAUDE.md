@@ -112,7 +112,7 @@ contexto/
 
 | Tabela | Descrição |
 |--------|-----------|
-| `characters` | id, name, description, personality, avatar_url, scenario, first_message, affection_points (pontos de afeto acumulados) |
+| `characters` | id, name, description, personality, avatar_url, scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
 | `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |
 | `persona` | id='self', name, description, avatar_url (única linha) |
@@ -169,6 +169,7 @@ POST /api/persona           → salva persona
 GET  /api/config            → config global de geração
 POST /api/config            → salva config global
 GET  /api/presets           → presets de hardware (low/medium/high)
+GET  /api/affection/levels  → escala de níveis de afeição (select de override na edição de personagem)
 GET  /api/models            → lista modelos instalados no Ollama (nome, tamanho, família, parâmetros)
 POST /api/models/pull       → baixa um modelo do Ollama → streaming SSE de progresso
 GET  /api/viewdb/tables     → lista tabelas com contagem
@@ -349,6 +350,7 @@ Pontos de afeto por personagem (`characters.affection_points`) definem o estági
 - **Prompt**: `buildPromptMessages({ affection })` injeta o bloco `[Relationship — how X currently feels about Y]` logo após o character card, com orientação de comportamento por nível e instrução explícita de não forçar o estágio em toda resposta nem mencionar níveis/pontos.
 - **SSE**: após o `done`, o backend emite `{type:"affection", points, level, name, next_threshold, progress, leveled_up}` — o frontend atualiza o badge no header (`#header-affection`, coração + nome do nível + barra de progresso) e mostra toast em level-up.
 - **Reset** da conversa NÃO zera os pontos (a afeição é do personagem e sobrevive entre conversas); rollback também não mexe neles. `GET /api/conversations/:id` e `POST .../reset` retornam `affection` no payload (calculada dos pontos do personagem). Migração: DBs antigos herdam em `characters.affection_points` o MAX entre as conversas do personagem.
+- **Override manual**: `characters.affection_override` (NULL = automático) fixa o estágio da relação — configurável no select da página de edição do personagem (`edit-character.html`), que carrega a escala via `GET /api/affection/levels`. Com override ativo, `getEffectiveAffection()` retorna o nível fixado (`override: true`, `next_threshold: null`, `progress: 1` → badge sem barra de progressão) e nunca emite level-up; os pontos continuam acumulando em segundo plano, então voltar para "Auto" retoma a progressão normal do banco. Validação no PUT: inteiro dentro da escala ou null.
 
 ## Config centralizada (`src/config.js`)
 

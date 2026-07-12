@@ -33,6 +33,7 @@ export async function migrate() {
       dislikes TEXT,
       avatar_url TEXT,
       affection_points INTEGER DEFAULT 0,
+      affection_override INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -59,6 +60,9 @@ export async function migrate() {
       `);
     } catch { /* DB antigo sem affection_points em conversations — começa em 0 */ }
   }
+
+  // Migration: override manual do estágio de afeição (NULL = progressão automática)
+  try { db.run(`ALTER TABLE characters ADD COLUMN affection_override INTEGER`); } catch {}
 
   // ===== CONVERSATIONS =====
   // Cada conversa pertence a um personagem e carrega seu próprio cenário + mensagem inicial.

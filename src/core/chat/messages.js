@@ -7,7 +7,7 @@ import {
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
-import { getAffectionLevel, computeAffectionGain } from "../affection.js";
+import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 
@@ -37,10 +37,11 @@ router.post("/conversations/:id/messages", async (req, res) => {
         // Afeto: cada mensagem do usuário rende pontos ao personagem (compartilhados
         // entre todas as conversas dele). O prompt já reflete o nível novo, mas os
         // pontos só são persistidos se a geração produzir resposta — falha de Ollama
-        // não pontua.
+        // não pontua. Com affection_override ativo o estágio é fixo, mas os pontos
+        // seguem acumulando para quando voltar ao modo automático.
         const gained        = computeAffectionGain(content);
-        const prevAffection = getAffectionLevel(character.affection_points);
-        const affection     = getAffectionLevel(character.affection_points + gained);
+        const prevAffection = getEffectiveAffection(character);
+        const affection     = getEffectiveAffection(character, gained);
 
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv, charConfig,
@@ -133,7 +134,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             historyMessages: recentMsgs,
             userMessage: null,
             memories, lorebooks,
-            affection: getAffectionLevel(character.affection_points),
+            affection: getEffectiveAffection(character),
         });
 
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };

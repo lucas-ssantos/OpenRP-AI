@@ -8,6 +8,7 @@ import {
     getRecentCharactersWithConversations,
     updateCharacter,
 } from "../../database/queries.js";
+import { AFFECTION_LEVELS } from "../../../core/affection.js";
 
 const publicPath = path.resolve(process.cwd(), "public");
 
@@ -57,6 +58,11 @@ export default function characterRouter(uploadDir) {
     // Página do personagem: lista de conversas + criação de nova conversa.
     router.get("/character/:id", (_req, res) => {
         res.sendFile(path.join(publicPath, "conversations.html"));
+    });
+
+    // Escala de afeição — usada pelo select de override na edição de personagem.
+    router.get("/api/affection/levels", (_req, res) => {
+        res.json({ ok: true, levels: AFFECTION_LEVELS });
     });
 
     router.get("/api/characters", (_req, res) => {
@@ -125,10 +131,18 @@ export default function characterRouter(uploadDir) {
             const existing = getCharacter(id);
             if (!existing) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
-            const { name, description, personality, likes, dislikes, avatar_link, avatar_upload, avatar_filename } = req.body;
+            const { name, description, personality, likes, dislikes, avatar_link, avatar_upload, avatar_filename, affection_override } = req.body;
 
             if (name !== undefined && !name.trim()) {
                 return res.status(400).json({ ok: false, message: "O nome do personagem não pode ser vazio." });
+            }
+
+            // Override de afeição: null = automático; senão precisa ser um nível válido.
+            if (affection_override !== undefined && affection_override !== null) {
+                const lvl = Number(affection_override);
+                if (!Number.isInteger(lvl) || lvl < 0 || lvl >= AFFECTION_LEVELS.length) {
+                    return res.status(400).json({ ok: false, message: "Estágio de afeição inválido." });
+                }
             }
 
             let avatarUrl;
@@ -149,6 +163,9 @@ export default function characterRouter(uploadDir) {
                 likes:         likes         !== undefined ? likes                 : undefined,
                 dislikes:      dislikes      !== undefined ? dislikes              : undefined,
                 avatar_url:    avatarUrl,
+                affection_override: affection_override !== undefined
+                    ? (affection_override === null ? null : Number(affection_override))
+                    : undefined,
             });
 
             res.json({ ok: true, id });

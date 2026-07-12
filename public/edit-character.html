@@ -56,6 +56,22 @@
                   </div>
                 </div>
 
+                <!-- Afeição -->
+                <div class="glass-card card p-3 mb-4" style="border-radius:.85rem !important;">
+                  <p class="fw-semibold mb-1 d-flex align-items-center gap-2" style="color:#cbd5e1; font-size:.9rem;">
+                    <i class="bi bi-heart-fill text-info"></i> Estágio de afeição
+                  </p>
+                  <p class="text-secondary small mb-3">
+                    Fixe manualmente o estágio da relação com o personagem. Em <strong>Auto</strong>,
+                    o estágio evolui naturalmente pelos pontos acumulados nas conversas —
+                    os pontos continuam contando mesmo com um estágio fixado.
+                  </p>
+                  <select id="affection_override" name="affection_override" class="form-select">
+                    <option value="">Auto (progressão por pontos)</option>
+                  </select>
+                  <div class="form-text mt-1" id="affection-current"></div>
+                </div>
+
                 <div class="glass-card card p-3 mb-4" style="border-radius:.85rem !important;">
                   <p class="fw-semibold mb-3 d-flex align-items-center gap-2" style="color:#cbd5e1; font-size:.9rem;">
                     <i class="bi bi-image text-info"></i> Imagem do personagem

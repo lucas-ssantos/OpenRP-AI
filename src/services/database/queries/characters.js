@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, avatar_url, affection_points, created_at, updated_at`;
+const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, avatar_url, affection_points, affection_override, created_at, updated_at`;
 
 function mapCharacterRow(row) {
   return {
@@ -14,8 +14,9 @@ function mapCharacterRow(row) {
     dislikes: row[5],
     avatar_url: row[6],
     affection_points: row[7] ?? 0,
-    created_at: row[8],
-    updated_at: row[9],
+    affection_override: row[8] ?? null,
+    created_at: row[9],
+    updated_at: row[10],
   };
 }
 
@@ -46,7 +47,7 @@ export function getAllCharacters() {
   return result[0].values.map(mapCharacterRow);
 }
 
-export function updateCharacter(id, { name, description, personality, likes, dislikes, avatar_url }) {
+export function updateCharacter(id, { name, description, personality, likes, dislikes, avatar_url, affection_override }) {
   const db = getDB();
   const sets = [];
   const vals = [];
@@ -57,6 +58,8 @@ export function updateCharacter(id, { name, description, personality, likes, dis
   if (likes !== undefined)         { sets.push("likes = ?");         vals.push(likes); }
   if (dislikes !== undefined)      { sets.push("dislikes = ?");      vals.push(dislikes); }
   if (avatar_url !== undefined)    { sets.push("avatar_url = ?");    vals.push(avatar_url); }
+  // null = volta para a progressão automática por pontos
+  if (affection_override !== undefined) { sets.push("affection_override = ?"); vals.push(affection_override); }
 
   if (sets.length === 0) return false;
   sets.push("updated_at = ?");

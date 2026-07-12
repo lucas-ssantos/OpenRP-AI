@@ -27,10 +27,11 @@ async function readFileAsBase64(file) {
 
 async function loadCharacter() {
   try {
-    const [charRes, lbAllRes, lbCharRes] = await Promise.all([
+    const [charRes, lbAllRes, lbCharRes, affRes] = await Promise.all([
       fetch(`/api/characters/${characterId}`),
       fetch('/api/lorebooks'),
       fetch(`/api/characters/${characterId}/lorebooks`),
+      fetch('/api/affection/levels'),
     ]);
 
     if (!charRes.ok) throw new Error('Personagem não encontrado.');
@@ -58,6 +59,9 @@ async function loadCharacter() {
     const allLorebooks  = lbAllRes.ok  ? (await lbAllRes.json()).lorebooks  || [] : [];
     const assignedIds   = lbCharRes.ok ? (await lbCharRes.json()).lorebook_ids || [] : [];
     renderLorebookPicker(allLorebooks, new Set(assignedIds));
+
+    const affLevels = affRes.ok ? (await affRes.json()).levels || [] : [];
+    renderAffectionSelect(affLevels, character);
   } catch (err) {
     showError(err.message || 'Erro ao carregar personagem.');
   }
@@ -80,6 +84,30 @@ function renderLorebookPicker(lorebooks, selectedIds) {
   `).join('');
 }
 
+function renderAffectionSelect(levels, character) {
+  const select = document.getElementById('affection_override');
+  const hint   = document.getElementById('affection-current');
+  if (!levels.length) return;
+
+  for (const lvl of levels) {
+    const opt = document.createElement('option');
+    opt.value = String(lvl.level);
+    opt.textContent = `${lvl.name} (nível ${lvl.level})`;
+    select.appendChild(opt);
+  }
+
+  const override = character.affection_override;
+  select.value = override !== null && override !== undefined ? String(override) : '';
+
+  // Estágio que os pontos acumulados dariam no modo automático
+  const points = character.affection_points ?? 0;
+  let autoLevel = levels[0];
+  for (const lvl of levels) {
+    if (points >= lvl.threshold) autoLevel = lvl;
+  }
+  hint.textContent = `Progressão atual: ${autoLevel.name} — ${points} ponto${points === 1 ? '' : 's'} acumulado${points === 1 ? '' : 's'}.`;
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -100,7 +128,11 @@ async function handleSubmit(event) {
 
   if (!name) { showError('O nome do personagem é obrigatório.'); return; }
 
-  const body = { name, description, personality, likes, dislikes };
+  const overrideValue = document.getElementById('affection_override').value;
+  const body = {
+    name, description, personality, likes, dislikes,
+    affection_override: overrideValue === '' ? null : Number(overrideValue),
+  };
 
   if (avatarFile) {
     body.avatar_upload   = await readFileAsBase64(avatarFile);

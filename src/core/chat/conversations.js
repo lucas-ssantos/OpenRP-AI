@@ -6,7 +6,7 @@ import {
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
 import { resolveConfig } from "./helpers.js";
-import { getAffectionLevel } from "../affection.js";
+import { getEffectiveAffection } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
 
 const router = Router();
@@ -69,7 +69,7 @@ router.get("/conversations/:id", (req, res) => {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
         const character = getCharacter(conv.character_id);
-        res.json({ ok: true, conversation: conv, affection: getAffectionLevel(character?.affection_points ?? 0) });
+        res.json({ ok: true, conversation: conv, affection: getEffectiveAffection(character) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -131,7 +131,7 @@ router.post("/conversations/:id/reset", (req, res) => {
         }
 
         // A afeição pertence ao personagem — resetar a conversa não a zera.
-        res.json({ ok: true, first_message: firstMsg, affection: getAffectionLevel(character?.affection_points ?? 0) });
+        res.json({ ok: true, first_message: firstMsg, affection: getEffectiveAffection(character) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
