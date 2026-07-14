@@ -51,6 +51,8 @@ export function showError(text) {
 export function setInputEnabled(enabled) {
   dom.inputEl.disabled = !enabled;
   dom.sendBtn.disabled = !enabled;
+  const ideasBtn = document.getElementById('ideas-btn');
+  if (ideasBtn) ideasBtn.disabled = !enabled;
 }
 
 export function showChatStatus(text) {
