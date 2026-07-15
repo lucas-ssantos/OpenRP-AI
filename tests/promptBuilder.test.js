@@ -48,6 +48,32 @@ test("memórias pinned e contextuais entram em blocos separados", () => {
   assert.match(sys, /\[Relevant memories[^\]]*\]\n- Foram ao mercado\./);
 });
 
+test("memórias trazem hora atual e tempo relativo de quando aconteceram", () => {
+  const msgs = buildPromptMessages({
+    character, persona,
+    userMessage: "oi",
+    now: "2026-07-13 15:00:00",
+    memories: [
+      { content: "Confessou amor.",   is_pinned: true,  created_at: "2026-07-12 20:00:00" },
+      { content: "Foram ao mercado.", is_pinned: false, created_at: "2026-07-10 10:00:00" },
+    ],
+  });
+  const sys = systemText(msgs);
+  assert.match(sys, /\[Current time: Monday, 2026-07-13 15:00:00\]/);
+  assert.match(sys, /- \(yesterday\) Confessou amor\./);
+  assert.match(sys, /- \(3 days ago\) Foram ao mercado\./);
+});
+
+test("memória sem created_at entra sem prefixo de tempo", () => {
+  const msgs = buildPromptMessages({
+    character, persona,
+    userMessage: "oi",
+    now: "2026-07-13 15:00:00",
+    memories: [{ content: "Sem data.", is_pinned: false }],
+  });
+  assert.match(systemText(msgs), /\n- Sem data\./);
+});
+
 test("lorebook: ativa por keyword com fronteira de palavra e sem acentos", () => {
   const lorebooks = [
     { title: "Coração de Ferro", content: "Uma espada lendária.", keywords: "coração de ferro" },

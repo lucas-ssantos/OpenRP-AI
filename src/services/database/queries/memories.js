@@ -16,14 +16,17 @@ const mapMemory = (row) => ({
   updated_at: row[10],
 });
 
-export function createMemory(conversationId, type, content, keywords = null, relevanceWeight = 1.0, isPinned = false, summary = null) {
+// createdAt opcional: memórias extraídas do backlog carregam o horário da
+// mensagem de origem, não o da extração — é ele que define o "quando aconteceu"
+// mostrado no prompt (formatRelativeTime).
+export function createMemory(conversationId, type, content, keywords = null, relevanceWeight = 1.0, isPinned = false, summary = null, createdAt = null) {
   const db = getDB();
   const id = uuidv4();
   const now = localDatetime();
   db.run(
     `INSERT INTO memories (id, conversation_id, type, content, summary, keywords, is_pinned, relevance_weight, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, conversationId, type, content, summary, keywords, isPinned ? 1 : 0, relevanceWeight, now, now]
+    [id, conversationId, type, content, summary, keywords, isPinned ? 1 : 0, relevanceWeight, createdAt || now, now]
   );
   saveDB();
   return id;

@@ -1,5 +1,6 @@
 import { buildAffectionPrompt } from './affection.js';
 import { parseKeywords, keywordInText, normalize } from './memory/retrieval.js';
+import { localDatetime, formatRelativeTime, weekdayOf } from '../utils/datetime.js';
 
 // Returns true if any of the comma-separated keywords appears in normalizedContext.
 // Same matcher as memory retrieval: word boundary + accent-insensitive
@@ -97,6 +98,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
  * @param {number}   opts.authorNoteDepth  - how many messages from the end to inject the author's note (default 4)
+ * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
  * @returns {{ role: string, content: string }[]}
  */
 export function buildPromptMessages({
@@ -110,6 +112,7 @@ export function buildPromptMessages({
   lorebooks = [],
   affection = null,
   authorNoteDepth = 4,
+  now = localDatetime(),
 }) {
   // Context text for keyword matching: current message + last 5 history messages
   const contextText = [
@@ -135,12 +138,25 @@ export function buildPromptMessages({
   const systemParts = [basePrompt];
   const affectionBlock = buildAffectionPrompt(affection, character, persona);
   if (affectionBlock) systemParts.push(affectionBlock);
+  // Cada memória vem prefixada com quando aconteceu relativo a agora — "(yesterday)",
+  // "(3 days ago)" — para o personagem situar o fato no tempo com naturalidade.
+  const memLine = (m) => {
+    const rel = formatRelativeTime(m.created_at, now);
+    return rel ? `- (${rel}) ${m.content}` : `- ${m.content}`;
+  };
+  if (memories.length > 0) {
+    const weekday = weekdayOf(now);
+    systemParts.push(
+      `[Current time: ${weekday ? weekday + ', ' : ''}${now}]\n` +
+      `Each memory below is marked with when it happened relative to now — use that to refer to past events naturally (e.g. a memory marked "yesterday" happened one day ago).`
+    );
+  }
   if (coreMems.length > 0) {
-    const memText = coreMems.map(m => `- ${m.content}`).join('\n');
+    const memText = coreMems.map(memLine).join('\n');
     systemParts.push(`[Core memories — defining events and feelings; these are always true for ${character.name}]\n${memText}`);
   }
   if (contextualMems.length > 0) {
-    const memText = contextualMems.map(m => `- ${m.content}`).join('\n');
+    const memText = contextualMems.map(memLine).join('\n');
     systemParts.push(`[Relevant memories — recalled because they relate to the current scene]\n${memText}`);
   }
   if (activeEntries.length > 0) {

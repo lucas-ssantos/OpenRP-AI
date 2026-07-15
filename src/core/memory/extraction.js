@@ -164,6 +164,11 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
         const existingAuto   = getMemories(conversationId).filter(m => !m.is_pinned);
         const created = { auto: [], pinned: [] };
 
+        // A memória registra QUANDO o fato aconteceu (horário das mensagens de
+        // origem), não quando a extração rodou — se o usuário voltar dias depois
+        // e o backlog for processado, o prompt ainda mostra "3 days ago" correto.
+        const happenedAt = recentMessages.at(-1)?.created_at ?? null;
+
         for (const item of parsed.memories) {
             const content = item?.content?.trim();
             if (!content) continue;
@@ -179,7 +184,7 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
                 if (item.pinned) {
                     if (isTooSimilar(existingPinned, content)) continue;
                     const id = createPinnedMemory(conversationId, content, {
-                        keywords, summary, relevanceWeight: weight,
+                        keywords, summary, relevanceWeight: weight, happenedAt,
                     });
                     created.pinned.push(id);
                     existingPinned.push({ content, is_pinned: true });
@@ -187,7 +192,7 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
                     // Auto que duplica uma pinned também é ruído — dedup contra as duas listas
                     if (isTooSimilar(existingAuto, content) || isTooSimilar(existingPinned, content)) continue;
                     const id = createAutoMemory(conversationId, content, {
-                        keywords, summary, relevanceWeight: weight,
+                        keywords, summary, relevanceWeight: weight, happenedAt,
                     });
                     created.auto.push(id);
                     existingAuto.push({ content, type: 'auto' });

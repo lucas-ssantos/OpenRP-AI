@@ -9,9 +9,9 @@ import { extractKeywordsFromText } from "./retrieval.js";
  *
  * relevanceWeight (0.8–1.2 quando vindo do extrator) modula o score do retrieval.
  */
-export function createAutoMemory(conversationId, content, { keywords = null, summary = null, relevanceWeight = 1.0 } = {}) {
+export function createAutoMemory(conversationId, content, { keywords = null, summary = null, relevanceWeight = 1.0, happenedAt = null } = {}) {
     if (!content?.trim()) throw new Error("Memória auto requer conteúdo.");
-    return createMemory(conversationId, 'auto', content.trim(), keywords, relevanceWeight, false, summary);
+    return createMemory(conversationId, 'auto', content.trim(), keywords, relevanceWeight, false, summary, happenedAt);
 }
 
 /**
@@ -55,10 +55,11 @@ export function createPinnedMemory(conversationId, content, {
     keywords = null,
     summary  = null,
     relevanceWeight = 1.5,
+    happenedAt = null,
 } = {}) {
     if (!content?.trim()) throw new Error("Memória pinned requer conteúdo.");
     if (content.trim().length < 20) throw new Error("Memória pinned requer ao menos 20 caracteres — descreva o fato com clareza.");
     if (!keywords?.trim()) throw new Error("Memória pinned requer keywords. Elas identificam o tema e permitem auditoria futura.");
 
-    return createMemory(conversationId, 'pinned', content.trim(), keywords.trim(), relevanceWeight, true, summary);
+    return createMemory(conversationId, 'pinned', content.trim(), keywords.trim(), relevanceWeight, true, summary, happenedAt);
 }
