@@ -25,33 +25,18 @@ function rowToObject(result) {
   return obj;
 }
 
-export function getGenerationConfig(level = "global", id = null) {
+export function getGenerationConfig() {
   const db = getDB();
 
-  if (level === "global") {
-    const row = rowToObject(db.exec(`SELECT * FROM generation_config WHERE id = 'global'`));
-    if (!row) return null;
-    return {
-      model: row.model, temperature: row.temperature, top_p: row.top_p, top_k: row.top_k,
-      min_p: row.min_p, repeat_penalty: row.repeat_penalty, repeat_last_n: row.repeat_last_n,
-      max_tokens: row.max_tokens, context_size: row.context_size, stream: row.stream === 1,
-      seed: row.seed, stop: parseStop(row.stop), num_ctx_messages: row.num_ctx_messages,
-      min_tokens: row.min_tokens ?? 60,
-      memory_interval: row.memory_interval ?? 5,
-    };
-  }
-
-  if (level !== "character") return null;
-
-  const row = rowToObject(db.exec("SELECT * FROM character_config WHERE character_id = ?", [id]));
+  const row = rowToObject(db.exec(`SELECT * FROM generation_config WHERE id = 'global'`));
   if (!row) return null;
   return {
     model: row.model, temperature: row.temperature, top_p: row.top_p, top_k: row.top_k,
     min_p: row.min_p, repeat_penalty: row.repeat_penalty, repeat_last_n: row.repeat_last_n,
     max_tokens: row.max_tokens, context_size: row.context_size, stream: row.stream === 1,
     seed: row.seed, stop: parseStop(row.stop), num_ctx_messages: row.num_ctx_messages,
-    system_prompt: row.system_prompt ?? null,
-    jailbreak: row.jailbreak ?? null,
+    min_tokens: row.min_tokens ?? 60,
+    memory_interval: row.memory_interval ?? 5,
   };
 }
 
@@ -79,42 +64,27 @@ export function setConversationModel(conversationId, model) {
   saveDB();
 }
 
-export function setGenerationConfig(level = "global", id = null, config = {}) {
+export function setGenerationConfig(config = {}) {
   const db = getDB();
   const now = localDatetime();
   const toStop = (v) => (Array.isArray(v) ? v.join(", ") : v || "");
   const toStream = (v) => (v === 1 || v === true || v === "1" ? 1 : 0);
   const toSeed = (v) => (v !== null && v !== undefined ? v : -1);
 
-  if (level === "global") {
-    const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-            max_tokens, context_size, stream, seed, stop, num_ctx_messages,
-            min_tokens, memory_interval } = config;
-    db.run(
-      `INSERT OR REPLACE INTO generation_config
-       (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-        max_tokens, context_size, stream, seed, stop, num_ctx_messages, min_tokens,
-        memory_interval, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-       max_tokens, context_size, toStream(stream), toSeed(seed),
-       toStop(stop), num_ctx_messages || 20, min_tokens ?? 60,
-       memory_interval ?? 5, now]
-    );
-  } else if (level === "character") {
-    const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-            max_tokens, context_size, stream, seed, stop, num_ctx_messages,
-            system_prompt, jailbreak } = config;
-    db.run(
-      `INSERT OR REPLACE INTO character_config
-       (character_id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-        max_tokens, context_size, stream, seed, stop, num_ctx_messages, system_prompt, jailbreak, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
-       max_tokens, context_size, toStream(stream), toSeed(seed),
-       toStop(stop), num_ctx_messages || 20, system_prompt, jailbreak, now]
-    );
-  }
+  const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+          max_tokens, context_size, stream, seed, stop, num_ctx_messages,
+          min_tokens, memory_interval } = config;
+  db.run(
+    `INSERT OR REPLACE INTO generation_config
+     (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+      max_tokens, context_size, stream, seed, stop, num_ctx_messages, min_tokens,
+      memory_interval, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+     max_tokens, context_size, toStream(stream), toSeed(seed),
+     toStop(stop), num_ctx_messages || 20, min_tokens ?? 60,
+     memory_interval ?? 5, now]
+  );
 
   saveDB();
 }

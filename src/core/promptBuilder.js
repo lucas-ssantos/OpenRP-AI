@@ -42,15 +42,17 @@ function buildInstructionPrompt(character, persona) {
   );
 }
 
-// Builds the base character system prompt (the "character card").
-// If charConfig has a custom system_prompt, uses it with {{char}}/{{user}} substitution.
-function buildBaseSystemPrompt(character, persona, charConfig, conversation) {
-  if (charConfig?.system_prompt) {
-    return charConfig.system_prompt
-      .replace(/\{\{char\}\}/gi, character.name)
-      .replace(/\{\{user\}\}/gi, persona?.name || 'User');
-  }
+// Expands {{char}}/{{user}} placeholders with the character and persona names.
+// Aplicado sobre o system prompt inteiro — description, personality, likes/dislikes,
+// cenário, memórias e lorebooks podem usar os placeholders livremente.
+function expandPlaceholders(text, character, persona) {
+  return text
+    .replace(/\{\{char\}\}/gi, character.name)
+    .replace(/\{\{user\}\}/gi, persona?.name || 'User');
+}
 
+// Builds the base character system prompt (the "character card").
+function buildBaseSystemPrompt(character, persona, conversation) {
   const parts = [
     character.description
       ? `You are ${character.name}. ${character.description}`
@@ -79,25 +81,22 @@ function filterLorebooks(lorebooks, contextText) {
 /**
  * Builds the Ollama messages array using the following structure:
  *
- *  [1] SYSTEM PROMPT   — character identity + persona + custom system_prompt override
+ *  [1] SYSTEM PROMPT   — character identity + persona
  *  [2] MEMORIES        — already selected by the retrieval layer (getMemoriesForPrompt);
  *                        split into [Core memories] (pinned) and [Relevant memories] (contextual)
  *  [3] LOREBOOK        — keyword-activated world-info entries (appended to system prompt)
  *  [4] HISTORY         — recent conversation messages
- *  [5] AUTHOR'S NOTE   — charConfig.jailbreak injected `authorNoteDepth` messages from the end
- *  [6] USER MESSAGE    — current user turn (null for regenerate)
+ *  [5] USER MESSAGE    — current user turn (null for regenerate)
  *
  * @param {object} opts
  * @param {object}   opts.character        - character row from DB
  * @param {object}   opts.persona          - persona row from DB (may be null)
  * @param {object}   opts.conversation     - conversation row from DB (may be null); provides scenario
- * @param {object}   opts.charConfig       - character_config row (may be null); provides system_prompt + jailbreak
  * @param {object[]} opts.historyMessages  - recent messages from DB (role !== 'system' are forwarded)
  * @param {string}   opts.userMessage      - current user message; null for regenerate
  * @param {object[]} opts.memories         - memories already selected by the retrieval layer
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
- * @param {number}   opts.authorNoteDepth  - how many messages from the end to inject the author's note (default 4)
  * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
  * @returns {{ role: string, content: string }[]}
  */
@@ -105,13 +104,11 @@ export function buildPromptMessages({
   character,
   persona,
   conversation = null,
-  charConfig = null,
   historyMessages = [],
   userMessage = null,
   memories = [],
   lorebooks = [],
   affection = null,
-  authorNoteDepth = 4,
   now = localDatetime(),
 }) {
   // Context text for keyword matching: current message + last 5 history messages
@@ -121,11 +118,10 @@ export function buildPromptMessages({
   ].join(' ');
 
   // ── [0] Fixed behavioral instruction (own system message) ──────────────────
-  // Skipped when a custom system_prompt override is provided — that fully replaces it.
-  const instructionPrompt = charConfig?.system_prompt ? null : buildInstructionPrompt(character, persona);
+  const instructionPrompt = buildInstructionPrompt(character, persona);
 
   // ── [1] Base system prompt (character card + scenario + persona) ───────────
-  const basePrompt = buildBaseSystemPrompt(character, persona, charConfig, conversation);
+  const basePrompt = buildBaseSystemPrompt(character, persona, conversation);
 
   // ── [2] Memories — already selected by the retrieval layer; split by weight ─
   const coreMems       = memories.filter(m => m.is_pinned);
@@ -163,35 +159,21 @@ export function buildPromptMessages({
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');
     systemParts.push(`[World info]\n${loreText}`);
   }
-  const systemContent = systemParts.join('\n\n---\n\n');
+  const systemContent = expandPlaceholders(systemParts.join('\n\n---\n\n'), character, persona);
 
   // ── [4] Message history (skip any system-role rows from the DB) ────────────
   const history = historyMessages
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role, content: m.content }));
 
-  // ── [6] Append current user message ───────────────────────────────────────
-  const allMessages = userMessage
+  // ── [5] Append current user message ───────────────────────────────────────
+  const bodyMessages = userMessage
     ? [...history, { role: 'user', content: userMessage }]
     : history;
 
-  // ── [5] Inject author's note (jailbreak) N messages from the end ──────────
-  const authorNote = charConfig?.jailbreak ?? null;
-  let bodyMessages;
-  if (authorNote && allMessages.length > 0) {
-    const insertIdx = Math.max(0, allMessages.length - authorNoteDepth);
-    bodyMessages = [
-      ...allMessages.slice(0, insertIdx),
-      { role: 'system', content: authorNote },
-      ...allMessages.slice(insertIdx),
-    ];
-  } else {
-    bodyMessages = allMessages;
-  }
-
-  const systemMessages = [];
-  if (instructionPrompt) systemMessages.push({ role: 'system', content: instructionPrompt });
-  systemMessages.push({ role: 'system', content: systemContent });
-
-  return [...systemMessages, ...bodyMessages];
+  return [
+    { role: 'system', content: instructionPrompt },
+    { role: 'system', content: systemContent },
+    ...bodyMessages,
+  ];
 }

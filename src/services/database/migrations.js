@@ -195,30 +195,9 @@ export async function migrate() {
     stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5,
   ]);
 
-  // ===== CHARACTER-SPECIFIC CONFIG =====
-  db.run(`
-    CREATE TABLE IF NOT EXISTS character_config (
-      character_id TEXT PRIMARY KEY,
-      model TEXT,
-      temperature REAL,
-      top_p REAL,
-      top_k INTEGER,
-      min_p REAL,
-      repeat_penalty REAL,
-      repeat_last_n INTEGER,
-      max_tokens INTEGER,
-      context_size INTEGER,
-      stream INTEGER,
-      seed INTEGER,
-      stop TEXT,
-      num_ctx_messages INTEGER,
-      system_prompt TEXT,
-      jailbreak TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (character_id) REFERENCES characters(id)
-    );
-  `);
+  // O override de config por personagem foi removido — o único override que
+  // existe é o modelo por conversa (conversation_config). Limpa DBs antigos.
+  db.run(`DROP TABLE IF EXISTS character_config`);
 
   // ===== CONVERSATION-SPECIFIC CONFIG =====
   // Override por conversa é model-only (ver resolveConfig / setConversationModel).

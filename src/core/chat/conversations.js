@@ -93,7 +93,7 @@ router.get("/conversations/:id/model", (req, res) => {
         res.json({
             ok: true,
             model: getConversationModel(req.params.id),
-            inherited_model: resolveConfig(conv.character_id).model,
+            inherited_model: resolveConfig().model,
         });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
@@ -149,7 +149,7 @@ router.post("/conversations/:id/memories/generate", async (req, res) => {
 
         const character = getCharacter(conv.character_id);
         const persona   = getPersona();
-        const config    = resolveConfig(conv.character_id, req.params.id);
+        const config    = resolveConfig(req.params.id);
 
         const result = await extractAndSaveMemories(req.params.id, messages, { character, persona, config });
         if (result === null) return res.status(502).json({ ok: false, message: "Falha ao gerar memórias — verifique o Ollama." });

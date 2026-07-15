@@ -23,15 +23,35 @@ test("estrutura básica: instrução + card + histórico + mensagem do usuário"
   assert.deepEqual(msgs.at(-1), { role: "user", content: "Oi, Ana" });
 });
 
-test("system_prompt customizado substitui a instrução e expande {{char}}/{{user}}", () => {
+test("{{char}}/{{user}} são expandidos no system prompt: card, cenário, memórias e lorebooks", () => {
   const msgs = buildPromptMessages({
-    character, persona,
-    charConfig: { system_prompt: "Você é {{char}} falando com {{user}}." },
+    character: {
+      name: "Ana",
+      description: "{{char}} é uma caçadora que protege {{user}}.",
+      personality: "Leal a {{user}}.",
+    },
+    persona,
+    conversation: { scenario: "{{char}} e {{user}} viajam juntos." },
+    userMessage: "oi",
+    memories: [{ content: "{{user}} salvou {{char}} do incêndio.", is_pinned: true }],
+    lorebooks: [{ title: "Pacto", content: "{{char}} jurou proteger {{user}}.", keywords: null }],
+  });
+  const sys = systemText(msgs);
+  assert.match(sys, /Ana é uma caçadora que protege Luke\./);
+  assert.match(sys, /Leal a Luke\./);
+  assert.match(sys, /Ana e Luke viajam juntos\./);
+  assert.match(sys, /Luke salvou Ana do incêndio\./);
+  assert.match(sys, /Ana jurou proteger Luke\./);
+  assert.doesNotMatch(sys, /\{\{char\}\}|\{\{user\}\}/i);
+});
+
+test("{{user}} sem persona vira 'User'", () => {
+  const msgs = buildPromptMessages({
+    character: { name: "Ana", description: "Protege {{user}}." },
+    persona: null,
     userMessage: "oi",
   });
-  const systems = msgs.filter(m => m.role === "system");
-  assert.equal(systems.length, 1);
-  assert.match(systems[0].content, /Você é Ana falando com Luke\./);
+  assert.match(systemText(msgs), /Protege User\./);
 });
 
 test("memórias pinned e contextuais entram em blocos separados", () => {
@@ -91,22 +111,6 @@ test("lorebook: ativa por keyword com fronteira de palavra e sem acentos", () =>
   assert.match(sys, /Uma espada lendária\./);
   assert.match(sys, /Regras do mundo\./);
   assert.doesNotMatch(sys, /Não deve ativar\./);
-});
-
-test("author's note é injetado a N mensagens do fim", () => {
-  const history = Array.from({ length: 6 }, (_, i) => ({
-    role: i % 2 ? "assistant" : "user", content: `msg ${i}`,
-  }));
-  const msgs = buildPromptMessages({
-    character, persona,
-    charConfig: { system_prompt: "custom", jailbreak: "NOTA" },
-    historyMessages: history,
-    userMessage: "oi",
-    authorNoteDepth: 4,
-  });
-  const noteIdx = msgs.findIndex(m => m.content === "NOTA");
-  assert.ok(noteIdx !== -1, "author's note deve estar presente");
-  assert.equal(msgs.length - 1 - noteIdx, 4);
 });
 
 test("mensagens system do histórico são descartadas", () => {

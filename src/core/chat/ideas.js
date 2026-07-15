@@ -85,7 +85,7 @@ router.post("/conversations/:id/ideas", async (req, res) => {
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
         const persona = getPersona();
-        const config  = resolveConfig(conv.character_id, req.params.id);
+        const config  = resolveConfig(req.params.id);
 
         const exclude = (Array.isArray(req.body?.exclude) ? req.body.exclude : [])
             .filter(s => typeof s === "string" && s.trim())

@@ -108,7 +108,7 @@ router.post("/api/models/pull", async (req, res) => {
 router.get("/api/config", (_req, res) => {
     try {
         // config null → o front carrega o preset "Máquina Média" como ponto de partida.
-        res.json({ ok: true, config: getGenerationConfig("global") || null });
+        res.json({ ok: true, config: getGenerationConfig() || null });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -118,7 +118,7 @@ router.post("/api/config", (req, res) => {
     try {
         const config = req.body;
         if (!config.model) return res.status(400).json({ ok: false, message: "Modelo é obrigatório." });
-        setGenerationConfig("global", null, config);
+        setGenerationConfig(config);
         res.json({ ok: true, message: "Configuração salva com sucesso." });
     } catch (err) {
         res.status(500).json({ ok: false, message: `Erro ao salvar: ${err.message}` });

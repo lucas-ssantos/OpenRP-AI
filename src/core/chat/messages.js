@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-    getCharacter, getPersona, getGenerationConfig,
+    getCharacter, getPersona,
     getConversation, addMessage, updateMessage, rollbackConversation,
     getLastMessage, deleteMessage, getLastNMessages,
     getAllLorebooks, getMemories, addAffectionPoints,
@@ -27,8 +27,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
         const persona    = getPersona();
-        const config     = resolveConfig(conv.character_id, conversationId);
-        const charConfig = getGenerationConfig("character", conv.character_id);
+        const config     = resolveConfig(conversationId);
 
         const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
         const memories   = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
@@ -44,7 +43,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const affection     = getEffectiveAffection(character, gained);
 
         const ollamaMessages = buildPromptMessages({
-            character, persona, conversation: conv, charConfig,
+            character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
             memories, lorebooks, affection,
@@ -121,8 +120,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         }
 
         const persona    = getPersona();
-        const config     = resolveConfig(conv.character_id, conversationId);
-        const charConfig = getGenerationConfig("character", conv.character_id);
+        const config     = resolveConfig(conversationId);
 
         const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
         const lastUser   = [...recentMsgs].reverse().find(m => m.role === "user");
@@ -130,7 +128,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const lorebooks  = getAllLorebooks(conv.character_id);
 
         const ollamaMessages = buildPromptMessages({
-            character, persona, conversation: conv, charConfig,
+            character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
             memories, lorebooks,

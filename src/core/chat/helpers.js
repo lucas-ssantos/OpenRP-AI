@@ -1,20 +1,56 @@
+import fs from "fs";
+import path from "path";
 import { getGenerationConfig, getConversationModel } from "../../services/database/queries.js";
 import { appConfig } from "../../config.js";
 
-const OLLAMA_URL    = appConfig.ollama.chatEndpoint;
-const DEFAULT_CONFIG = { ...appConfig.defaults };
+const OLLAMA_URL = appConfig.ollama.chatEndpoint;
 
-// Hierarquia: defaults (.env) → global → character_config (se tiver model) →
-// override de modelo da conversa (model-only). Só o campo `model` é sobreposto
-// pela conversa; os demais parâmetros continuam herdados.
-export function resolveConfig(characterId, conversationId = null) {
-    const globalConfig = getGenerationConfig("global");
-    const charConfig   = getGenerationConfig("character", characterId);
-    const config = { ...DEFAULT_CONFIG, ...globalConfig, ...(charConfig?.model ? charConfig : {}) };
+// Último recurso da cadeia de fallback — carregado uma vez no boot.
+let MEDIUM_SPEC = {};
+try {
+    MEDIUM_SPEC = JSON.parse(fs.readFileSync(
+        path.join(process.cwd(), "config_recomendadas", "medium_spec.json"), "utf8"
+    ));
+} catch { /* sem o preset, a cadeia para nos defaults do .env */ }
+
+// Um valor só é aceito de uma fonte se passar no validador do campo — NULL vindo
+// do banco (campo deixado em branco no /settings) ou lixo nunca chega ao Ollama.
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const isInt = (v) => Number.isInteger(v);
+const VALIDATORS = {
+    model:              (v) => typeof v === "string" && v.trim().length > 0,
+    temperature:        (v) => isNum(v) && v >= 0 && v <= 2,
+    top_p:              (v) => isNum(v) && v > 0 && v <= 1,
+    top_k:              (v) => isInt(v) && v >= 0,
+    min_p:              (v) => isNum(v) && v >= 0 && v < 1,
+    repeat_penalty:     (v) => isNum(v) && v > 0,
+    repeat_last_n:      (v) => isInt(v) && v >= -1,
+    max_tokens:         (v) => isInt(v) && (v === -1 || v > 0),
+    min_tokens:         (v) => isInt(v) && v >= 0,
+    // null = "contexto automático" (checkbox do /settings) — deliberado, não inválido
+    context_size:       (v) => v === null || (isInt(v) && v > 0),
+    num_ctx_messages:   (v) => isInt(v) && v > 0,
+    memory_interval:    (v) => isInt(v) && v > 0,
+    seed:               (v) => isInt(v),
+    stream:             (v) => typeof v === "boolean",
+    stop:               (v) => Array.isArray(v),
+    max_response_chars: (v) => isInt(v) && v >= 0,
+};
+
+// Hierarquia por campo: global (banco) → defaults (.env) → medium_spec.json.
+// Campo null/inválido numa fonte cai para a próxima — nunca vaza para o Ollama.
+// Único override existente: modelo exclusivo da conversa (model-only).
+export function resolveConfig(conversationId = null) {
+    const sources = [getGenerationConfig(), appConfig.defaults, MEDIUM_SPEC];
+    const config = {};
+    for (const [key, isValid] of Object.entries(VALIDATORS)) {
+        const src = sources.find((s) => s && isValid(s[key]));
+        if (src) config[key] = src[key];
+    }
 
     if (conversationId) {
         const convModel = getConversationModel(conversationId);
-        if (convModel) config.model = convModel;
+        if (VALIDATORS.model(convModel)) config.model = convModel;
     }
     return config;
 }

@@ -59,8 +59,7 @@ Isso permite que cada personagem tenha um "universo" diferente de lore disponív
 [2] Memórias relevantes (pinned + keyword-matched)
 [3] Lorebook entries ativados  ← AQUI
 [4] Histórico de mensagens
-[5] Author's Note (jailbreak, se configurado)
-[6] Mensagem atual do usuário
+[5] Mensagem atual do usuário
 ```
 
 Os lorebooks vão para o system prompt, agrupados sob o marcador `[World info]`:

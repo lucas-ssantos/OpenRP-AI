@@ -159,9 +159,8 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
         }
     }
 
-    // ── [4] Histórico + author's note ─────────────────────────────────────────
+    // ── [4] Histórico ─────────────────────────────────────────────────────────
     // A última mensagem do restMsgs com role=user é a mensagem atual do usuário.
-    // Mensagens system no meio são o author's note (jailbreak).
     const lastUserIdx = [...restMsgs].reverse().findIndex(m => m.role === "user");
     const splitAt = lastUserIdx === -1 ? restMsgs.length : restMsgs.length - 1 - lastUserIdx;
 

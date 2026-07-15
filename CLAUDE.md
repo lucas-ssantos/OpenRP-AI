@@ -120,8 +120,7 @@ contexto/
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
 | `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval |
-| `character_config` | override por personagem (mesmos campos + system_prompt, jailbreak) |
-| `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel) |
+| `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel); único override existente |
 
 **Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita. `saveDB()` é **debounced** (~500ms); a gravação imediata é `flushDB()`, chamada no shutdown. A coluna `stop` é CSV (o parseStop ainda lê o formato JSON legado de bancos antigos).
 
@@ -187,7 +186,7 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 
 `POST /api/conversations/:id/messages` funciona assim:
 1. Valida e busca conversa + personagem + persona
-2. Mescla config: `DEFAULT_CONFIG` → `global` → `character_config` (override só se tiver `model` definido)
+2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. Exceção: `context_size = NULL` é "contexto automático" (deliberado). Único override: modelo da conversa (`conversation_config`)
 3. Monta mensagens via `buildPromptMessages()` (ver `src/core/promptBuilder.js` e `contexto/prompt_builder`)
 4. Busca últimas N mensagens (`getLastNMessages`) para contexto
 5. Salva mensagem do usuário no banco (`addMessage`)
@@ -287,7 +286,7 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `stop` | Tokens de parada que encerram a geração | Nenhum |
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
 
-A config tem hierarquia: `appConfig.defaults` (.env) → `generation_config` (global) → `character_config` (override por personagem, só se tiver `model` definido).
+A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" e é preservado. O único override é o modelo por conversa (`conversation_config`).
 
 ## Estrutura de memória e prompt (ver `contexto/`)
 
@@ -295,9 +294,8 @@ A config tem hierarquia: `appConfig.defaults` (.env) → `generation_config` (gl
 1. System prompt do personagem (description + personality + scenario + persona do usuário)
 2. Memórias relevantes (pinned primeiro, depois por score/keyword)
 3. Lorebook entries (ativadas por keyword no chat)
-4. Example dialogues (few-shot, se couber no budget)
-5. Histórico das últimas N mensagens
-6. Author's Note (injetado perto do fim)
+4. Histórico das últimas N mensagens
+5. Mensagem atual do usuário
 
 `contexto/estrutura_memoria` — tipos de memória:
 - **Auto**: gerada pelo extrator unificado (`memory/extraction.js`) quando mensagens saem da janela de contexto — o registro episódico da conversa; recuperada por keyword/score
@@ -373,12 +371,12 @@ npm test         # testes (node:test, pasta tests/ — lógica pura: affection, 
 
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
 - **Ollama é obrigatório** — redireciona para `/check` se não responder
-- Config de geração tem hierarquia: `.env defaults` → `global` → `character_config`
+- Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; único override é o modelo por conversa
 - O modelo padrão é `gemma4:e4b` — pode ser alterado em `/settings`. Na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-32k` (32k ctx) e `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existirem
 - Avatar upload: enviado como base64 no body JSON, validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx 8MB — a extensão salva vem do tipo detectado, nunca do nome enviado) e salvo em `public/assets/uploads/` como `timestamp-nome.ext`
 - Todos os IDs são UUIDs v4
 - `getLastNMessages` retorna as últimas N mensagens **totais** (user+assistant, exclui system) por `position DESC LIMIT n`, revertidas (mais antiga primeiro) — mesma definição de janela usada pelo gatilho de memórias
-- `first_message` suporta `{{user}}` (nome da persona) e `{{char}}` (nome do personagem)
+- `{{user}}` (nome da persona) e `{{char}}` (nome do personagem) são expandidos em `first_message` e em todo o system prompt do `promptBuilder` (description, personality, likes/dislikes, cenário, memórias e lorebooks)
 - Frontend: todo dado do banco interpolado em `innerHTML` passa por escape (`escHtml`/`sidebarEscHtml`)
 - `character.routes.js` usa factory `characterRouter(uploadDir)` porque precisa do caminho de upload injetado pelo `webServer.init.js`
 - `chat.js` frontend usa `type="module"` e ES Modules; os demais JS são scripts regulares
