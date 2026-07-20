@@ -170,6 +170,38 @@ body {
   flex: 1 0 0;
 }
 
+/* ── Scenario bubble (cenário da conversa, acima de todas as mensagens) ── */
+.scenario-bubble {
+  align-self: center;
+  max-width: min(88%, 520px);
+  text-align: center;
+  padding: 0.8rem 1.25rem;
+  border-radius: 1rem;
+  background: rgba(6, 12, 30, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #cbd5e1;
+  font-size: 0.87rem;
+  line-height: 1.6;
+  font-style: italic;
+  animation: fadeSlide 0.22s ease both;
+}
+
+.scenario-bubble .scenario-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #38bdf8;
+}
+
 /* ── Message row (bubble + action buttons) ── */
 .msg-row {
   display: flex;

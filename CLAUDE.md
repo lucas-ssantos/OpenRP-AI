@@ -249,6 +249,7 @@ Implementado em `initResetModal()` — fecha o offcanvas via `hidden.bs.offcanva
 - No desktop (>900px): chat centralizado em 680px, overlay lateral deixa imagem visível à esquerda
 - Balão personagem: esquerda, glassmorphism escuro, `border-radius: 0 1.25rem 1.25rem 1.25rem`
 - Balão usuário: direita, azul `rgba(56,189,248,0.88)`, `border-radius: 1.25rem 1.25rem 0 1.25rem`
+- Bolha de cenário: bolha central (`renderScenarioBubble` em `ui.js`) no topo do histórico com o cenário da conversa (`conversation.scenario || title`), sempre acima de todas as mensagens; re-renderizada após reset (`state.scenarioText`); rollback não a afeta (não é `.msg-row`)
 - Indicador de digitação: 3 pontos animados enquanto aguarda Ollama
 - Streaming token-a-token: `reader.getReader()` + SSE parsing
 - Header contém: botão de menu (offcanvas nav), avatar, nome/cenário, botão editar personagem, botão voltar

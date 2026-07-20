@@ -4,6 +4,7 @@ export const conversationId = window.location.pathname.split('/')[2];
 export const state = {
   conversationId: null,
   characterId: null,
+  scenarioText: '',
   isStreaming: false,
 };
 

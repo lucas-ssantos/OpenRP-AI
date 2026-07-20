@@ -3,7 +3,7 @@ import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
   showPinnedMemoryToast, showChatStatus, clearChatStatus,
-  updateAffectionBadge, showAffectionToast,
+  updateAffectionBadge, showAffectionToast, renderScenarioBubble,
 } from './ui.js';
 
 // ── Rollback state ────────────────────────────────────────────────────
@@ -350,6 +350,7 @@ export function initResetModal() {
       if (!data.ok) throw new Error(data.message);
 
       dom.messagesEl.innerHTML = '';
+      renderScenarioBubble(state.scenarioText);
 
       if (data.first_message) {
         addBubble('assistant', data.first_message.content, data.first_message.id);

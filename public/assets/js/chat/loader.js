@@ -1,5 +1,5 @@
 import { conversationId, state, dom } from './state.js';
-import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge } from './ui.js';
+import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge, renderScenarioBubble } from './ui.js';
 import { addBubble, initInputListeners } from './events.js';
 
 export async function init() {
@@ -26,10 +26,12 @@ export async function init() {
     const character = charData.character;
 
     const scenarioText = conversation.scenario || conversation.title || '';
+    state.scenarioText = scenarioText;
 
     document.title = `${character.name} — OpenRP AI`;
     dom.charNameEl.textContent = character.name;
     if (scenarioText) dom.scenarioEl.textContent = scenarioText;
+    renderScenarioBubble(scenarioText);
 
     // Background: sorteia uma imagem da galeria do personagem a cada visita.
     // O avatar do header/nav continua fixo no avatar principal (avatar_url).

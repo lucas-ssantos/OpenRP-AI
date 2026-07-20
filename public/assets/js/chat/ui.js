@@ -14,6 +14,24 @@ export function renderBubbleText(el, text) {
   el.innerHTML = escaped.replace(/\*([^*]+)\*/g, '<em class="action-text">$1</em>');
 }
 
+// Bolha central com o cenário da conversa — sempre a primeira coisa do histórico.
+// Re-renderizável (reset limpa o container e chama de novo).
+export function renderScenarioBubble(text) {
+  document.getElementById('scenario-bubble')?.remove();
+  if (!text) return;
+  const el = document.createElement('div');
+  el.id = 'scenario-bubble';
+  el.className = 'scenario-bubble';
+  const label = document.createElement('div');
+  label.className = 'scenario-label';
+  label.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Cenário';
+  const body = document.createElement('div');
+  body.textContent = text;
+  el.appendChild(label);
+  el.appendChild(body);
+  dom.messagesEl.prepend(el);
+}
+
 export function updateLastCharRow() {
   const charRows = [...dom.messagesEl.querySelectorAll('.msg-row-char')];
   charRows.forEach(r => {
