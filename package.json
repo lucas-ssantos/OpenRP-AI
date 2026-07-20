@@ -5,17 +5,22 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "postinstall": "node -e \"try{require('fs').chmodSync('node_modules/systray2/traybin/tray_linux_release',0o755)}catch(e){}\"",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",
     "db:init": "node src/config/database.js",
-    "db:reset": "node src/config/database.js --reset"
+    "db:reset": "node src/config/database.js --reset",
+    "launcher": "node launcher/tray.js",
+    "launcher:install": "node launcher/desktopEntry.js",
+    "launcher:uninstall": "node launcher/desktopEntry.js --uninstall"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
     "ollama": "^0.5.1",
     "sql.js": "^1.14.1",
+    "systray2": "^2.1.4",
     "uuid": "^9.0.1",
     "zod": "^3.25.76"
   },

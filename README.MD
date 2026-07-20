@@ -22,6 +22,8 @@ Principais características:
 
 - **100% offline e local** — nenhum dado sai da sua máquina. Sem login, sem nuvem, sem assinatura. Opcionalmente, acesse de outros dispositivos via Tailscale com autenticação básica.
 
+- **Launcher com ícone na bandeja** — desktop entry pro menu de aplicativos e um ícone na bandeja do sistema pra iniciar/parar o servidor e o Tailscale com um clique, sem precisar de terminal. Notificações desktop avisam quando cada serviço está iniciando e quando inicia com sucesso.
+
 ## Privacidade e design local
 
 Este projeto foi pensado para ser totalmente local: nenhum dado é enviado por padrão para serviços remotos ou compartilhado entre usuários. Os modelos são executados localmente via Ollama, e os arquivos permanecem na máquina do usuário.
@@ -32,7 +34,6 @@ O projeto pretende manter foco em chat/roleplay local, com planos para:
 
 - Memórias semânticas e vetores
 - Adicionar um script de instalação
-- Criar um desktop.entry para poder utilizar fora do terminal
 
 ## Requisitos
 
@@ -120,6 +121,50 @@ sudo tailscale up
 
 **Importante**: ao expor a aplicação na rede Tailscale, ative a autenticação básica definindo `AUTH_PASSWORD` no `.env` (usuário padrão `openrp`; altere com `AUTH_USER`). Sem essa variável, o acesso é livre.
 
+## Launcher (ícone na bandeja do sistema)
+
+Para quem prefere não deixar um terminal aberto, o projeto tem um launcher (`launcher/`) que cria um atalho no menu de aplicativos e um ícone na bandeja do sistema para iniciar/parar tudo com um clique.
+
+1) Instale o atalho no menu de aplicativos (uma vez só):
+
+```bash
+npm run launcher:install
+```
+
+Isso cria `~/.local/share/applications/openrp-ai.desktop` — o OpenRP AI passa a aparecer no menu de aplicativos do seu ambiente gráfico. Para remover: `npm run launcher:uninstall`.
+
+2) Abra pelo menu de aplicativos, ou direto pelo terminal:
+
+```bash
+npm run launcher
+```
+
+A bandeja abre e já inicia o servidor automaticamente. O menu oferece:
+
+- **Servidor** — iniciar/parar o Node + Ollama. O indicador (🟢/⚪) mostra o estado real, checado a cada poucos segundos — reflete a situação de verdade mesmo que o servidor tenha sido iniciado por fora (ex: `npm start` manual em outro terminal), e "Parar" também funciona nesse caso.
+- **Tailscale** — conectar/desconectar da tailnet (`tailscale up`/`down`).
+- **Abrir no navegador** e **Sair** (encerra servidor e Tailscale).
+
+No `ps`/`htop`, o processo da bandeja aparece como `OpenRP AI` em vez de `node`.
+
+### Notificações
+
+O launcher envia notificações desktop via D-Bus (compatível com qualquer daemon de notificação — swaync, dunst, etc., sem depender de `notify-send`), avisando quando cada serviço (servidor, Ollama, Tailscale) está iniciando e quando inicia com sucesso.
+
+### Tailscale: liberando o botão "Parar" sem pedir senha
+
+Por padrão, `tailscale up`/`down` pedem root a cada chamada. Para o botão "Parar Tailscale" da bandeja funcionar sem sudo, rode uma vez:
+
+```bash
+sudo tailscale set --operator=$USER
+```
+
+Isso autoriza seu usuário a conectar/desconectar (`up`/`down`) sem precisar de senha. Não afeta o serviço `tailscaled` em si — ele continua rodando em segundo plano, gerenciado pelo systemd, independente disso; só muda quem pode controlar a conexão.
+
+### Ollama: funciona mesmo com o serviço systemd desabilitado
+
+Diferente do Tailscale, o Ollama não precisa de privilégios de root pra rodar (não cria interface de rede). Se o serviço `ollama` do systemd estiver desabilitado ou inativo, a aplicação automaticamente sobe o `ollama serve` como processo comum do seu usuário — sem sudo, sem configuração extra.
+
 ## Uso e desenvolvimento
 
 - Rodar em modo de desenvolvimento (backend + watcher):
@@ -133,6 +178,8 @@ npm run dev
 - `npm start` — inicia a aplicação (backend + serve frontend)
 - `npm run dev` — inicia em modo watch
 - `npm test` — roda os testes (node:test, pasta `tests/`)
+- `npm run launcher` — abre o launcher (ícone na bandeja, ver seção acima)
+- `npm run launcher:install` / `npm run launcher:uninstall` — cria/remove o atalho no menu de aplicativos
 
 ## Ajuda / Troubleshooting
 

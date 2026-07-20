@@ -33,7 +33,7 @@ export async function initOllama()
         }
 
         console.log("Ollama service is not active. Attempting to start it via systemd...");
-        const start = spawnSync("systemctl", ["start", "ollama"]);
+        const start = spawnSync("systemctl", ["start", "ollama", "--no-ask-password"]);
         if(start.status === 0)
         {
             const nowActive = spawnSync("systemctl", ["is-active", "--quiet", "ollama"]);
@@ -61,7 +61,7 @@ export async function initOllama()
         const errLog = fs.openSync(path.join(logsDir, "ollama.err.log"), "a");
 
         console.log("Starting Ollama daemon as fallback (node-managed). Logs:", logsDir);
-        const child = spawn("ollama", ["daemon"], {
+        const child = spawn("ollama", ["serve"], {
             stdio: ["ignore", outLog, errLog],
         });
 

@@ -1,4 +1,5 @@
 import { spawnSync } from "child_process";
+import { stopTailscale } from "../services/tailscale.init.js";
 
 let _webServer = null;
 let _ollamaProcess = null;
@@ -72,7 +73,7 @@ export async function shutdown(code = 0)
                     if (isActive.status === 0)
                     {
                         console.log("Stopping systemd-managed Ollama service...");
-                        const stop = spawnSync("systemctl", ["stop", "ollama"]);
+                        const stop = spawnSync("systemctl", ["stop", "ollama", "--no-ask-password"]);
                         if (stop.status === 0)
                         {
                             console.log("Ollama systemd service stopped");
@@ -107,27 +108,9 @@ export async function shutdown(code = 0)
 
         if (_stopTailscale)
         {
-            // Mesmo padrão do Ollama (systemd): confirma systemctl, checa se está ativo, então para.
             try
             {
-                const hasSystemctl = spawnSync("which", ["systemctl"]).status === 0;
-                if (hasSystemctl)
-                {
-                    const isActive = spawnSync("systemctl", ["is-active", "--quiet", "tailscaled"]);
-                    if (isActive.status === 0)
-                    {
-                        console.log("Stopping systemd-managed Tailscale service...");
-                        const stop = spawnSync("systemctl", ["stop", "tailscaled"]);
-                        if (stop.status === 0)
-                        {
-                            console.log("Tailscale systemd service stopped");
-                        }
-                        else
-                        {
-                            console.warn("Failed to stop Tailscale via systemctl — you may need sudo.\nRun: sudo systemctl stop tailscaled");
-                        }
-                    }
-                }
+                stopTailscale();
             }
             catch (e)
             {
