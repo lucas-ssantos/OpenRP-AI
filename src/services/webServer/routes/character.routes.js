@@ -2,9 +2,12 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import {
+    addCharacterImages,
     createCharacter,
+    deleteCharacterImage,
     getAllCharacters,
     getCharacter,
+    getCharacterImages,
     getRecentCharactersWithConversations,
     updateCharacter,
 } from "../../database/queries.js";
@@ -26,22 +29,49 @@ function detectImageType(buffer) {
     return null;
 }
 
-// Decodifica, valida e grava o avatar. Retorna a URL pública ou lança com
-// mensagem amigável para a rota devolver 400.
-function saveAvatarUpload(uploadDir, base64Data, filename) {
+function decodeAndValidateAvatar(base64Data, filename) {
     const buffer = Buffer.from(base64Data, "base64");
     if (buffer.length > MAX_AVATAR_BYTES) {
-        throw new Error("Imagem muito grande — o avatar deve ter no máximo 8MB.");
+        throw new Error("Imagem muito grande — cada imagem deve ter no máximo 8MB.");
     }
     const type = detectImageType(buffer);
     if (!type) {
-        throw new Error("Arquivo de avatar inválido — envie uma imagem PNG, JPEG, WebP ou GIF.");
+        throw new Error("Arquivo de imagem inválido — envie imagens PNG, JPEG, WebP ou GIF.");
     }
     const base = path.basename(filename || "avatar", path.extname(filename || ""))
         .replace(/[^a-zA-Z0-9._-]/g, "_");
-    const safeName = `${Date.now()}-${base}.${type}`;
-    fs.writeFileSync(path.join(uploadDir, safeName), buffer);
-    return `/assets/uploads/${safeName}`;
+    return { buffer, type, base };
+}
+
+// Decodifica, valida e grava os uploads. Valida TODOS antes de gravar qualquer
+// um (falha no meio do lote não deixa arquivos órfãos). Retorna as URLs públicas
+// ou lança com mensagem amigável para a rota devolver 400.
+function saveAvatarUploads(uploadDir, uploads) {
+    const validated = uploads.map((u) => decodeAndValidateAvatar(u.data, u.filename));
+    return validated.map((v, i) => {
+        const safeName = `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}-${v.base}.${v.type}`;
+        fs.writeFileSync(path.join(uploadDir, safeName), v.buffer);
+        return `/assets/uploads/${safeName}`;
+    });
+}
+
+// Normaliza o body: aceita o novo formato `avatar_uploads: [{data, filename}]`
+// e o legado `avatar_upload`/`avatar_filename` (singular).
+function collectUploads(body) {
+    if (Array.isArray(body.avatar_uploads)) {
+        return body.avatar_uploads
+            .filter((u) => u && typeof u.data === "string" && u.data)
+            .map((u) => ({ data: u.data, filename: u.filename }));
+    }
+    if (body.avatar_upload) {
+        return [{ data: body.avatar_upload, filename: body.avatar_filename }];
+    }
+    return [];
+}
+
+function deleteUploadedFile(uploadDir, url) {
+    if (typeof url !== "string" || !url.startsWith("/assets/uploads/")) return;
+    try { fs.unlinkSync(path.join(uploadDir, path.basename(url))); } catch { /* já removido */ }
 }
 
 export default function characterRouter(uploadDir) {
@@ -75,31 +105,30 @@ export default function characterRouter(uploadDir) {
 
     router.post("/api/characters", (req, res) => {
         try {
-            const { name, description, personality, likes, dislikes, avatar_link, avatar_upload, avatar_filename } = req.body;
+            const { name, description, personality, likes, dislikes, avatar_link } = req.body;
             if (!name) return res.status(400).json({ ok: false, message: "O nome do personagem é obrigatório." });
 
-            let avatarUrl = null;
-
-            if (avatar_upload) {
-                try {
-                    avatarUrl = saveAvatarUpload(uploadDir, avatar_upload, avatar_filename);
-                } catch (e) {
-                    return res.status(400).json({ ok: false, message: e.message });
-                }
-            } else if (avatar_link) {
-                avatarUrl = avatar_link;
-            } else {
-                return res.status(400).json({ ok: false, message: "Envie um arquivo de imagem ou um link de avatar." });
+            let imageUrls;
+            try {
+                imageUrls = saveAvatarUploads(uploadDir, collectUploads(req.body));
+            } catch (e) {
+                return res.status(400).json({ ok: false, message: e.message });
+            }
+            if (avatar_link) imageUrls.push(avatar_link);
+            if (imageUrls.length === 0) {
+                return res.status(400).json({ ok: false, message: "Envie ao menos uma imagem ou um link de avatar." });
             }
 
+            // A primeira imagem é o avatar principal (cards, sidebar, header do chat)
             const characterId = createCharacter(
                 name,
                 description || "",
                 personality || "",
-                avatarUrl,
+                imageUrls[0],
                 likes || null,
                 dislikes || null
             );
+            addCharacterImages(characterId, imageUrls);
 
             res.json({ ok: true, id: characterId });
         } catch (err) {
@@ -119,6 +148,7 @@ export default function characterRouter(uploadDir) {
         try {
             const character = getCharacter(req.params.id);
             if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
+            character.images = getCharacterImages(character.id);
             res.json({ ok: true, character });
         } catch (err) {
             res.status(500).json({ ok: false, message: err.message });
@@ -131,7 +161,7 @@ export default function characterRouter(uploadDir) {
             const existing = getCharacter(id);
             if (!existing) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
-            const { name, description, personality, likes, dislikes, avatar_link, avatar_upload, avatar_filename, affection_override } = req.body;
+            const { name, description, personality, likes, dislikes, avatar_link, affection_override, remove_image_ids } = req.body;
 
             if (name !== undefined && !name.trim()) {
                 return res.status(400).json({ ok: false, message: "O nome do personagem não pode ser vazio." });
@@ -145,15 +175,38 @@ export default function characterRouter(uploadDir) {
                 }
             }
 
+            const uploads = collectUploads(req.body);
+            const currentImages = getCharacterImages(id);
+            const removeIds = Array.isArray(remove_image_ids)
+                ? remove_image_ids.filter((rid) => currentImages.some((img) => img.id === rid))
+                : [];
+
+            // Valida antes de gravar qualquer arquivo: a galeria não pode ficar vazia.
+            const finalCount = currentImages.length - removeIds.length + uploads.length + (avatar_link ? 1 : 0);
+            const touchesImages = removeIds.length > 0 || uploads.length > 0 || Boolean(avatar_link);
+            if (touchesImages && finalCount === 0) {
+                return res.status(400).json({ ok: false, message: "O personagem precisa de ao menos uma imagem." });
+            }
+
+            let newUrls;
+            try {
+                newUrls = saveAvatarUploads(uploadDir, uploads);
+            } catch (e) {
+                return res.status(400).json({ ok: false, message: e.message });
+            }
+            if (avatar_link) newUrls.push(avatar_link);
+
+            for (const rid of removeIds) {
+                const removedUrl = deleteCharacterImage(id, rid);
+                deleteUploadedFile(uploadDir, removedUrl);
+            }
+            if (newUrls.length) addCharacterImages(id, newUrls);
+
+            // Avatar principal acompanha a primeira imagem da galeria.
             let avatarUrl;
-            if (avatar_upload) {
-                try {
-                    avatarUrl = saveAvatarUpload(uploadDir, avatar_upload, avatar_filename);
-                } catch (e) {
-                    return res.status(400).json({ ok: false, message: e.message });
-                }
-            } else if (avatar_link) {
-                avatarUrl = avatar_link;
+            if (touchesImages) {
+                const images = getCharacterImages(id);
+                avatarUrl = images.length ? images[0].url : undefined;
             }
 
             updateCharacter(id, {

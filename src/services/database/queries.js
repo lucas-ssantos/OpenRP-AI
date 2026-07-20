@@ -1,4 +1,5 @@
 export * from "./queries/characters.js";
+export * from "./queries/characterImages.js";
 export * from "./queries/persona.js";
 export * from "./queries/conversations.js";
 export * from "./queries/messages.js";

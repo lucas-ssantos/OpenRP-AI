@@ -34,19 +34,20 @@ async function handleSubmit(event) {
   const likes       = document.getElementById('likes').value.trim();
   const dislikes    = document.getElementById('dislikes').value.trim();
   const avatarLink  = document.getElementById('avatar_link').value.trim();
-  const avatarFile  = document.getElementById('avatar_upload').files[0];
+  const avatarFiles = [...document.getElementById('avatar_upload').files];
 
   if (!name) { showError('O nome do personagem é obrigatório.'); return; }
-  if (!avatarFile && !avatarLink) { showError('Envie uma imagem ou informe um link de avatar.'); return; }
+  if (!avatarFiles.length && !avatarLink) { showError('Envie ao menos uma imagem ou informe um link de avatar.'); return; }
 
   const body = { name, description, personality, likes, dislikes };
 
-  if (avatarFile) {
-    body.avatar_upload   = await readFileAsBase64(avatarFile);
-    body.avatar_filename = avatarFile.name;
-  } else {
-    body.avatar_link = avatarLink;
+  if (avatarFiles.length) {
+    body.avatar_uploads = await Promise.all(avatarFiles.map(async (file) => ({
+      data: await readFileAsBase64(file),
+      filename: file.name,
+    })));
   }
+  if (avatarLink) body.avatar_link = avatarLink;
 
   try {
     const response = await fetch('/api/characters', {

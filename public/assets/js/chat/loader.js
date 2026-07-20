@@ -31,8 +31,15 @@ export async function init() {
     dom.charNameEl.textContent = character.name;
     if (scenarioText) dom.scenarioEl.textContent = scenarioText;
 
+    // Background: sorteia uma imagem da galeria do personagem a cada visita.
+    // O avatar do header/nav continua fixo no avatar principal (avatar_url).
+    const galleryUrls = (character.images || []).map((img) => img.url);
+    if (!galleryUrls.length && character.avatar_url) galleryUrls.push(character.avatar_url);
+    if (galleryUrls.length) {
+      const bgUrl = galleryUrls[Math.floor(Math.random() * galleryUrls.length)];
+      dom.bg.style.backgroundImage = `url('${bgUrl}')`;
+    }
     if (character.avatar_url) {
-      dom.bg.style.backgroundImage = `url('${character.avatar_url}')`;
       dom.headerAvt.src = character.avatar_url;
       dom.headerAvt.style.display = 'block';
     }

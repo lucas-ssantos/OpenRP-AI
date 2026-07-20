@@ -43,6 +43,7 @@ src/
       save.js                       ← flush do banco em disco (usado pelo shutdown)
       queries/
         characters.js               ← createCharacter, getCharacter, getAllCharacters, updateCharacter
+        characterImages.js          ← getCharacterImages, addCharacterImages, deleteCharacterImage (galeria de imagens)
         persona.js                  ← getPersona, savePersona
         conversations.js            ← createConversation, getConversation, getLatestConversationForCharacter, getRecentCharactersWithConversations
         messages.js                 ← addMessage, updateMessage, getLastMessage, deleteMessage, rollbackConversation, resetConversation, getConversationMessages, getLastNMessages, getMemoryBacklog
@@ -112,7 +113,8 @@ contexto/
 
 | Tabela | Descrição |
 |--------|-----------|
-| `characters` | id, name, description, personality, avatar_url, scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
+| `characters` | id, name, description, personality, avatar_url (imagem principal = primeira da galeria), scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
+| `character_images` | id, character_id, url, position — galeria de imagens do personagem; o chat sorteia uma como background a cada carregamento. Migração: DBs antigos herdam avatar_url como primeira imagem |
 | `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |
 | `persona` | id='self', name, description, avatar_url (única linha) |
@@ -142,9 +144,9 @@ GET /api/viewdb              → viewdb.html
 ```
 GET    /api/characters             → lista todos
 GET    /api/characters/recent      → últimos com conversa (usados na sidebar do chat)
-GET    /api/characters/:id         → busca por ID
-POST   /api/characters             → cria (avatar_upload em base64 ou avatar_link)
-PUT    /api/characters/:id         → edita (todos os campos opcionais exceto name; avatar opcional)
+GET    /api/characters/:id         → busca por ID (inclui `images`: galeria [{id, url, position}])
+POST   /api/characters             → cria (avatar_uploads: [{data, filename}] em base64 e/ou avatar_link; aceita legado avatar_upload singular; exige ≥1 imagem)
+PUT    /api/characters/:id         → edita (todos os campos opcionais exceto name; avatar_uploads/avatar_link APENDAM à galeria; remove_image_ids remove — galeria nunca fica vazia; avatar_url = primeira imagem restante)
 ```
 
 ### Conversas e chat
@@ -253,7 +255,7 @@ Implementado em `initResetModal()` — fecha o offcanvas via `hidden.bs.offcanva
 
 ## Fluxo de criação de personagem
 
-1. `POST /api/characters` com avatar (base64 ou link) → salvo em `public/assets/uploads/`
+1. `POST /api/characters` com uma ou mais imagens (`avatar_uploads` base64 e/ou `avatar_link`) → salvas em `public/assets/uploads/` e registradas em `character_images`; a primeira vira `avatar_url` (cards, sidebar, header do chat)
 2. Resposta: `{ ok: true, id: "uuid" }`
 3. Redirect para `/chat/:id`
 4. Chat page faz `GET /api/characters/:id/conversation` → cria conversa + insere `first_message` como mensagem `assistant` position=0
@@ -263,7 +265,7 @@ Implementado em `initResetModal()` — fecha o offcanvas via `hidden.bs.offcanva
 
 1. Botão de lápis no card da index ou no header do chat → `/character/:id/edit`
 2. `edit-character.js` carrega dados via `GET /api/characters/:id` e pré-preenche o form
-3. Submit envia `PUT /api/characters/:id` — avatar é opcional (mantém existente se nenhum for enviado)
+3. Submit envia `PUT /api/characters/:id` — imagens novas (upload múltiplo ou link) apendam à galeria; a galeria atual é exibida com marcação de remoção (`remove_image_ids`, aplicada no salvar; arquivos locais removidos do disco); backend impede galeria vazia
 4. Redireciona para `/chat/:id`
 
 ## Parâmetros de geração de IA
@@ -373,7 +375,8 @@ npm test         # testes (node:test, pasta tests/ — lógica pura: affection, 
 - **Ollama é obrigatório** — redireciona para `/check` se não responder
 - Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; único override é o modelo por conversa
 - O modelo padrão é `gemma4:e4b` — pode ser alterado em `/settings`. Na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-32k` (32k ctx) e `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existirem
-- Avatar upload: enviado como base64 no body JSON, validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx 8MB — a extensão salva vem do tipo detectado, nunca do nome enviado) e salvo em `public/assets/uploads/` como `timestamp-nome.ext`
+- Avatar upload: enviado como base64 no body JSON (`avatar_uploads` array; múltiplos por request), validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx 8MB cada — a extensão salva vem do tipo detectado, nunca do nome enviado; o lote inteiro é validado antes de gravar qualquer arquivo) e salvo em `public/assets/uploads/` como `timestamp-i-rand-nome.ext`
+- Galeria de imagens: `character_images` guarda todas as imagens do personagem; `chat/loader.js` sorteia uma para o background a cada carregamento do chat (header/nav continuam com `avatar_url`, a imagem principal)
 - Todos os IDs são UUIDs v4
 - `getLastNMessages` retorna as últimas N mensagens **totais** (user+assistant, exclui system) por `position DESC LIMIT n`, revertidas (mais antiga primeiro) — mesma definição de janela usada pelo gatilho de memórias
 - `{{user}}` (nome da persona) e `{{char}}` (nome do personagem) são expandidos em `first_message` e em todo o system prompt do `promptBuilder` (description, personality, likes/dislikes, cenário, memórias e lorebooks)

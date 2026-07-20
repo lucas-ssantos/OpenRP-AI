@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { v4 as uuidv4 } from "uuid";
 import { getDB, saveDB } from "./db.js";
 import { appConfig } from "../../config.js";
 
@@ -63,6 +64,34 @@ export async function migrate() {
 
   // Migration: override manual do estágio de afeição (NULL = progressão automática)
   try { db.run(`ALTER TABLE characters ADD COLUMN affection_override INTEGER`); } catch {}
+
+  // ===== CHARACTER IMAGES (galeria — o chat sorteia uma por sessão) =====
+  // characters.avatar_url continua existindo como imagem principal (cards, sidebar,
+  // header do chat) e é sempre a primeira imagem da galeria.
+  const hadCharacterImages = tableNames.includes("character_images");
+  db.run(`
+    CREATE TABLE IF NOT EXISTS character_images (
+      id TEXT PRIMARY KEY,
+      character_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      position INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Seed em DBs antigos: o avatar existente vira a primeira imagem da galeria.
+  if (!hadCharacterImages) {
+    const existing = db.exec(`SELECT id, avatar_url FROM characters WHERE avatar_url IS NOT NULL AND avatar_url != ''`);
+    if (existing.length > 0) {
+      for (const [charId, avatarUrl] of existing[0].values) {
+        db.run(
+          `INSERT INTO character_images (id, character_id, url, position) VALUES (?, ?, ?, 0)`,
+          [uuidv4(), charId, avatarUrl]
+        );
+      }
+    }
+  }
 
   // ===== CONVERSATIONS =====
   // Cada conversa pertence a um personagem e carrega seu próprio cenário + mensagem inicial.
@@ -224,6 +253,7 @@ export async function migrate() {
 
   // ===== INDEXES =====
   db.run(`CREATE INDEX IF NOT EXISTS idx_conv_char ON conversations(character_id);`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_char_images ON character_images(character_id, position);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_msg_pos ON messages(conversation_id, position);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_conv ON memories(conversation_id);`);

@@ -9,6 +9,24 @@
     <link rel="stylesheet" href="/assets/css/styles.css" />
     <link rel="stylesheet" href="/assets/css/sidebar.css" />
     <link rel="stylesheet" href="/assets/css/lorebooks.css" />
+    <style>
+      .img-gallery { display: flex; flex-wrap: wrap; gap: .6rem; }
+      .img-thumb-wrap { position: relative; }
+      .img-thumb-wrap img {
+        width: 96px; height: 96px; object-fit: cover;
+        border-radius: .75rem; border: 1px solid rgba(148,163,184,0.2);
+        transition: opacity .15s ease, border-color .15s ease;
+      }
+      .img-thumb-wrap.marked img { opacity: .3; border-color: rgba(248,113,113,0.6); }
+      .img-thumb-remove {
+        position: absolute; top: -6px; right: -6px;
+        width: 22px; height: 22px; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; border: none; font-size: .75rem;
+        background: rgba(248,113,113,0.9); color: #fff; cursor: pointer;
+      }
+      .img-thumb-wrap.marked .img-thumb-remove { background: rgba(56,189,248,0.9); }
+    </style>
   </head>
   <body>
     <div class="d-flex min-vh-100">
@@ -74,24 +92,22 @@
 
                 <div class="glass-card card p-3 mb-4" style="border-radius:.85rem !important;">
                   <p class="fw-semibold mb-3 d-flex align-items-center gap-2" style="color:#cbd5e1; font-size:.9rem;">
-                    <i class="bi bi-image text-info"></i> Imagem do personagem
+                    <i class="bi bi-images text-info"></i> Imagens do personagem
                   </p>
 
-                  <div id="avatar-preview-wrap" class="mb-3" style="display:none;">
-                    <p class="text-secondary small mb-2">Imagem atual:</p>
-                    <img id="avatar-preview" src="" alt="Avatar atual" style="width:96px; height:96px; object-fit:cover; border-radius:.75rem; border:1px solid rgba(148,163,184,0.2);" />
+                  <div id="images-gallery-wrap" class="mb-3" style="display:none;">
+                    <p class="text-secondary small mb-2">Imagens atuais — clique no <i class="bi bi-x"></i> para marcar para remoção (aplicada ao salvar). A primeira é o avatar principal; o chat sorteia uma delas como fundo.</p>
+                    <div id="images-gallery" class="img-gallery"></div>
                   </div>
-
-                  <p class="text-secondary small mb-3">Deixe os campos abaixo em branco para manter a imagem atual.</p>
 
                   <div class="row g-3">
                     <div class="col-12 col-sm-6">
-                      <label class="form-label" for="avatar_upload">Upload de arquivo</label>
-                      <input id="avatar_upload" name="avatar_upload" type="file" accept="image/*" class="form-control" />
-                      <div class="form-text mt-1">Envie uma nova imagem.</div>
+                      <label class="form-label" for="avatar_upload">Adicionar imagens</label>
+                      <input id="avatar_upload" name="avatar_upload" type="file" accept="image/*" multiple class="form-control" />
+                      <div class="form-text mt-1">Envie uma ou mais imagens novas.</div>
                     </div>
                     <div class="col-12 col-sm-6">
-                      <label class="form-label" for="avatar_link">Ou use um link</label>
+                      <label class="form-label" for="avatar_link">Ou adicione por link</label>
                       <input id="avatar_link" name="avatar_link" type="url" class="form-control" placeholder="https://..." />
                       <div class="form-text mt-1">URL pública de uma imagem.</div>
                     </div>

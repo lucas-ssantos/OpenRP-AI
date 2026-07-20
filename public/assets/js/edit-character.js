@@ -4,6 +4,9 @@ const msgOk    = document.getElementById('msg-success');
 
 const characterId = window.location.pathname.split('/')[2];
 
+let characterImages = [];          // galeria atual vinda do banco
+const removeImageIds = new Set();  // marcadas para remoção — aplicadas no salvar
+
 function showError(text) {
   msgError.textContent = text;
   msgError.style.display = 'block';
@@ -46,11 +49,11 @@ async function loadCharacter() {
     document.getElementById('likes').value         = character.likes         || '';
     document.getElementById('dislikes').value      = character.dislikes      || '';
 
-    if (character.avatar_url) {
-      const wrap = document.getElementById('avatar-preview-wrap');
-      document.getElementById('avatar-preview').src = character.avatar_url;
-      wrap.style.display = 'block';
+    characterImages = character.images || [];
+    if (!characterImages.length && character.avatar_url) {
+      characterImages = [{ id: null, url: character.avatar_url }];
     }
+    renderImagesGallery();
 
     document.getElementById('btn-cancel').addEventListener('click', () => {
       window.location.href = `/character/${characterId}`;
@@ -65,6 +68,49 @@ async function loadCharacter() {
   } catch (err) {
     showError(err.message || 'Erro ao carregar personagem.');
   }
+}
+
+function renderImagesGallery() {
+  const wrap    = document.getElementById('images-gallery-wrap');
+  const gallery = document.getElementById('images-gallery');
+  if (!characterImages.length) { wrap.style.display = 'none'; return; }
+
+  gallery.innerHTML = '';
+  for (const img of characterImages) {
+    const item = document.createElement('div');
+    item.className = 'img-thumb-wrap';
+
+    const thumb = document.createElement('img');
+    thumb.src = img.url;
+    thumb.alt = 'Imagem do personagem';
+    item.appendChild(thumb);
+
+    // Imagens sem id (fallback do avatar_url legado) não são removíveis
+    if (img.id) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'img-thumb-remove';
+      btn.innerHTML = '<i class="bi bi-x"></i>';
+      btn.title = 'Marcar para remoção';
+      btn.addEventListener('click', () => {
+        if (removeImageIds.has(img.id)) {
+          removeImageIds.delete(img.id);
+          item.classList.remove('marked');
+          btn.innerHTML = '<i class="bi bi-x"></i>';
+          btn.title = 'Marcar para remoção';
+        } else {
+          removeImageIds.add(img.id);
+          item.classList.add('marked');
+          btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+          btn.title = 'Desfazer remoção';
+        }
+      });
+      item.appendChild(btn);
+    }
+
+    gallery.appendChild(item);
+  }
+  wrap.style.display = 'block';
 }
 
 function renderLorebookPicker(lorebooks, selectedIds) {
@@ -124,9 +170,15 @@ async function handleSubmit(event) {
   const likes        = document.getElementById('likes').value.trim();
   const dislikes     = document.getElementById('dislikes').value.trim();
   const avatarLink   = document.getElementById('avatar_link').value.trim();
-  const avatarFile   = document.getElementById('avatar_upload').files[0];
+  const avatarFiles  = [...document.getElementById('avatar_upload').files];
 
   if (!name) { showError('O nome do personagem é obrigatório.'); return; }
+
+  const remainingCount = characterImages.length - removeImageIds.size + avatarFiles.length + (avatarLink ? 1 : 0);
+  if (remainingCount === 0) {
+    showError('O personagem precisa de ao menos uma imagem — adicione uma antes de remover todas.');
+    return;
+  }
 
   const overrideValue = document.getElementById('affection_override').value;
   const body = {
@@ -134,12 +186,14 @@ async function handleSubmit(event) {
     affection_override: overrideValue === '' ? null : Number(overrideValue),
   };
 
-  if (avatarFile) {
-    body.avatar_upload   = await readFileAsBase64(avatarFile);
-    body.avatar_filename = avatarFile.name;
-  } else if (avatarLink) {
-    body.avatar_link = avatarLink;
+  if (avatarFiles.length) {
+    body.avatar_uploads = await Promise.all(avatarFiles.map(async (file) => ({
+      data: await readFileAsBase64(file),
+      filename: file.name,
+    })));
   }
+  if (avatarLink) body.avatar_link = avatarLink;
+  if (removeImageIds.size) body.remove_image_ids = [...removeImageIds];
 
   const checkedIds = [...document.querySelectorAll('input[name="lorebook_ids"]:checked')].map(el => el.value);
 
