@@ -56,7 +56,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         startSSE(res);
         let turnSaved = false;
-        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent) => {
+        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent, rawThinking) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent) : null;
             turnSaved = !!fullContent;
@@ -69,6 +69,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 messages: ollamaMessages,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
+                thinking: rawThinking,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
             });
@@ -138,7 +139,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };
 
         startSSE(res);
-        await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent) => {
+        await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, insertPos) : null;
 
@@ -149,6 +150,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 messages: ollamaMessages,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
+                thinking: rawThinking,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
                 isRegen: true,

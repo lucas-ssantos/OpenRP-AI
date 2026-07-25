@@ -191,6 +191,7 @@ export async function migrate() {
       num_ctx_messages INTEGER DEFAULT 20,
       min_tokens INTEGER DEFAULT 60,
       memory_interval INTEGER DEFAULT 5,
+      think INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -198,6 +199,10 @@ export async function migrate() {
 
   // Migration para DBs existentes sem a coluna memory_interval
   try { db.run(`ALTER TABLE generation_config ADD COLUMN memory_interval INTEGER DEFAULT 5`); } catch {}
+
+  // Migration: raciocínio nativo do Ollama (thinking) — desligado por padrão,
+  // preserva o comportamento anterior (hardcoded think:false) em DBs existentes.
+  try { db.run(`ALTER TABLE generation_config ADD COLUMN think INTEGER DEFAULT 0`); } catch {}
 
   // Seed inicial: usa o preset de "PC médio" (mesclado sobre os defaults do .env, que
   // preenchem campos que o preset não traz, como num_ctx_messages/memory_interval).
@@ -215,13 +220,13 @@ export async function migrate() {
     INSERT OR IGNORE INTO generation_config
       (id, model, temperature, top_p, top_k, min_p,
        repeat_penalty, repeat_last_n, max_tokens,
-       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, think)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
     d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
-    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5,
+    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.think ? 1 : 0,
   ]);
 
   // O override de config por personagem foi removido — o único override que

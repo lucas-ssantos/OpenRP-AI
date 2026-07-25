@@ -35,6 +35,7 @@ const VALIDATORS = {
     stream:             (v) => typeof v === "boolean",
     stop:               (v) => Array.isArray(v),
     max_response_chars: (v) => isInt(v) && v >= 0,
+    think:              (v) => typeof v === "boolean",
 };
 
 // Hierarquia por campo: global (banco) → defaults (.env) → medium_spec.json.
@@ -149,10 +150,11 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
 
     let fullContent = "";  // filtered (without <think> blocks) — sent to SSE and saved
     let rawContent  = "";  // verbatim output from the model — used for logging
+    let rawThinking = "";  // native Ollama reasoning (message.thinking) — logging only, never sent to SSE/saved
 
     const finish = async () => {
         cleanup();
-        const extra = await onDone(fullContent, rawContent);
+        const extra = await onDone(fullContent, rawContent, rawThinking);
         if (clientGone) return;
         res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
         if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
@@ -169,7 +171,7 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
                 model: config.model,
                 messages,
                 stream: true,
-                think: false,
+                think: config.think === true,
                 options: {
                     temperature:   config.temperature,
                     top_p:         config.top_p,
@@ -210,6 +212,8 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
                 if (!line.trim()) continue;
                 let parsed;
                 try { parsed = JSON.parse(line); } catch { continue; }
+
+                if (parsed.message?.thinking) rawThinking += parsed.message.thinking;
 
                 if (parsed.message?.content) {
                     const raw  = parsed.message.content;
@@ -256,7 +260,7 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
         cleanup();
         if (err?.name === "AbortError") {
             // Cliente desconectou (ou o stream travou): persiste o parcial e encerra.
-            if (fullContent) { try { await onDone(fullContent, rawContent); } catch { /* já estamos encerrando */ } }
+            if (fullContent) { try { await onDone(fullContent, rawContent, rawThinking); } catch { /* já estamos encerrando */ } }
             if (!clientGone) {
                 try {
                     res.write(`data: ${JSON.stringify({ error: "Geração interrompida — o Ollama parou de responder." })}\n\n`);

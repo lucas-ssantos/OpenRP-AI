@@ -230,6 +230,7 @@ async function loadConfig() {
 function fillForm(config) {
   ensureModelOption(config.model);
   document.getElementById('model').value          = config.model          || '';
+  document.getElementById('think').checked        = !!config.think;
   document.getElementById('temperature').value    = config.temperature    ?? '';
   document.getElementById('top_p').value          = config.top_p          ?? '';
   document.getElementById('top_k').value          = config.top_k          ?? '';
@@ -301,6 +302,7 @@ async function handleSubmit(e) {
     memory_interval:  parseInt(document.getElementById('memory_interval').value)  || 5,
     stream:           parseInt(document.getElementById('stream').value)           || null,
     seed:             parseInt(document.getElementById('seed').value)             || -1,
+    think:            document.getElementById('think').checked,
     stop,
   };
 

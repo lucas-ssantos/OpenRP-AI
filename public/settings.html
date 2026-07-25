@@ -39,6 +39,17 @@
                 <select id="model" name="model" class="form-select" required>
                   <option value="">— Carregando modelos instalados... —</option>
                 </select>
+
+                <div class="form-check form-switch mt-3">
+                  <input class="form-check-input" type="checkbox" id="think" role="switch" />
+                  <label class="form-check-label d-flex align-items-center gap-1" for="think">
+                    Ativar thinking (raciocínio) do modelo
+                    <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                       data-bs-toggle="tooltip"
+                       title="Só tem efeito em modelos com suporte a reasoning (ex: qwen3, deepseek-r1, gpt-oss). O raciocínio nunca aparece no chat — fica registrado apenas nos logs de desenvolvimento (data/logs) para depuração."></i>
+                  </label>
+                </div>
+
                 <div class="ctx-alert mt-3">
                   <i class="bi bi-info-circle-fill flex-shrink-0" style="margin-top:.1rem;"></i>
                   <span>

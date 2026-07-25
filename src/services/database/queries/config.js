@@ -37,6 +37,7 @@ export function getGenerationConfig() {
     seed: row.seed, stop: parseStop(row.stop), num_ctx_messages: row.num_ctx_messages,
     min_tokens: row.min_tokens ?? 60,
     memory_interval: row.memory_interval ?? 5,
+    think: row.think === 1,
   };
 }
 
@@ -70,20 +71,21 @@ export function setGenerationConfig(config = {}) {
   const toStop = (v) => (Array.isArray(v) ? v.join(", ") : v || "");
   const toStream = (v) => (v === 1 || v === true || v === "1" ? 1 : 0);
   const toSeed = (v) => (v !== null && v !== undefined ? v : -1);
+  const toThink = (v) => (v === 1 || v === true || v === "1" ? 1 : 0);
 
   const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
           max_tokens, context_size, stream, seed, stop, num_ctx_messages,
-          min_tokens, memory_interval } = config;
+          min_tokens, memory_interval, think } = config;
   db.run(
     `INSERT OR REPLACE INTO generation_config
      (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
       max_tokens, context_size, stream, seed, stop, num_ctx_messages, min_tokens,
-      memory_interval, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      memory_interval, think, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
      max_tokens, context_size, toStream(stream), toSeed(seed),
      toStop(stop), num_ctx_messages || 20, min_tokens ?? 60,
-     memory_interval ?? 5, now]
+     memory_interval ?? 5, toThink(think), now]
   );
 
   saveDB();

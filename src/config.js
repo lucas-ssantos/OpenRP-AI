@@ -39,6 +39,7 @@ export const appConfig = {
         seed:             parseInt(process.env.DEFAULT_SEED ?? "-1")             || -1,
         max_response_chars: parseInt(process.env.DEFAULT_MAX_RESPONSE_CHARS)   || 0,
         stream:           true,
+        think:            process.env.DEFAULT_THINK === "true",
         stop: process.env.DEFAULT_STOP
             ? process.env.DEFAULT_STOP.split(",").map((s) => s.trim())
             : ["User:", "Human:", "### User", "\n\nUser:"],

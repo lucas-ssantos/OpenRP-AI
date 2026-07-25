@@ -20,6 +20,7 @@ export function isDevMode() {
  * @param {object[]} opts.messages         - array completo enviado ao Ollama (system + histórico + user)
  * @param {string}   opts.rawResponse      - resposta bruta do modelo (com <think> se houver)
  * @param {string}   opts.filteredResponse - resposta após remover tokens de raciocínio
+ * @param {string}   [opts.thinking]       - raciocínio nativo do Ollama (message.thinking, quando think:true na config)
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
  */
 export function logConversationTurn({
@@ -29,6 +30,7 @@ export function logConversationTurn({
     messages,
     rawResponse,
     filteredResponse,
+    thinking = "",
     allMemories  = [],
     allLorebooks = [],
     isRegen = false,
@@ -49,7 +51,7 @@ export function logConversationTurn({
 
         const entry = buildLogEntry({
             character, model, messages,
-            rawResponse, filteredResponse,
+            rawResponse, filteredResponse, thinking,
             allMemories, allLorebooks,
             isRegen,
         });
@@ -71,7 +73,7 @@ function section(label) {
     return `\n── ${label} ${dashes}`;
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, allMemories, allLorebooks, isRegen }) {
+function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, allMemories, allLorebooks, isRegen }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -180,6 +182,12 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
     if (currentUser) {
         lines.push(section("[5] MENSAGEM ATUAL DO USUÁRIO"));
         lines.push(currentUser.content);
+    }
+
+    // ── Raciocínio nativo do Ollama (think:true na config) ─────────────────────
+    if (thinking) {
+        lines.push(section("RACIOCÍNIO DO MODELO (thinking — não enviado ao chat)"));
+        lines.push(thinking);
     }
 
     // ── Resposta do modelo ────────────────────────────────────────────────────

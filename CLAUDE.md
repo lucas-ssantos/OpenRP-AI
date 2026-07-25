@@ -121,7 +121,7 @@ contexto/
 | `memories` | id, conversation_id, type (auto/manual/pinned), content, summary, keywords, is_pinned, relevance_weight |
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
-| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval |
+| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval, think (raciocínio nativo do Ollama, desligado por padrão) |
 | `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel); único override existente |
 
 **Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita. `saveDB()` é **debounced** (~500ms); a gravação imediata é `flushDB()`, chamada no shutdown. A coluna `stop` é CSV (o parseStop ainda lê o formato JSON legado de bancos antigos).
@@ -193,14 +193,21 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 4. Busca últimas N mensagens (`getLastNMessages`) para contexto
 5. Salva mensagem do usuário no banco (`addMessage`)
 6. Calcula `dynamicMaxTokens` — proporcional ao tamanho da mensagem do usuário
-7. Chama `http://127.0.0.1:11434/api/chat` com `stream: true` via `streamOllama()`
+7. Chama `http://127.0.0.1:11434/api/chat` com `stream: true` e `think: config.think` via `streamOllama()`
 8. Responde com **SSE** (`Content-Type: text/event-stream`)
 9. Cada chunk: `data: {"delta":"texto","done":false}`
 10. Final: `data: {"delta":"","done":true,"message_id":"...","user_message_id":"..."}`
-11. Filtra `<think>...</think>` (reasoning tokens do qwen3) durante o stream
+11. Filtra `<think>...</think>` (fallback para modelos que inlinam raciocínio no `content` mesmo com `think:false`) durante o stream
 12. Salva resposta completa no banco ao final
 
 Robustez do streaming (`streamOllama`): se o cliente desconectar, a geração no Ollama é **abortada** (AbortController) e o conteúdo parcial é persistido; há timeout de inatividade de 120s (stream travado → abort + evento de erro). O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
+
+### Thinking (raciocínio do modelo)
+
+- `generation_config.think` (bool, padrão `false`) controla o parâmetro nativo `think` da API do Ollama — configurável em `/settings` (toggle no card "Modelo em uso"). Só tem efeito em modelos com suporte a reasoning (qwen3, qwen3.5, deepseek-r1, gpt-oss, etc.); em outros modelos o Ollama ignora o parâmetro.
+- Quando ativo, o Ollama retorna o raciocínio no campo separado `message.thinking` (distinto de `message.content`) a cada chunk do stream. `streamOllama()` acumula isso em `rawThinking` — **nunca** é enviado por SSE, salvo como mensagem ou passado ao extrator de memórias; existe só para diagnóstico.
+- Em modo dev, `logConversationTurn()` grava esse raciocínio numa seção própria (`RACIOCÍNIO DO MODELO`) em `data/logs/`, antes da seção de resposta bruta — é por isso que ele não aparecia nos logs antes desta mudança (o parâmetro vinha hardcoded como `false`).
+- `memory/extraction.js` e `chat/ideas.js` fazem chamadas Ollama próprias com `think: false` fixo (JSON estruturado não se beneficia de raciocínio) — não seguem essa config.
 
 ## Eventos do chat (frontend)
 
@@ -288,6 +295,7 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `seed` | Semente do RNG (`-1` = aleatório) | Nenhum |
 | `stop` | Tokens de parada que encerram a geração | Nenhum |
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
+| `think` | Ativa o raciocínio nativo (`message.thinking`) em modelos com suporte a reasoning (qwen3, deepseek-r1, gpt-oss...); nunca aparece no chat, só nos logs dev | **Alto** (soma tokens de raciocínio à resposta) |
 
 A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" e é preservado. O único override é o modelo por conversa (`conversation_config`).
 

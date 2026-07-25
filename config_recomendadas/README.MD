@@ -292,6 +292,23 @@ Adapte de acordo com o formato de prompt que seu webapp utiliza.
 
 ---
 
+### `think`
+
+**O que faz:** Pede ao Ollama para o modelo gerar seu raciocínio interno (chain-of-thought) antes da resposta final, via campo nativo `message.thinking` da API — separado do `message.content`.
+
+- Só tem efeito em modelos com suporte a reasoning (`qwen3`, `qwen3.5`, `deepseek-r1`, `gpt-oss`, etc.). Em modelos sem esse suporte, o parâmetro é ignorado.
+- `false` (padrão) → geração direta, sem raciocínio — mais rápida.
+- `true` → o modelo "pensa" antes de responder; pode melhorar coerência em cenas complexas, mas aumenta a latência (tokens de raciocínio somam ao tempo total de geração).
+- Nesta aplicação o raciocínio nunca é exibido no chat nem salvo como mensagem — quando ativo, fica registrado apenas nos logs de desenvolvimento (`data/logs/`) para depuração.
+
+**Custo computacional:** **Alto** — tokens de raciocínio são gerados antes da resposta, somando ao tempo total.
+
+```json
+"think": false
+```
+
+---
+
 ## Configurações por Hardware
 
 ### Máquina fraca — i5 7ª gen · 8 GB RAM · GTX 1060 6 GB
@@ -411,3 +428,4 @@ You stay fully in character at all times. You do not break character, add discla
 | `repeat_last_n` | Nenhum | Leve |
 | `mirostat` | Nenhum | Leve |
 | `stream` | Nenhum | Nenhum |
+| `think` | Nenhum | **Alto** (soma raciocínio + resposta) |
