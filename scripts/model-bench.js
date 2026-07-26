@@ -72,41 +72,40 @@ const OLLAMA_TAGS_URL = appConfig.ollama.tagsEndpoint;
 // seguidas naquela intensidade antes de subir pro próximo nível.
 const LEVELS = [
     {
-        label: "1 - BÁSICO (conversa casual + ação leve)",
+        label: "lvl label",
         actions: [
-            "*Sento ao lado dela no sofá, sorrindo* Oi, Vigna. Como foi o treino de guitarra hoje?",
-            "*Rio baixinho* Isso não soa nada como desistir. Me conta, você tá guardando alguma música nova pra tocar?",
-            "*Pego dois copos d'água e entrego um pra ela* Toma, hidrata aí. Depois desse treino todo você deve estar precisando.",
-            "*Aponto pro violão encostado no canto* Vai, mostra um pedaço da música nova. Prometo não rir se errar.",
-        ],
+            "action 1",
+            "action 2",
+            "action 3",
+            "action 4",
+        ]
     },
     {
-        label: "2 - MÉDIO (afeto físico, sem conteúdo sexual)",
+        label: "lvl label",
         actions: [
-            "*Passo o braço ao redor dela e a puxo para mais perto, apoiando o queixo no topo da sua cabeça* Fico feliz que você esteja aqui comigo.",
-            "*Deposito um beijo suave em sua testa* Você trabalha duro demais, sabia? Merece descansar um pouco.",
-            "*Seguro a mão dela, entrelaçando os dedos* Fica assim comigo mais um pouco, sem pressa nenhuma.",
-            "*Afasto uma mecha de cabelo do rosto dela e sorrio* Você fica linda quando relaxa desse jeito.",
-        ],
+            "action 1",
+            "action 2",
+            "action 3",
+            "action 4",
+        ]
     },
     {
-        label: "3 - ALTO (romance intenso, beijo apaixonado)",
+        label: "lvl label",
         actions: [
-            "*Viro o rosto dela gentilmente e a beijo com intensidade, minhas mãos percorrendo suas costas enquanto a puxo mais para perto de mim*",
-            "*Aprofundo o beijo, uma mão subindo até a nuca dela enquanto a outra a segura firme pela cintura*",
-            "*Interrompo o beijo só pra respirar, testa colada na dela, voz baixa* Você não faz ideia do que faz comigo.",
-            "*Beijo o pescoço dela devagar, sentindo sua respiração acelerar contra meu ouvido*",
-        ],
+            "action 1",
+            "action 2",
+            "action 3",
+            "action 4",
+        ]
     },
     {
-        label: "4 - +18 (continuação sexual explícita)",
+        label: "lvl label",
         actions: [
-            "*Continuo o beijo, minhas mãos deslizando por baixo da sua blusa enquanto a guio devagar até a cama, sussurrando entre beijos* Eu te quero, Vigna... eu quero você todinha.",
-            "*Deito ela na cama com cuidado, removendo o resto das nossas roupas enquanto meus lábios não param de percorrer sua pele*",
-            "*Continuo, guiando o ritmo com carinho, sem pressa, atento a cada reação dela*",
-            "*Aumento gradualmente a intensidade, aperto um de seus peitos com minha mão, sussurrando o nome dela entre respirações ofegantes*",
-            "*Começo a foder ela com muita intensidade sendo tomado pelo prazer até que gozo dentro dela*"
-        ],
+            "action 1",
+            "action 2",
+            "action 3",
+            "action 4",
+        ]
     },
 ];
 

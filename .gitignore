@@ -6,3 +6,4 @@ data/*.sqlite
 data/logs/
 public/assets/uploads/*
 data/model-bench/*
+scripts/bench-lks.js
