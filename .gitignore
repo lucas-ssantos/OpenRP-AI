@@ -5,3 +5,4 @@ data/*.sqlite
 *.log
 data/logs/
 public/assets/uploads/*
+data/model-bench/*

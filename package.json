@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",
+    "bench:models": "node scripts/model-bench.js",
     "db:init": "node src/config/database.js",
     "db:reset": "node src/config/database.js --reset",
     "launcher": "node launcher/tray.js",
