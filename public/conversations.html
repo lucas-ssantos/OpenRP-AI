@@ -30,12 +30,6 @@
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       .conv-item .conv-meta { color: #64748b; font-size: .76rem; margin-top: .15rem; }
       .conv-item .conv-arrow { color: #38bdf8; font-size: 1.1rem; margin-left: auto; }
-      .conv-item .conv-delete-btn {
-        flex-shrink: 0; width: 34px; height: 34px; border-radius: .6rem; border: none;
-        display: flex; align-items: center; justify-content: center;
-        background: rgba(248,113,113,0.1); color: #f87171; transition: background .15s;
-      }
-      .conv-item .conv-delete-btn:hover { background: rgba(248,113,113,0.22); }
     </style>
   </head>
   <body>
@@ -57,8 +51,6 @@
                 </div>
               </div>
             </div>
-
-            <div id="page-error" class="alert-glass-error mb-4" role="status" style="display:none;"></div>
 
             <!-- Lista de conversas -->
             <div class="d-flex align-items-center justify-content-between mb-3">
@@ -117,63 +109,6 @@
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Delete: passo 1 (aviso) ───────────────────────────────────── -->
-    <div class="modal fade" id="deleteStep1Modal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
-        <div class="modal-content" style="background:rgba(6,12,30,0.98); border:1px solid rgba(148,163,184,0.15); border-radius:1.1rem;">
-          <div class="modal-header" style="border-bottom:1px solid rgba(148,163,184,0.1); padding:1.1rem 1.25rem .85rem;">
-            <h6 class="modal-title mb-0" id="delete-step1-title" style="color:#f1f5f9; font-weight:700; font-size:.95rem;">
-              <i class="bi bi-trash3 me-2" style="color:#f87171;"></i>Apagar
-            </h6>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size:.8rem;"></button>
-          </div>
-          <div class="modal-body" style="color:#94a3b8; font-size:.88rem; line-height:1.65; padding:1.1rem 1.25rem;">
-            <p class="mb-0" id="delete-step1-body"></p>
-          </div>
-          <div class="modal-footer" style="border-top:1px solid rgba(148,163,184,0.1); padding:.85rem 1.25rem; gap:.5rem;">
-            <button type="button" data-bs-dismiss="modal"
-                    style="background:rgba(30,41,59,.7); border:1px solid rgba(148,163,184,.2); color:#cbd5e1; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
-              Cancelar
-            </button>
-            <button type="button" id="delete-step1-confirm"
-                    style="background:rgba(239,68,68,.18); border:1px solid rgba(239,68,68,.4); color:#fca5a5; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
-              Continuar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Delete: passo 2 (confirmação final) ──────────────────────── -->
-    <div class="modal fade" id="deleteStep2Modal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
-        <div class="modal-content" style="background:rgba(6,12,30,0.98); border:1px solid rgba(239,68,68,0.3); border-radius:1.1rem;">
-          <div class="modal-header" style="border-bottom:1px solid rgba(148,163,184,0.1); padding:1.1rem 1.25rem .85rem;">
-            <h6 class="modal-title mb-0" style="color:#f1f5f9; font-weight:700; font-size:.95rem;">
-              <i class="bi bi-exclamation-triangle-fill me-2" style="color:#f87171;"></i>Tem certeza mesmo?
-            </h6>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size:.8rem;"></button>
-          </div>
-          <div class="modal-body" style="color:#94a3b8; font-size:.88rem; line-height:1.65; padding:1.1rem 1.25rem;">
-            <p class="mb-0">
-              Confirme mais uma vez: deseja apagar <strong id="delete-step2-target" style="color:#fca5a5;"></strong>?
-              Esta ação é <strong style="color:#f87171;">irreversível</strong>.
-            </p>
-          </div>
-          <div class="modal-footer" style="border-top:1px solid rgba(148,163,184,0.1); padding:.85rem 1.25rem; gap:.5rem;">
-            <button type="button" data-bs-dismiss="modal"
-                    style="background:rgba(30,41,59,.7); border:1px solid rgba(148,163,184,.2); color:#cbd5e1; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
-              Cancelar
-            </button>
-            <button type="button" id="delete-step2-confirm"
-                    style="background:rgba(239,68,68,.9); border:1px solid rgba(239,68,68,.9); color:#fff; border-radius:.75rem; padding:.35rem .9rem; font-size:.85rem; cursor:pointer;">
-              <i class="bi bi-trash3 me-1"></i>Sim, apagar definitivamente
-            </button>
-          </div>
         </div>
       </div>
     </div>
