@@ -1,5 +1,4 @@
 const characterId = window.location.pathname.split('/')[2];
-let currentCharacterName = '';
 
 function escHtml(str) {
   if (!str) return '';
@@ -24,11 +23,9 @@ async function loadCharacter() {
   if (!res.ok) throw new Error('Personagem não encontrado.');
   const { character } = await res.json();
 
-  currentCharacterName = character.name;
   document.title = `${character.name} — OpenRP AI`;
   document.getElementById('char-name').textContent = character.name;
   document.getElementById('char-desc').textContent = character.description || 'Sem descrição.';
-  document.getElementById('edit-char-btn').href = `/character/${characterId}/edit`;
 
   if (character.avatar_url) {
     const avatar = document.getElementById('char-avatar');
@@ -111,15 +108,6 @@ function initDeleteModals() {
     pendingDeleteConfirm = null;
     if (confirmFn) confirmFn();
   });
-
-  document.getElementById('delete-char-btn').addEventListener('click', () => {
-    openDeleteFlow({
-      title: 'Apagar personagem',
-      label: `o personagem "${currentCharacterName}" e tudo relacionado a ele`,
-      warning: 'Isso apagará permanentemente o personagem, todas as suas conversas, mensagens e memórias.',
-      onConfirm: deleteCharacter,
-    });
-  });
 }
 
 function openDeleteFlow({ title, label, warning, onConfirm }) {
@@ -130,17 +118,6 @@ function openDeleteFlow({ title, label, warning, onConfirm }) {
   pendingDeleteConfirm = onConfirm;
   document.getElementById('page-error').style.display = 'none';
   deleteStep1Modal.show();
-}
-
-async function deleteCharacter() {
-  try {
-    const res = await fetch(`/api/characters/${characterId}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao apagar personagem.');
-    window.location.href = '/';
-  } catch (err) {
-    showPageError(err.message || 'Erro ao apagar personagem.');
-  }
 }
 
 async function loadModels() {
