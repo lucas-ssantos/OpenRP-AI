@@ -378,6 +378,10 @@ npm run dev      # watch mode (node --watch)
 npm test         # testes (node:test, pasta tests/ — lógica pura: affection, helpers, retrieval, promptBuilder)
 ```
 
+## Testes temporários
+
+Scripts de teste criados em `tests/` (ou em qualquer lugar) apenas para verificar uma hipótese pontual durante uma tarefa (debug, validação de fix, experimento) **devem ser apagados** ao final da tarefa — não deixar sujeira no repositório. Isso não se aplica à suíte de testes permanente (`node:test` em `tests/`), que só cresce quando o usuário pedir explicitamente para adicionar um teste definitivo.
+
 ## Observações importantes
 
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
