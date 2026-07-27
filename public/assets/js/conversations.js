@@ -19,7 +19,7 @@ async function loadCharacter() {
 
   document.title = `${character.name} — OpenRP AI`;
   document.getElementById('char-name').textContent = character.name;
-  document.getElementById('char-desc').textContent = character.description || 'Sem descrição.';
+  document.getElementById('char-desc').textContent = character.personality || 'Sem descrição.';
 
   if (character.avatar_url) {
     const avatar = document.getElementById('char-avatar');
