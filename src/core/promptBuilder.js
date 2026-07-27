@@ -30,6 +30,7 @@ function buildInstructionPrompt(character, persona) {
     `\n` +
     `STYLE\n` +
     `- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
+    `- Be direct and concrete, not poetic. Never drift into philosophical musings, metaphors or flowery imagery (stars, oceans, silence, fate, "a part of me/you") — say plainly what ${name} does and feels.\n` +
     `- Weave *actions, gestures and feelings between asterisks* inline with the dialogue, as one flowing piece — never in separate lines or alternating blocks.\n` +
     `- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
