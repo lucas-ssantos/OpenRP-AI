@@ -71,6 +71,33 @@ export function updateCharacter(id, { name, description, personality, likes, dis
   return true;
 }
 
+// Apaga o personagem e tudo que depende dele: conversas (com mensagens/memórias/
+// override de modelo), galeria de imagens e associações de lorebook. As URLs das
+// imagens devem ser lidas (getCharacterImages) e os arquivos removidos do disco
+// pela rota ANTES de chamar esta função — aqui só apaga as linhas do banco.
+export function deleteCharacter(characterId) {
+  const db = getDB();
+  db.run(
+    `DELETE FROM memories WHERE conversation_id IN (SELECT id FROM conversations WHERE character_id = ?)`,
+    [characterId]
+  );
+  db.run(
+    `DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE character_id = ?)`,
+    [characterId]
+  );
+  db.run(
+    `DELETE FROM conversation_config WHERE conversation_id IN (SELECT id FROM conversations WHERE character_id = ?)`,
+    [characterId]
+  );
+  db.run(`DELETE FROM conversations WHERE character_id = ?`, [characterId]);
+  db.run(`DELETE FROM character_lorebooks WHERE character_id = ?`, [characterId]);
+  db.run(`DELETE FROM character_images WHERE character_id = ?`, [characterId]);
+  db.run(`DELETE FROM characters WHERE id = ?`, [characterId]);
+  const changed = db.getRowsModified() > 0;
+  saveDB();
+  return changed;
+}
+
 // Soma pontos de afeto ao personagem e retorna o total atualizado.
 export function addAffectionPoints(characterId, delta) {
   const db = getDB();

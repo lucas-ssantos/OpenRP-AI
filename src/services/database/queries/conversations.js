@@ -87,6 +87,18 @@ export function getConversationsForCharacter(characterId) {
   }));
 }
 
+// Apaga a conversa e tudo que depende dela (mensagens, memórias, override de modelo).
+export function deleteConversation(conversationId) {
+  const db = getDB();
+  db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
+  db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
+  db.run(`DELETE FROM conversation_config WHERE conversation_id = ?`, [conversationId]);
+  db.run(`DELETE FROM conversations WHERE id = ?`, [conversationId]);
+  const changed = db.getRowsModified() > 0;
+  saveDB();
+  return changed;
+}
+
 export function getRecentCharactersWithConversations(limit = 5) {
   const db = getDB();
   const result = db.exec(

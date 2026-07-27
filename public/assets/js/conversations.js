@@ -1,8 +1,15 @@
 const characterId = window.location.pathname.split('/')[2];
+let currentCharacterName = '';
 
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showPageError(text) {
+  const el = document.getElementById('page-error');
+  el.textContent = text;
+  el.style.display = 'block';
 }
 
 function formatDate(value) {
@@ -17,6 +24,7 @@ async function loadCharacter() {
   if (!res.ok) throw new Error('Personagem não encontrado.');
   const { character } = await res.json();
 
+  currentCharacterName = character.name;
   document.title = `${character.name} — OpenRP AI`;
   document.getElementById('char-name').textContent = character.name;
   document.getElementById('char-desc').textContent = character.description || 'Sem descrição.';
@@ -45,16 +53,94 @@ async function loadConversations() {
     return;
   }
 
-  list.innerHTML = data.conversations.map(conv => `
-    <a class="conv-item" href="/chat/${conv.id}">
+  list.innerHTML = '';
+  for (const conv of data.conversations) {
+    const item = document.createElement('div');
+    item.className = 'conv-item';
+    item.innerHTML = `
       <div style="min-width:0;">
         <div class="conv-title">${escHtml(conv.title) || 'Conversa sem título'}</div>
         ${conv.scenario ? `<div class="conv-scenario">${escHtml(conv.scenario)}</div>` : ''}
         <div class="conv-meta">${conv.message_count} mensagem(ns) · ${formatDate(conv.last_activity)}</div>
       </div>
+      <button type="button" class="conv-delete-btn" title="Apagar conversa"><i class="bi bi-trash3"></i></button>
       <i class="bi bi-chevron-right conv-arrow"></i>
-    </a>
-  `).join('');
+    `;
+    item.addEventListener('click', () => { window.location.href = `/chat/${conv.id}`; });
+    item.querySelector('.conv-delete-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteFlow({
+        title: 'Apagar conversa',
+        label: `a conversa "${conv.title || 'sem título'}"`,
+        warning: 'Isso apagará permanentemente esta conversa, suas mensagens e memórias associadas.',
+        onConfirm: () => deleteConversation(conv.id),
+      });
+    });
+    list.appendChild(item);
+  }
+}
+
+async function deleteConversation(conversationId) {
+  try {
+    const res = await fetch(`/api/conversations/${conversationId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao apagar conversa.');
+    await loadConversations();
+  } catch (err) {
+    showPageError(err.message || 'Erro ao apagar conversa.');
+  }
+}
+
+// ── Delete flow (duplo aviso: passo 1 explica, passo 2 confirma de novo) ─────
+
+let deleteStep1Modal, deleteStep2Modal;
+let pendingDeleteConfirm = null;
+
+function initDeleteModals() {
+  deleteStep1Modal = new bootstrap.Modal(document.getElementById('deleteStep1Modal'));
+  deleteStep2Modal = new bootstrap.Modal(document.getElementById('deleteStep2Modal'));
+
+  document.getElementById('delete-step1-confirm').addEventListener('click', () => {
+    deleteStep1Modal.hide();
+    deleteStep2Modal.show();
+  });
+
+  document.getElementById('delete-step2-confirm').addEventListener('click', () => {
+    deleteStep2Modal.hide();
+    const confirmFn = pendingDeleteConfirm;
+    pendingDeleteConfirm = null;
+    if (confirmFn) confirmFn();
+  });
+
+  document.getElementById('delete-char-btn').addEventListener('click', () => {
+    openDeleteFlow({
+      title: 'Apagar personagem',
+      label: `o personagem "${currentCharacterName}" e tudo relacionado a ele`,
+      warning: 'Isso apagará permanentemente o personagem, todas as suas conversas, mensagens e memórias.',
+      onConfirm: deleteCharacter,
+    });
+  });
+}
+
+function openDeleteFlow({ title, label, warning, onConfirm }) {
+  document.getElementById('delete-step1-title').innerHTML =
+    `<i class="bi bi-trash3 me-2" style="color:#f87171;"></i>${title}`;
+  document.getElementById('delete-step1-body').textContent = warning;
+  document.getElementById('delete-step2-target').textContent = label;
+  pendingDeleteConfirm = onConfirm;
+  document.getElementById('page-error').style.display = 'none';
+  deleteStep1Modal.show();
+}
+
+async function deleteCharacter() {
+  try {
+    const res = await fetch(`/api/characters/${characterId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao apagar personagem.');
+    window.location.href = '/';
+  } catch (err) {
+    showPageError(err.message || 'Erro ao apagar personagem.');
+  }
 }
 
 async function loadModels() {
@@ -105,6 +191,7 @@ function initNewConvForm() {
 window.addEventListener('load', async () => {
   await loadSidebar();
   initNewConvForm();
+  initDeleteModals();
   loadModels();
   try {
     await loadCharacter();

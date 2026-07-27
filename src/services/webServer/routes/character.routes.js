@@ -4,6 +4,7 @@ import path from "path";
 import {
     addCharacterImages,
     createCharacter,
+    deleteCharacter,
     deleteCharacterImage,
     getAllCharacters,
     getCharacter,
@@ -222,6 +223,22 @@ export default function characterRouter(uploadDir) {
             });
 
             res.json({ ok: true, id });
+        } catch (err) {
+            res.status(500).json({ ok: false, message: err.message });
+        }
+    });
+
+    router.delete("/api/characters/:id", (req, res) => {
+        try {
+            const { id } = req.params;
+            const existing = getCharacter(id);
+            if (!existing) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
+
+            const images = getCharacterImages(id);
+            deleteCharacter(id);
+            for (const img of images) deleteUploadedFile(uploadDir, img.url);
+
+            res.json({ ok: true });
         } catch (err) {
             res.status(500).json({ ok: false, message: err.message });
         }

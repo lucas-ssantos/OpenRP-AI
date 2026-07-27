@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
     getCharacter, getPersona,
-    createConversation, getConversation, getConversationsForCharacter,
+    createConversation, getConversation, getConversationsForCharacter, deleteConversation,
     addMessage, getConversationMessages, resetConversation,
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
@@ -132,6 +132,19 @@ router.post("/conversations/:id/reset", (req, res) => {
 
         // A afeição pertence ao personagem — resetar a conversa não a zera.
         res.json({ ok: true, first_message: firstMsg, affection: getEffectiveAffection(character) });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
+// ── DELETE /api/conversations/:id ────────────────────────────────────────────
+router.delete("/conversations/:id", (req, res) => {
+    try {
+        const conv = getConversation(req.params.id);
+        if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+
+        deleteConversation(req.params.id);
+        res.json({ ok: true, character_id: conv.character_id });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
