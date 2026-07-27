@@ -5,6 +5,17 @@ function escHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
+function expandPlaceholders(text, charName, userName) {
+  if (!text) return text;
+  return text
+    .replace(/\{\{char\}\}/gi, charName || '')
+    .replace(/\{\{user\}\}/gi, userName || 'você');
+}
+
+let userName = 'você';
+let charName = '';
+
 function formatDate(value) {
   if (!value) return '';
   const d = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
@@ -13,13 +24,20 @@ function formatDate(value) {
 }
 
 async function loadCharacter() {
-  const res = await fetch(`/api/characters/${characterId}`);
+  const [res, personaRes] = await Promise.all([
+    fetch(`/api/characters/${characterId}`),
+    fetch('/api/persona'),
+  ]);
   if (!res.ok) throw new Error('Personagem não encontrado.');
   const { character } = await res.json();
+  const personaData = personaRes.ok ? await personaRes.json() : null;
+  userName = personaData?.persona?.name || 'você';
+  charName = character.name;
 
   document.title = `${character.name} — OpenRP AI`;
   document.getElementById('char-name').textContent = character.name;
-  document.getElementById('char-desc').textContent = character.personality || 'Sem descrição.';
+  document.getElementById('char-desc').textContent =
+    expandPlaceholders(character.personality, character.name, userName) || 'Sem descrição.';
 
   if (character.avatar_url) {
     const avatar = document.getElementById('char-avatar');
@@ -44,16 +62,20 @@ async function loadConversations() {
     return;
   }
 
-  list.innerHTML = data.conversations.map(conv => `
+  list.innerHTML = data.conversations.map(conv => {
+    const title    = expandPlaceholders(conv.title, charName, userName);
+    const scenario = expandPlaceholders(conv.scenario, charName, userName);
+    return `
     <a class="conv-item" href="/chat/${conv.id}">
       <div style="min-width:0;">
-        <div class="conv-title">${escHtml(conv.title) || 'Conversa sem título'}</div>
-        ${conv.scenario ? `<div class="conv-scenario">${escHtml(conv.scenario)}</div>` : ''}
+        <div class="conv-title">${escHtml(title) || 'Conversa sem título'}</div>
+        ${scenario ? `<div class="conv-scenario">${escHtml(scenario)}</div>` : ''}
         <div class="conv-meta">${conv.message_count} mensagem(ns) · ${formatDate(conv.last_activity)}</div>
       </div>
       <i class="bi bi-chevron-right conv-arrow"></i>
     </a>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function loadModels() {

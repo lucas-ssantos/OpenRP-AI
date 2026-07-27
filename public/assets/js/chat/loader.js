@@ -2,6 +2,14 @@ import { conversationId, state, dom } from './state.js';
 import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge, renderScenarioBubble } from './ui.js';
 import { addBubble, initInputListeners } from './events.js';
 
+// Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
+function expandPlaceholders(text, charName, userName) {
+  if (!text) return text;
+  return text
+    .replace(/\{\{char\}\}/gi, charName || '')
+    .replace(/\{\{user\}\}/gi, userName || 'você');
+}
+
 export async function init() {
   if (!conversationId) {
     dom.charNameEl.textContent = 'Conversa não encontrada';
@@ -19,13 +27,18 @@ export async function init() {
     state.characterId    = conversation.character_id;
     if (convData.affection) updateAffectionBadge(convData.affection);
 
-    // 2) Dados do personagem.
-    const charRes  = await fetch(`/api/characters/${state.characterId}`);
+    // 2) Dados do personagem + persona (para expandir {{char}}/{{user}} na exibição).
+    const [charRes, personaRes] = await Promise.all([
+      fetch(`/api/characters/${state.characterId}`),
+      fetch('/api/persona'),
+    ]);
     const charData = await charRes.json();
     if (!charData.ok) throw new Error(charData.message);
     const character = charData.character;
+    const personaData = personaRes.ok ? await personaRes.json() : null;
+    const userName = personaData?.persona?.name || 'você';
 
-    const scenarioText = conversation.scenario || conversation.title || '';
+    const scenarioText = expandPlaceholders(conversation.scenario || conversation.title || '', character.name, userName);
     state.scenarioText = scenarioText;
 
     document.title = `${character.name} — OpenRP AI`;
