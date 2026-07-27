@@ -74,6 +74,14 @@
   cursor: not-allowed;
 }
 
+/* No mobile o cartão seguinte fica mais perto por causa da tela estreita —
+   dá um respiro extra pra mensagem de feedback não parecer colada nele. */
+@media (max-width: 767.98px) {
+  #feedback-msg {
+    margin-bottom: 2rem !important;
+  }
+}
+
 .field-section-title {
   font-size: .88rem;
   font-weight: 700;

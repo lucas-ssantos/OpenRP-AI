@@ -5,9 +5,21 @@ const form       = document.getElementById('settings-form');
 const feedbackEl = document.getElementById('feedback-msg');
 
 function showFeedback(text, isError = false) {
-  feedbackEl.className = isError ? 'alert-glass-error' : 'alert-glass-success';
+  feedbackEl.className = `mb-4 ${isError ? 'alert-glass-error' : 'alert-glass-success'}`;
   feedbackEl.innerHTML = `<i class="bi bi-${isError ? 'exclamation-triangle' : 'check-circle'} me-2"></i>${text}`;
   feedbackEl.style.display = 'block';
+
+  // Sobe a página até a mensagem — o formulário é longo e o botão de salvar fica
+  // no rodapé, então sem isso a mensagem fica fora da área visível. Calculado
+  // manualmente (em vez de scrollIntoView) para descontar a topbar fixa do mobile,
+  // que senão cobre o topo da mensagem.
+  requestAnimationFrame(() => {
+    const topbar = document.querySelector('.mobile-topbar');
+    const topbarHeight = topbar && getComputedStyle(topbar).display !== 'none' ? topbar.offsetHeight : 0;
+    const y = feedbackEl.getBoundingClientRect().top + window.scrollY - topbarHeight - 16;
+    window.scrollTo({ top: Math.max(y, 0), behavior: 'smooth' });
+  });
+
   if (!isError) setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
 }
 
