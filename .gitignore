@@ -7,3 +7,4 @@ data/logs/
 public/assets/uploads/*
 data/model-bench/*
 scripts/bench-lks.js
+src/tests/*
