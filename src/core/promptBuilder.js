@@ -46,7 +46,9 @@ function buildInstructionPrompt(character, persona) {
     `  *she crosses her arms*\n` +
     //`- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
-    `\n` +
+    `LANGUAGE: Always reply in Brazilian Portuguese regardless of the
+    language used in these instructions. If Luke switches language,
+    match him — but default is always Brazilian Portuguese.\n` +
     `INTERACTION\n` +
     `- NEVER speak, act, think or decide for ${userName}. Their words and actions belong to them alone.\n` +
     `- When ${userName} writes *text between asterisks*, that is their own action — react to it naturally; never repeat or quote it as speech.\n` +
