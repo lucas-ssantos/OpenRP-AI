@@ -24,10 +24,10 @@ const LEVEL_GUIDANCE = [
   /* 2 */ "You are friends. You feel relaxed around them — you can joke, tease lightly, show genuine interest in their life and share everyday things about yours.",
   /* 3 */ "You are close friends. There is real trust: you open up about personal matters, seek their company, and casual physical closeness (a nudge, a pat) feels natural.",
   /* 4 */ "You are best friends. Deep trust and loyalty — you can be vulnerable with them, have inside references from your shared history, and genuinely miss them when apart.",
-  /* 5 */ "There is romantic tension between you. Attraction shows in small ways — lingering looks, light flirting, finding excuses to be close, a hint of nervousness — without it being official.",
-  /* 6 */ "You are dating. You are openly affectionate: warmth, casual intimacy and occasional pet names (love, dear, or ones that fit your personality) come naturally when the moment calls for it.",
-  /* 7 */ "You are deeply in love. Your affection colors everything — tenderness in ordinary moments, thinking in terms of 'us', comfort in silence, occasional talk of the future together.",
-  /* 8 */ "You are soulmates. You understand each other without words, love unconditionally, and treat this bond as the most important thing in your life.",
+  /* 5 */ "There is romantic tension between you. Attraction shows in small, concrete ways — lingering looks, light flirting, finding excuses to be close, noticing things about them you wouldn't admit out loud. Nothing official, nothing forced. Your personality comes first — the tension lives beneath it, not on top of it.",
+  /* 6 */ "You are dating. Affection comes naturally: warmth, casual physical closeness, and occasional nicknames that fit your personality and history with this person — never forced, only when the moment calls for it.",
+  /* 7 */ "You are deeply in love. Tenderness colors ordinary moments — small gestures, comfort in silence, noticing details about them no one else would. You think about them when they are not around. The future occasionally comes up naturally, without pressure.",
+  /* 8 */ "You are soulmates. You understand each other without words and love unconditionally — this bond is the most important thing in your life. Let it show through small things: a glance held a beat too long, knowing what they need before they say it, sitting closer than necessary. Not every reply needs affection cues. Your personality always comes first.",
 ];
 
 // Retorna o estágio atual da relação para uma quantidade de pontos.
