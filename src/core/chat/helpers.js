@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getGenerationConfig, getConversationModel } from "../../services/database/queries.js";
+import { getModelContextLength } from "../../services/ollama.models.js";
 import { appConfig } from "../../config.js";
 
 const OLLAMA_URL = appConfig.ollama.chatEndpoint;
@@ -27,7 +28,9 @@ const VALIDATORS = {
     repeat_last_n:      (v) => isInt(v) && v >= -1,
     max_tokens:         (v) => isInt(v) && (v === -1 || v > 0),
     min_tokens:         (v) => isInt(v) && v >= 0,
-    // null = "contexto automático" (checkbox do /settings) — deliberado, não inválido
+    // null = "contexto automático" (checkbox do /settings) — deliberado, não inválido.
+    // Resolvido em streamOllama() para o context_length real do modelo (via
+    // getModelContextLength), não simplesmente omitido do request ao Ollama.
     context_size:       (v) => v === null || (isInt(v) && v > 0),
     num_ctx_messages:   (v) => isInt(v) && v > 0,
     memory_interval:    (v) => isInt(v) && v > 0,
@@ -163,6 +166,10 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
 
     try {
         resetStallTimer();
+        // context_size NULL ("contexto automático") resolve para o context_length real
+        // do modelo em vez de omitir num_ctx — sem isso o Ollama cai no default hardcoded
+        // de 4096 tokens para qualquer modelo sem PARAMETER num_ctx no próprio Modelfile.
+        const numCtx = config.context_size || await getModelContextLength(config.model) || undefined;
         const ollamaRes = await fetch(OLLAMA_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -179,7 +186,7 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
                     min_p:         config.min_p,
                     repeat_penalty: config.repeat_penalty,
                     repeat_last_n: config.repeat_last_n,
-                    num_ctx:       config.context_size || undefined,
+                    num_ctx:       numCtx,
                     num_predict:   config.max_tokens,
                     seed:          (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
                     stop:          config.stop?.length ? config.stop : undefined,

@@ -61,6 +61,36 @@ async function createModel(name, numCtx) {
     console.log(`[models] "${name}" ready.`);
 }
 
+// Contexto máximo suportado por um modelo, consultado via /api/show (chave vem
+// namespaced pela arquitetura — "qwen35.context_length", "gemma4.context_length"...
+// — por isso procura qualquer chave terminada em ".context_length" em vez de
+// assumir um nome fixo). Usado para resolver "contexto automático" (context_size
+// NULL) para o num_ctx real do modelo, em vez de simplesmente omitir o parâmetro
+// e deixar o Ollama cair no default hardcoded de 4096 tokens.
+// Cacheado em memória por nome de modelo — não muda em runtime (só reiniciando
+// o servidor após recriar o modelo com outro Modelfile invalidaria o valor).
+const contextLengthCache = new Map();
+
+export async function getModelContextLength(model) {
+    if (contextLengthCache.has(model)) return contextLengthCache.get(model);
+    try {
+        const res = await fetch(`${appConfig.ollama.host}/api/show`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const info = data.model_info || {};
+        const key = Object.keys(info).find((k) => k.endsWith(".context_length"));
+        const contextLength = key ? info[key] : null;
+        contextLengthCache.set(model, contextLength);
+        return contextLength;
+    } catch {
+        return null;
+    }
+}
+
 export async function ensureCustomModels() {
     const available = await getAvailableModels();
 

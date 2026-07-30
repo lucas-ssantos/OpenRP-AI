@@ -188,7 +188,7 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 
 `POST /api/conversations/:id/messages` funciona assim:
 1. Valida e busca conversa + personagem + persona
-2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. Exceção: `context_size = NULL` é "contexto automático" (deliberado). Único override: modelo da conversa (`conversation_config`)
+2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. Exceção: `context_size = NULL` é "contexto automático" (deliberado) — resolvido em `streamOllama()` para o `context_length` real do modelo via `getModelContextLength()` (`/api/show`, cacheado em memória por nome de modelo), não simplesmente omitido do request. Único override: modelo da conversa (`conversation_config`)
 3. Monta mensagens via `buildPromptMessages()` (ver `src/core/promptBuilder.js` e `contexto/prompt_builder`)
 4. Busca últimas N mensagens (`getLastNMessages`) para contexto
 5. Salva mensagem do usuário no banco (`addMessage`)
@@ -297,7 +297,7 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
 | `think` | Ativa o raciocínio nativo (`message.thinking`) em modelos com suporte a reasoning (qwen3, deepseek-r1, gpt-oss...); nunca aparece no chat, só nos logs dev | **Alto** (soma tokens de raciocínio à resposta) |
 
-A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" e é preservado. O único override é o modelo por conversa (`conversation_config`).
+A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" — em vez de omitir `num_ctx` do request (o que faria o Ollama cair no default hardcoded de 4096 tokens para modelos sem `PARAMETER num_ctx` no Modelfile), `streamOllama()` resolve para o `context_length` real do modelo via `getModelContextLength()` em `src/services/ollama.models.js` (`POST /api/show`, cacheado em memória por nome de modelo). O único override é o modelo por conversa (`conversation_config`).
 
 ## Estrutura de memória e prompt (ver `contexto/`)
 
