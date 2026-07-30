@@ -29,10 +29,22 @@ function buildInstructionPrompt(character, persona) {
     `- Treat the memories and world info provided as established facts of the story. Never contradict them or the conversation history.\n` +
     `\n` +
     `STYLE\n` +
-    `- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
+    //`- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
     `- Be direct and concrete, not poetic. Never drift into philosophical musings, metaphors or flowery imagery (stars, oceans, silence, fate, "a part of me/you") — say plainly what ${name} does and feels.\n` +
+    `  NEVER write things like:\n` +
+    `  - "like two stars finding each other in the dark"\n` +
+    `  - "something stirred deep inside her"\n` +
+    `  - "the silence between them said everything"\n` +
+    `  - "her heart ached with the weight of"\n` +
+    `  INSTEAD: show it through action — "she looked away fast" beats "her heart raced".\n` +
     `- Weave *actions, gestures and feelings between asterisks* inline with the dialogue, as one flowing piece — never in separate lines or alternating blocks.\n` +
-    `- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
+    `  FORMAT (follow exactly):\n` +
+    `  *she crosses her arms and looks away* "Tá bom, pode falar."\n` +
+    `  *taps her finger on the guitar* "Mas não demora."\n` +
+    `  NEVER do this:\n` +
+    `  "Tá bom, pode falar."\n` +
+    `  *she crosses her arms*\n` +
+    //`- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
     `\n` +
     `INTERACTION\n` +
@@ -41,6 +53,14 @@ function buildInstructionPrompt(character, persona) {
     `- Keep the scene alive: react to what ${userName} just said or did, add one new detail from ${name}'s side, and when it feels natural leave a hook — a question, an invitation, a tease or a challenge.\n` +
     `- Let feelings show through concrete actions and tone, not explanations of emotions.`
   );
+}
+
+// Hard length cap, kept isolated as its own block at the very end of the system
+// prompt — never mixed into STYLE. A size constraint sitting next to tone
+// instructions makes the model sometimes prioritize one and ignore the other;
+// isolated at the end it's followed far more reliably.
+function buildHardLimitBlock() {
+  return `HARD LIMIT\n500 characters max per reply. Cut early if needed. Never pad.`;
 }
 
 // Expands {{char}}/{{user}} placeholders with the character and persona names.
@@ -54,16 +74,24 @@ function expandPlaceholders(text, character, persona) {
 
 // Builds the base character system prompt (the "character card").
 function buildBaseSystemPrompt(character, persona, conversation) {
-  const parts = [
-    character.description
-      ? `You are ${character.name}. ${character.description}`
-      : `You are ${character.name}.`,
-  ];
-  if (character.personality) parts.push(`Personality: ${character.personality}`);
-  if (character.likes)    parts.push(`Likes: ${character.likes}`);
-  if (character.dislikes) parts.push(`Dislikes: ${character.dislikes}`);
+  const parts = [`You are ${character.name}.`];
+
+  // Kept separate from PERSONALITY: mixed together, the model tends to give
+  // physical description and behavioral traits equal narrative weight.
+  if (character.description) {
+    parts.push(`APPEARANCE (reference only — describe naturally if asked, never narrate it unprompted)\n${character.description}`);
+  }
+
+  const personalityLines = [];
+  if (character.personality) personalityLines.push(character.personality);
+  if (character.likes)    personalityLines.push(`Likes: ${character.likes}`);
+  if (character.dislikes) personalityLines.push(`Dislikes: ${character.dislikes}`);
+  if (personalityLines.length > 0) {
+    parts.push(`PERSONALITY\n${personalityLines.join('\n\n')}`);
+  }
+
   if (conversation?.scenario) {
-    parts.push(`Current scenario: ${conversation.scenario}\nEverything in the conversation happens inside this scenario — keep the setting, time and circumstances consistent with it.`);
+    parts.push(`SCENARIO\n${conversation.scenario}\nEverything in the conversation happens inside this scenario — keep the setting, time and circumstances consistent with it.`);
   }
   if (persona?.name) {
     parts.push(`You are talking with ${persona.name}.${persona.description ? ' About ' + persona.name + ': ' + persona.description : ''}`);
@@ -160,6 +188,8 @@ export function buildPromptMessages({
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');
     systemParts.push(`[World info]\n${loreText}`);
   }
+  // Isolated, always last — see buildHardLimitBlock() for why it's not in STYLE.
+  systemParts.push(buildHardLimitBlock());
   const systemContent = expandPlaceholders(systemParts.join('\n\n---\n\n'), character, persona);
 
   // ── [4] Message history (skip any system-role rows from the DB) ────────────
