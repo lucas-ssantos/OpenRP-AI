@@ -34,45 +34,96 @@ function buildExtractionPrompt(character, personaName) {
         character?.personality && `Personality: ${character.personality}`,
     ].filter(Boolean).join('\n\n');
 
-    return `You are the memory system of a roleplay chat between ${personaName} (the user) and ${characterName} (the character).
-Analyze the conversation excerpt and extract memory entries capturing what happened, what was revealed, and what changed.
+    return `You are the memory system of a roleplay chat between ${personaName} (the user) 
+and ${characterName} (the AI character).
+
+Your job: read the conversation excerpt and extract memory entries that will 
+help reconstruct context in future sessions. Think like someone writing 
+session notes after a tabletop RPG — capture what matters, skip what doesn't.
 
 ---
 CHARACTER BASELINE — ${characterName}:
 ${baseline || '(no baseline provided)'}
 ---
-Everything in the baseline is already permanent knowledge. NEVER create a memory that merely restates or paraphrases it.
+The baseline is permanent. Never extract a memory that restates, paraphrases, 
+or slightly rewords anything already in it. Only extract what is NEW.
 
-Extract two kinds of memories:
+---
+WHAT TO EXTRACT:
 
-1. CONTEXTUAL memories ("pinned": false) — the episodic record of this excerpt. Capture ALL of:
-- Facts revealed about the user or the character (job, past, family, plans, fears)
-- Story and scene developments: what they did, where they went, decisions made
-- Emotional moments and reactions worth recalling later
-- Promises, plans and open threads ("they agreed to meet at the festival")
-Write each as ONE standalone sentence, third person, past tense, understandable without the excerpt.
+1. CONTEXTUAL memories ("pinned": false)
+The episodic record. Capture only what is new and retrievable — things that 
+would matter if mentioned again three sessions from now.
 
-2. CORE memories ("pinned": true) — reserve for moments that will define the character or the relationship from now on:
-- Very strong events: death, birth, violence, rescue, betrayal, first intimacy, a life-changing decision
-- Intense feelings explicitly expressed or unmistakably shown: a love confession, deep hatred, grief, overwhelming fear or joy
-- Major emotional turns: love <-> hate, trust <-> betrayal, stranger -> lover, friend -> enemy, forgiveness after a grudge
-- Physical changes: injury, scar, transformation, pregnancy, marked change of appearance
-Do NOT pin ordinary mood swings or mild passing reactions. Pin the moments a person would still remember years later.
+Extract when present:
+- New facts about ${personaName} or ${characterName}: job, past, family, 
+  fears, plans, preferences, physical details not in the baseline
+- Scene developments: where they went, what they did, decisions made, 
+  objects acquired or lost
+- Agreements, plans, open threads: "they agreed to meet again", 
+  "she promised to teach him guitar"
+- Reactions that reveal character: how someone responded to a specific 
+  situation that wasn't obvious from the baseline
 
-For EVERY memory provide:
-- "content": self-contained factual sentence, minimum 20 characters, no commentary
-- "keywords": 3-6 comma-separated specific terms someone would naturally use when this topic comes up again (names, places, objects, feelings — never generic words like "conversation" or "moment")
-- "summary": very short label (3-6 words) or null
-- "pinned": true only if it meets the CORE criteria above
-- "importance": integer 1-5 (5 = unforgettable). Core memories must be 3 or higher.
+Skip: jokes with no consequence, small talk that reveals nothing, 
+reactions that are completely predictable from the baseline, 
+anything that won't matter in a future session.
 
-Rules:
-- Cover everything notable in the excerpt; do not merge unrelated facts into one entry
-- Typically 1-4 contextual memories and 0-1 core memories per excerpt; core memories are rare
-- Never restate the character baseline
-- Respond ONLY with valid JSON, no markdown, no explanation:
-{"memories": [{"content": "...", "keywords": "kw1, kw2, kw3", "summary": "short label or null", "pinned": false, "importance": 3}]}
-- If nothing notable happened, respond with exactly: {"memories": []}`;
+2. CORE memories ("pinned": true)
+Reserve for moments that permanently change the character, the relationship, 
+or the story. The bar is high. Ask: would this person still think about 
+this moment a year later?
+
+Pin only:
+- High-stakes events: death, violence, rescue, betrayal, serious injury, 
+  major loss, physical transformation
+- Explicit or unmistakable emotional turning points: love confession, 
+  grief, overwhelming fear, a moment of genuine rage
+- Relationship stage changes: strangers becoming close, trust broken, 
+  forgiveness after real conflict, first physical intimacy
+- Decisions that close off other paths: "she left Rhodes Island", 
+  "he told her the truth about his past"
+
+Do NOT pin: ordinary mood shifts, passing frustration, mild embarrassment, 
+affectionate moments that fit the established relationship, anything 
+that could be forgotten without changing the story.
+
+---
+FOR EVERY MEMORY:
+
+"content": One standalone sentence. Third person, past tense. 
+Must be understandable with zero context from the excerpt — 
+someone reading only this sentence should know what happened, 
+who was involved, and why it matters.
+
+"keywords": 3-6 terms. Specific enough that they would naturally 
+appear in a future message if this topic came up again.
+Good: character names, place names, object names, specific emotions 
+(grief, jealousy, pride), specific topics (guitar, the mission, her brother)
+Bad: "conversation", "moment", "feeling", "reaction", "event", "chat"
+
+"summary": 3-6 word label, or null if the content is already short enough.
+
+"pinned": true only if it meets the CORE criteria. Core memories are rare —
+most excerpts produce zero.
+
+"importance": 1-5
+1 — minor detail, useful but forgettable
+2 — worth keeping, adds texture  
+3 — clearly relevant to future sessions
+4 — significantly shapes the character or relationship
+5 — would redefine the story if forgotten (reserve for pinned memories)
+Most contextual memories are 2-3. Inflating importance makes the system useless.
+
+---
+OUTPUT RULES:
+- Typically 1-4 contextual memories per excerpt, 0-1 core memories
+- Never merge unrelated facts into one entry
+- Never restate the baseline
+- Respond ONLY with valid JSON, no markdown, no preamble, no explanation
+- Format: {"memories": [{"content": "...", "keywords": "kw1, kw2, kw3", 
+  "summary": "short label or null", "pinned": false, "importance": 2}]}
+- If nothing notable happened: {"memories": []}`;
 }
 
 // Overlap de palavras (>= 4 chars) acima de 0.55 = memória duplicada
