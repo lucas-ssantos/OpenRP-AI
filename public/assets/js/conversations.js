@@ -66,26 +66,59 @@ async function loadConversations() {
     const title    = expandPlaceholders(conv.title, charName, userName);
     const scenario = expandPlaceholders(conv.scenario, charName, userName);
     return `
-    <a class="conv-item" href="/chat/${conv.id}">
-      <div style="min-width:0;">
+    <div class="conv-item" data-id="${escHtml(conv.id)}">
+      <div class="conv-main">
         <div class="conv-title">${escHtml(title) || 'Conversa sem título'}</div>
         ${scenario ? `<div class="conv-scenario">${escHtml(scenario)}</div>` : ''}
         <div class="conv-meta">${conv.message_count} mensagem(ns) · ${formatDate(conv.last_activity)}</div>
       </div>
+      <div class="conv-actions">
+        <button type="button" class="btn-edit-char btn-edit-conv" title="Editar conversa" data-id="${escHtml(conv.id)}">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <button type="button" class="btn-delete-char btn-delete-conv" title="Apagar conversa" data-id="${escHtml(conv.id)}">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
       <i class="bi bi-chevron-right conv-arrow"></i>
-    </a>
+    </div>
   `;
   }).join('');
+
+  list.querySelectorAll('.conv-main').forEach((el) => {
+    el.addEventListener('click', () => {
+      window.location.href = `/chat/${el.closest('.conv-item').dataset.id}`;
+    });
+  });
+  list.querySelectorAll('.conv-arrow').forEach((el) => {
+    el.addEventListener('click', () => {
+      window.location.href = `/chat/${el.closest('.conv-item').dataset.id}`;
+    });
+  });
+  list.querySelectorAll('.btn-edit-conv').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditConv(el.dataset.id);
+    });
+  });
+  list.querySelectorAll('.btn-delete-conv').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const item  = el.closest('.conv-item');
+      const title = item.querySelector('.conv-title').textContent;
+      openDeleteConvFlow(el.dataset.id, title);
+    });
+  });
 }
 
 async function loadModels() {
-  const select = document.getElementById('conv-model');
   try {
     const res = await fetch('/api/models');
     const data = await res.json();
     if (!res.ok || !data.ok || !data.models?.length) return;
     const opts = data.models.map(m => `<option value="${escHtml(m.name)}">${escHtml(m.name)}</option>`).join('');
-    select.insertAdjacentHTML('beforeend', opts);
+    document.getElementById('conv-model').insertAdjacentHTML('beforeend', opts);
+    document.getElementById('conv-edit-model').insertAdjacentHTML('beforeend', opts);
   } catch { /* Ollama indisponível — fica só o padrão */ }
 }
 
@@ -123,9 +156,121 @@ function initNewConvForm() {
   });
 }
 
+// ── Editar conversa ───────────────────────────────────────────────────
+
+let editConvModal;
+let editingConvId = null;
+
+async function openEditConv(conversationId) {
+  const errEl = document.getElementById('conv-edit-error');
+  errEl.style.display = 'none';
+  try {
+    const [convRes, modelRes] = await Promise.all([
+      fetch(`/api/conversations/${conversationId}`),
+      fetch(`/api/conversations/${conversationId}/model`),
+    ]);
+    const convData  = await convRes.json();
+    const modelData = await modelRes.json();
+    if (!convRes.ok || !convData.ok) throw new Error(convData.message || 'Falha ao carregar conversa.');
+
+    editingConvId = conversationId;
+    document.getElementById('conv-edit-title').value         = convData.conversation.title || '';
+    document.getElementById('conv-edit-scenario').value      = convData.conversation.scenario || '';
+    document.getElementById('conv-edit-first-message').value = convData.conversation.first_message || '';
+    document.getElementById('conv-edit-model').value         = (modelRes.ok && modelData.ok && modelData.model) || '';
+
+    editConvModal.show();
+  } catch (err) {
+    showPageError(err.message || 'Erro ao carregar conversa.');
+  }
+}
+
+function initEditConvForm() {
+  editConvModal = new bootstrap.Modal(document.getElementById('editConvModal'));
+  const form  = document.getElementById('edit-conv-form');
+  const errEl = document.getElementById('conv-edit-error');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errEl.style.display = 'none';
+    if (!editingConvId) return;
+
+    const title        = document.getElementById('conv-edit-title').value.trim();
+    const scenario     = document.getElementById('conv-edit-scenario').value.trim();
+    const firstMessage = document.getElementById('conv-edit-first-message').value.trim();
+    const model        = document.getElementById('conv-edit-model').value;
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch(`/api/conversations/${editingConvId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, scenario, first_message: firstMessage, model }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao salvar conversa.');
+
+      editConvModal.hide();
+      editingConvId = null;
+      await loadConversations();
+    } catch (err) {
+      errEl.textContent = err.message || 'Erro ao salvar conversa.';
+      errEl.style.display = 'block';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+// ── Apagar conversa (duplo aviso) ───────────────────────────────────────
+
+let deleteConvStep1Modal, deleteConvStep2Modal;
+let deletingConvId = null;
+
+function initDeleteConvModals() {
+  deleteConvStep1Modal = new bootstrap.Modal(document.getElementById('deleteConvStep1Modal'));
+  deleteConvStep2Modal = new bootstrap.Modal(document.getElementById('deleteConvStep2Modal'));
+
+  document.getElementById('delete-conv-step1-confirm').addEventListener('click', () => {
+    deleteConvStep1Modal.hide();
+    deleteConvStep2Modal.show();
+  });
+
+  document.getElementById('delete-conv-step2-confirm').addEventListener('click', async () => {
+    deleteConvStep2Modal.hide();
+    if (!deletingConvId) return;
+    try {
+      const res  = await fetch(`/api/conversations/${deletingConvId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.message || 'Falha ao apagar conversa.');
+      deletingConvId = null;
+      await loadConversations();
+    } catch (err) {
+      showPageError(err.message || 'Erro ao apagar conversa.');
+    }
+  });
+}
+
+function openDeleteConvFlow(conversationId, title) {
+  deletingConvId = conversationId;
+  document.getElementById('delete-conv-step2-target').textContent = title || 'esta conversa';
+  document.getElementById('page-error').style.display = 'none';
+  deleteConvStep1Modal.show();
+}
+
+function showPageError(text) {
+  const el = document.getElementById('page-error');
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
 window.addEventListener('load', async () => {
   await loadSidebar();
   initNewConvForm();
+  initEditConvForm();
+  initDeleteConvModals();
   loadModels();
   try {
     await loadCharacter();

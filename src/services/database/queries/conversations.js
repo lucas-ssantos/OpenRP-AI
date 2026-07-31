@@ -87,6 +87,25 @@ export function getConversationsForCharacter(characterId) {
   }));
 }
 
+export function updateConversation(conversationId, { title, scenario, first_message } = {}) {
+  const db = getDB();
+  const sets = [];
+  const vals = [];
+
+  if (title !== undefined)         { sets.push("title = ?");         vals.push(title); }
+  if (scenario !== undefined)      { sets.push("scenario = ?");      vals.push(scenario); }
+  if (first_message !== undefined) { sets.push("first_message = ?"); vals.push(first_message); }
+
+  if (sets.length === 0) return false;
+  sets.push("updated_at = ?");
+  vals.push(localDatetime());
+  vals.push(conversationId);
+
+  db.run(`UPDATE conversations SET ${sets.join(", ")} WHERE id = ?`, vals);
+  saveDB();
+  return true;
+}
+
 // Apaga a conversa e tudo que depende dela (mensagens, memórias, override de modelo).
 export function deleteConversation(conversationId) {
   const db = getDB();

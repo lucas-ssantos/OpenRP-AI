@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
     getCharacter, getPersona,
-    createConversation, getConversation, getConversationsForCharacter, deleteConversation,
+    createConversation, getConversation, getConversationsForCharacter, updateConversation, deleteConversation,
     addMessage, getConversationMessages, resetConversation,
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
@@ -95,6 +95,32 @@ router.get("/conversations/:id/model", (req, res) => {
             model: getConversationModel(req.params.id),
             inherited_model: resolveConfig().model,
         });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
+// ── PUT /api/conversations/:id ────────────────────────────────────────────────
+// Edita título, cenário e/ou mensagem inicial de uma conversa existente.
+router.put("/conversations/:id", (req, res) => {
+    try {
+        const conv = getConversation(req.params.id);
+        if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+
+        const { title, scenario, first_message, model } = req.body;
+        if (title !== undefined && !title.trim()) {
+            return res.status(400).json({ ok: false, message: "O título não pode ser vazio." });
+        }
+
+        updateConversation(req.params.id, {
+            title: title !== undefined ? title.trim() : undefined,
+            scenario: scenario !== undefined ? (scenario.trim() || null) : undefined,
+            first_message: first_message !== undefined ? (first_message.trim() || null) : undefined,
+        });
+
+        if (model !== undefined) setConversationModel(req.params.id, model || null);
+
+        res.json({ ok: true, conversation: getConversation(req.params.id) });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

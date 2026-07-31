@@ -364,46 +364,6 @@ export function initResetModal() {
   });
 }
 
-// ── Delete conversation ───────────────────────────────────────────────
-
-let deleteConvStep1Modal, deleteConvStep2Modal;
-
-export function initDeleteConversationModal() {
-  deleteConvStep1Modal = new bootstrap.Modal(document.getElementById('deleteConvStep1Modal'));
-  deleteConvStep2Modal = new bootstrap.Modal(document.getElementById('deleteConvStep2Modal'));
-
-  document.getElementById('nav-delete-chat').addEventListener('click', (e) => {
-    e.preventDefault();
-    const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('chatNav'));
-    if (offcanvas) {
-      offcanvas.hide();
-      document.getElementById('chatNav').addEventListener('hidden.bs.offcanvas', () => {
-        deleteConvStep1Modal.show();
-      }, { once: true });
-    } else {
-      deleteConvStep1Modal.show();
-    }
-  });
-
-  document.getElementById('delete-conv-step1-confirm').addEventListener('click', () => {
-    deleteConvStep1Modal.hide();
-    deleteConvStep2Modal.show();
-  });
-
-  document.getElementById('delete-conv-step2-confirm').addEventListener('click', async () => {
-    if (!state.conversationId) return;
-    deleteConvStep2Modal.hide();
-    try {
-      const res  = await fetch(`/api/conversations/${state.conversationId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.message);
-      window.location.href = data.character_id ? `/character/${data.character_id}` : '/';
-    } catch (err) {
-      showError(`Erro ao apagar conversa: ${err.message}`);
-    }
-  });
-}
-
 // ── Auto-resize ───────────────────────────────────────────────────────
 
 export function autoResize() {
