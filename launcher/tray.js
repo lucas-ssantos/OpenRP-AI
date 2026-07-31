@@ -87,6 +87,13 @@ function buildMenu({ reachable, tailscaleActive })
                 checked: false,
                 click: handleStop,
             },
+            {
+                title: "Reiniciar servidor",
+                tooltip: "Para e inicia o OpenRP AI novamente",
+                enabled: reachable,
+                checked: false,
+                click: handleRestart,
+            },
             SysTray.separator,
             {
                 title: `${tailscaleActive ? DOT_ON : DOT_OFF} Tailscale: ${tailscaleActive ? "ativo" : "inativo"}`,
@@ -255,6 +262,23 @@ async function handleStop()
         console.warn("Falha ao parar Tailscale:", e.message || e);
     }
 
+    refreshMenu();
+}
+
+async function handleRestart()
+{
+    console.log("Reiniciando OpenRP AI...");
+    notify("OpenRP AI", "Reiniciando servidor...");
+
+    // Não mexe no Tailscale — reiniciar o servidor não deve derrubar a VPN.
+    await stopServer();
+
+    startServer({
+        onExit: (code, signal) => {
+            console.log(`OpenRP AI encerrado (code=${code}, signal=${signal})`);
+            refreshMenu();
+        },
+    });
     refreshMenu();
 }
 
