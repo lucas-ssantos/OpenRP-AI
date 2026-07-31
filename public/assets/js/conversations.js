@@ -13,6 +13,11 @@ function expandPlaceholders(text, charName, userName) {
     .replace(/\{\{user\}\}/gi, userName || 'você');
 }
 
+function truncate(text, maxLen) {
+  if (!text || text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen)}...`;
+}
+
 let userName = 'você';
 let charName = '';
 
@@ -37,7 +42,7 @@ async function loadCharacter() {
   document.title = `${character.name} — OpenRP AI`;
   document.getElementById('char-name').textContent = character.name;
   document.getElementById('char-desc').textContent =
-    expandPlaceholders(character.personality, character.name, userName) || 'Sem descrição.';
+    truncate(expandPlaceholders(character.personality, character.name, userName), 100) || 'Sem descrição.';
 
   if (character.avatar_url) {
     const avatar = document.getElementById('char-avatar');
