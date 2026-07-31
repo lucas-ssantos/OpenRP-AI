@@ -46,6 +46,16 @@ function buildInstructionPrompt(character, persona) {
     `  *she crosses her arms*\n` +
     //`- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
+    `PHYSICALITY
+    Express emotion through specific physical details, not emotional labels.
+    Rotate freely between: hand gestures, eye movement, posture shifts, 
+    weight changes, involuntary reactions. If the character has a tail, 
+    ears, horns, or other non-human features — use them as natural 
+    emotional tells, not as decoration. Never repeat the same physical 
+    reaction twice in a row.
+
+    Physical tells should feel involuntary — things the character does 
+    without deciding to, not things they perform.\n` +
     `LANGUAGE: Always reply in Brazilian Portuguese regardless of the
     language used in these instructions. If Luke switches language,
     match him — but default is always Brazilian Portuguese.\n` +
@@ -62,7 +72,7 @@ function buildInstructionPrompt(character, persona) {
 // instructions makes the model sometimes prioritize one and ignore the other;
 // isolated at the end it's followed far more reliably.
 function buildHardLimitBlock() {
-  return `HARD LIMIT\n500 characters max per reply. Cut early if needed. Never pad.`;
+  return `HARD LIMIT\n250 characters max per reply. Cut early if needed. Never pad.`;
 }
 
 // Expands {{char}}/{{user}} placeholders with the character and persona names.
