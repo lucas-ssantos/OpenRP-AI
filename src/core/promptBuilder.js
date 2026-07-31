@@ -102,6 +102,12 @@ function buildBaseSystemPrompt(character, persona, conversation) {
     parts.push(`PERSONALITY\n${personalityLines.join('\n\n')}`);
   }
 
+  // Character-specific involuntary tells (hands, eyes, tail, ears, posture...) —
+  // complements the generic PHYSICALITY instruction with concrete, per-character detail.
+  if (character.physical_traits) {
+    parts.push(`PHYSICAL TELLS — USE THESE NATURALLY\n${character.physical_traits}`);
+  }
+
   if (conversation?.scenario) {
     parts.push(`SCENARIO\n${conversation.scenario}\nEverything in the conversation happens inside this scenario — keep the setting, time and circumstances consistent with it.`);
   }

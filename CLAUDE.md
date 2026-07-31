@@ -113,7 +113,7 @@ contexto/
 
 | Tabela | Descrição |
 |--------|-----------|
-| `characters` | id, name, description, personality, avatar_url (imagem principal = primeira da galeria), scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
+| `characters` | id, name, description, personality, physical_traits (tiques físicos/tells por personagem — injetado no prompt como seção própria "PHYSICAL TELLS"), avatar_url (imagem principal = primeira da galeria), scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
 | `character_images` | id, character_id, url, position — galeria de imagens do personagem; o chat sorteia uma como background a cada carregamento. Migração: DBs antigos herdam avatar_url como primeira imagem |
 | `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |

@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, avatar_url, affection_points, affection_override, created_at, updated_at`;
+const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, physical_traits, avatar_url, affection_points, affection_override, created_at, updated_at`;
 
 function mapCharacterRow(row) {
   return {
@@ -12,22 +12,23 @@ function mapCharacterRow(row) {
     personality: row[3],
     likes: row[4],
     dislikes: row[5],
-    avatar_url: row[6],
-    affection_points: row[7] ?? 0,
-    affection_override: row[8] ?? null,
-    created_at: row[9],
-    updated_at: row[10],
+    physical_traits: row[6],
+    avatar_url: row[7],
+    affection_points: row[8] ?? 0,
+    affection_override: row[9] ?? null,
+    created_at: row[10],
+    updated_at: row[11],
   };
 }
 
-export function createCharacter(name, description, personality, avatarUrl = null, likes = null, dislikes = null) {
+export function createCharacter(name, description, personality, avatarUrl = null, likes = null, dislikes = null, physicalTraits = null) {
   const db = getDB();
   const id = uuidv4();
   const now = localDatetime();
   db.run(
-    `INSERT INTO characters (id, name, description, personality, likes, dislikes, avatar_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, name, description, personality, likes, dislikes, avatarUrl, now, now]
+    `INSERT INTO characters (id, name, description, personality, likes, dislikes, physical_traits, avatar_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, name, description, personality, likes, dislikes, physicalTraits, avatarUrl, now, now]
   );
   saveDB();
   return id;
@@ -47,7 +48,7 @@ export function getAllCharacters() {
   return result[0].values.map(mapCharacterRow);
 }
 
-export function updateCharacter(id, { name, description, personality, likes, dislikes, avatar_url, affection_override }) {
+export function updateCharacter(id, { name, description, personality, likes, dislikes, physical_traits, avatar_url, affection_override }) {
   const db = getDB();
   const sets = [];
   const vals = [];
@@ -57,6 +58,7 @@ export function updateCharacter(id, { name, description, personality, likes, dis
   if (personality !== undefined)   { sets.push("personality = ?");   vals.push(personality); }
   if (likes !== undefined)         { sets.push("likes = ?");         vals.push(likes); }
   if (dislikes !== undefined)      { sets.push("dislikes = ?");      vals.push(dislikes); }
+  if (physical_traits !== undefined) { sets.push("physical_traits = ?"); vals.push(physical_traits); }
   if (avatar_url !== undefined)    { sets.push("avatar_url = ?");    vals.push(avatar_url); }
   // null = volta para a progressão automática por pontos
   if (affection_override !== undefined) { sets.push("affection_override = ?"); vals.push(affection_override); }

@@ -106,7 +106,7 @@ export default function characterRouter(uploadDir) {
 
     router.post("/api/characters", (req, res) => {
         try {
-            const { name, description, personality, likes, dislikes, avatar_link } = req.body;
+            const { name, description, personality, likes, dislikes, physical_traits, avatar_link } = req.body;
             if (!name) return res.status(400).json({ ok: false, message: "O nome do personagem é obrigatório." });
 
             let imageUrls;
@@ -127,7 +127,8 @@ export default function characterRouter(uploadDir) {
                 personality || "",
                 imageUrls[0],
                 likes || null,
-                dislikes || null
+                dislikes || null,
+                physical_traits || null
             );
             addCharacterImages(characterId, imageUrls);
 
@@ -162,7 +163,7 @@ export default function characterRouter(uploadDir) {
             const existing = getCharacter(id);
             if (!existing) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
 
-            const { name, description, personality, likes, dislikes, avatar_link, affection_override, remove_image_ids } = req.body;
+            const { name, description, personality, likes, dislikes, physical_traits, avatar_link, affection_override, remove_image_ids } = req.body;
 
             if (name !== undefined && !name.trim()) {
                 return res.status(400).json({ ok: false, message: "O nome do personagem não pode ser vazio." });
@@ -216,6 +217,7 @@ export default function characterRouter(uploadDir) {
                 personality:   personality   !== undefined ? personality           : undefined,
                 likes:         likes         !== undefined ? likes                 : undefined,
                 dislikes:      dislikes      !== undefined ? dislikes              : undefined,
+                physical_traits: physical_traits !== undefined ? physical_traits   : undefined,
                 avatar_url:    avatarUrl,
                 affection_override: affection_override !== undefined
                     ? (affection_override === null ? null : Number(affection_override))

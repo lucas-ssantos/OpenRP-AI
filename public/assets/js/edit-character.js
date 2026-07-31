@@ -43,11 +43,12 @@ async function loadCharacter() {
     document.title = `Editar ${character.name} — OpenRP AI`;
     document.getElementById('subtitle').textContent = `Modificando dados de ${character.name}`;
 
-    document.getElementById('name').value          = character.name          || '';
-    document.getElementById('description').value   = character.description   || '';
-    document.getElementById('personality').value   = character.personality   || '';
-    document.getElementById('likes').value         = character.likes         || '';
-    document.getElementById('dislikes').value      = character.dislikes      || '';
+    document.getElementById('name').value             = character.name             || '';
+    document.getElementById('description').value      = character.description      || '';
+    document.getElementById('personality').value      = character.personality      || '';
+    document.getElementById('physical_traits').value  = character.physical_traits  || '';
+    document.getElementById('likes').value             = character.likes            || '';
+    document.getElementById('dislikes').value          = character.dislikes         || '';
 
     characterImages = character.images || [];
     if (!characterImages.length && character.avatar_url) {
@@ -164,13 +165,14 @@ async function handleSubmit(event) {
   msgError.style.display = 'none';
   msgOk.style.display = 'none';
 
-  const name         = document.getElementById('name').value.trim();
-  const description  = document.getElementById('description').value.trim();
-  const personality  = document.getElementById('personality').value.trim();
-  const likes        = document.getElementById('likes').value.trim();
-  const dislikes     = document.getElementById('dislikes').value.trim();
-  const avatarLink   = document.getElementById('avatar_link').value.trim();
-  const avatarFiles  = [...document.getElementById('avatar_upload').files];
+  const name           = document.getElementById('name').value.trim();
+  const description    = document.getElementById('description').value.trim();
+  const personality    = document.getElementById('personality').value.trim();
+  const physicalTraits = document.getElementById('physical_traits').value.trim();
+  const likes          = document.getElementById('likes').value.trim();
+  const dislikes       = document.getElementById('dislikes').value.trim();
+  const avatarLink     = document.getElementById('avatar_link').value.trim();
+  const avatarFiles    = [...document.getElementById('avatar_upload').files];
 
   if (!name) { showError('O nome do personagem é obrigatório.'); return; }
 
@@ -182,7 +184,7 @@ async function handleSubmit(event) {
 
   const overrideValue = document.getElementById('affection_override').value;
   const body = {
-    name, description, personality, likes, dislikes,
+    name, description, personality, physical_traits: physicalTraits, likes, dislikes,
     affection_override: overrideValue === '' ? null : Number(overrideValue),
   };
 

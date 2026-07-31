@@ -28,18 +28,19 @@ async function handleSubmit(event) {
   msgError.style.display = 'none';
   msgOk.style.display = 'none';
 
-  const name        = document.getElementById('name').value.trim();
-  const description = document.getElementById('description').value.trim();
-  const personality = document.getElementById('personality').value.trim();
-  const likes       = document.getElementById('likes').value.trim();
-  const dislikes    = document.getElementById('dislikes').value.trim();
-  const avatarLink  = document.getElementById('avatar_link').value.trim();
-  const avatarFiles = [...document.getElementById('avatar_upload').files];
+  const name           = document.getElementById('name').value.trim();
+  const description    = document.getElementById('description').value.trim();
+  const personality    = document.getElementById('personality').value.trim();
+  const physicalTraits = document.getElementById('physical_traits').value.trim();
+  const likes          = document.getElementById('likes').value.trim();
+  const dislikes       = document.getElementById('dislikes').value.trim();
+  const avatarLink     = document.getElementById('avatar_link').value.trim();
+  const avatarFiles    = [...document.getElementById('avatar_upload').files];
 
   if (!name) { showError('O nome do personagem é obrigatório.'); return; }
   if (!avatarFiles.length && !avatarLink) { showError('Envie ao menos uma imagem ou informe um link de avatar.'); return; }
 
-  const body = { name, description, personality, likes, dislikes };
+  const body = { name, description, personality, physical_traits: physicalTraits, likes, dislikes };
 
   if (avatarFiles.length) {
     body.avatar_uploads = await Promise.all(avatarFiles.map(async (file) => ({

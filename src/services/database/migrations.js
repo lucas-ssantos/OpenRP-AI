@@ -32,6 +32,7 @@ export async function migrate() {
       personality TEXT,
       likes TEXT,
       dislikes TEXT,
+      physical_traits TEXT,
       avatar_url TEXT,
       affection_points INTEGER DEFAULT 0,
       affection_override INTEGER,
@@ -43,6 +44,9 @@ export async function migrate() {
   // Migration para DBs criados antes das colunas likes/dislikes
   try { db.run(`ALTER TABLE characters ADD COLUMN likes TEXT`); } catch {}
   try { db.run(`ALTER TABLE characters ADD COLUMN dislikes TEXT`); } catch {}
+
+  // Migration: traços físicos (tells) usados na seção PHYSICAL TELLS do prompt
+  try { db.run(`ALTER TABLE characters ADD COLUMN physical_traits TEXT`); } catch {}
 
   // Migration: afeição passou de conversa → personagem. Se a coluna acabou de ser
   // criada num DB antigo, herda o maior valor entre as conversas do personagem
