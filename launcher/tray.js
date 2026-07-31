@@ -311,11 +311,20 @@ async function handleExit()
 {
     if (refreshTimer) clearInterval(refreshTimer);
 
+    // Checa quem estava de fato ativo antes de derrubar tudo, para só notificar
+    // o encerramento dos serviços que realmente estavam rodando.
+    const wasServerRunning = await isServerReachable();
+    const wasOllamaRunning = await isOllamaReachable();
+    const wasTailscaleActive = isTailscaleRunning();
+
     await stopServer();
+    if (wasServerRunning) notify("OpenRP AI", "Servidor encerrado.", { icon: ICON_STOPPED });
+    if (wasOllamaRunning) notify("Ollama", "Ollama encerrado.", { icon: ICON_STOPPED });
 
     try
     {
         stopTailscaleConnection();
+        if (wasTailscaleActive) notify("Tailscale", "Tailscale desconectado.", { icon: ICON_STOPPED });
     }
     catch (e)
     {
