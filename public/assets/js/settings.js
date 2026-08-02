@@ -26,8 +26,8 @@ function showFeedback(text, isError = false) {
 // ── Curated recommendations ───────────────────────────────────────────────────
 
 const RECOMMENDED_MODELS = [
-  { name: "gemma4:e4b",      params: "4B",  vram: "~2.3 GB", desc: "Padrão da aplicação · leve e rápido" },
-  { name: "gemma4:12b",      params: "12B", vram: "~7 GB",   desc: "Mais coerente e expressivo" },
+  { name: "gemma4:e4b",      params: "4B",  vram: "~2.3 GB", desc: "Leve e rápido" },
+  { name: "gemma4:12b",      params: "12B", vram: "~7 GB",   desc: "Padrão da aplicação · mais coerente e expressivo" },
   { name: "gemma3:4b",       params: "4B",  vram: "~2.5 GB", desc: "Bom contexto visual e lore" },
   { name: "gemma3:12b",      params: "12B", vram: "~7 GB",   desc: "Contexto longo · boa narrativa" },
   { name: "llama3.2:3b",     params: "3B",  vram: "~2 GB",   desc: "Ultra leve · bom para HW fraco" },
@@ -77,7 +77,7 @@ async function loadModels() {
         opt.value = m.name;
         const gb  = m.size ? ` · ${(m.size / 1e9).toFixed(1)} GB` : '';
         const ps  = m.parameter_size ? ` ${m.parameter_size}` : '';
-        const rec = m.name === 'gemma4:e4b-32k' ? ' ★' : '';
+        const rec = m.name === 'gemma4:12b' ? ' ★' : '';
         opt.textContent = `${m.name}${ps}${gb}${rec}`;
         og.appendChild(opt);
       }

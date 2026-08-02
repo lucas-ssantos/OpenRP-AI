@@ -2,6 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { getGenerationConfig, setGenerationConfig } from "../../database/queries.js";
+import { getModelContextLength } from "../../ollama.models.js";
 import { appConfig } from "../../../config.js";
 
 const publicPath = path.resolve(process.cwd(), "public");
@@ -42,12 +43,15 @@ router.get("/api/models", async (_req, res) => {
         const ollamaRes = await fetch(appConfig.ollama.tagsEndpoint);
         if (!ollamaRes.ok) throw new Error(`Ollama: ${ollamaRes.status}`);
         const data = await ollamaRes.json();
-        const models = (data.models || []).map(m => ({
-            name:           m.name,
-            size:           m.size,
-            family:         m.details?.family || null,
-            parameter_size: m.details?.parameter_size || null,
-        }));
+        // context_length é cacheado em memória por nome de modelo (getModelContextLength) —
+        // consultar aqui para todos os modelos instalados é barato após o primeiro load.
+        const models = await Promise.all((data.models || []).map(async (m) => ({
+            name:            m.name,
+            size:            m.size,
+            family:          m.details?.family || null,
+            parameter_size:  m.details?.parameter_size || null,
+            context_length:  await getModelContextLength(m.name),
+        })));
         res.json({ ok: true, models });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });

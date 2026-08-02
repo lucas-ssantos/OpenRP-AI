@@ -53,9 +53,10 @@
                 <div class="ctx-alert mt-3">
                   <i class="bi bi-info-circle-fill flex-shrink-0" style="margin-top:.1rem;"></i>
                   <span>
-                    Modelos customizados com contexto expandido (ex: <code>gemma4:e4b-32k</code>) exigem que o
-                    <strong>Context Size</strong> abaixo esteja configurado adequadamente — caso contrário, o contexto
-                    extra não será aproveitado. Às vezes é necessário recarregar o modelo no Ollama após alterar esse valor.
+                    Com <strong>Context Size</strong> fixo (não automático), modelos customizados com contexto expandido
+                    (ex: <code>gemma4:e4b-64k</code>) exigem que o valor abaixo esteja configurado adequadamente — caso
+                    contrário, o contexto extra não será aproveitado. Deixe "Contexto automático" ativo para que o app
+                    use sempre o contexto máximo do modelo selecionado, sem precisar ajustar isso manualmente.
                   </span>
                 </div>
               </div>
@@ -173,7 +174,7 @@
                     Deixar o Ollama gerenciar o contexto automaticamente
                     <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
                        data-bs-toggle="tooltip"
-                       title="Quando ativo, o tamanho do contexto (num_ctx) não é enviado ao Ollama — o modelo usa seu próprio padrão. Útil para modelos com contexto já embutido (ex: gemma4:e4b-32k)."></i>
+                       title="Quando ativo (padrão), o app consulta o contexto máximo suportado pelo modelo selecionado e usa esse valor — em vez de um número fixo. Recomendado para a maioria dos casos."></i>
                   </label>
                 </div>
 

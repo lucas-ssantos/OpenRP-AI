@@ -24,7 +24,7 @@ export const appConfig = {
     },
 
     defaults: {
-        model:            process.env.OLLAMA_DEFAULT_MODEL                       || "qwen3:8b",
+        model:            process.env.OLLAMA_DEFAULT_MODEL                       || "gemma4:12b",
         temperature:      parseFloat(process.env.DEFAULT_TEMPERATURE)            || 0.92,
         top_p:            parseFloat(process.env.DEFAULT_TOP_P)                  || 0.90,
         top_k:            parseInt(process.env.DEFAULT_TOP_K)                    || 60,
@@ -33,7 +33,10 @@ export const appConfig = {
         repeat_last_n:    parseInt(process.env.DEFAULT_REPEAT_LAST_N)            || 192,
         max_tokens:       parseInt(process.env.DEFAULT_MAX_TOKENS ?? "-1")       || -1,
         min_tokens:       parseInt(process.env.DEFAULT_MIN_TOKENS)               || 60,
-        context_size:     parseInt(process.env.DEFAULT_CONTEXT_SIZE)             || 8192,
+        // null = "contexto automático" (usa o context_length real do modelo escolhido,
+        // ver getModelContextLength) — padrão de fábrica. Só fixo se DEFAULT_CONTEXT_SIZE
+        // estiver definido no .env.
+        context_size:     process.env.DEFAULT_CONTEXT_SIZE ? parseInt(process.env.DEFAULT_CONTEXT_SIZE) : null,
         num_ctx_messages: parseInt(process.env.DEFAULT_NUM_CTX_MESSAGES)         || 20,
         memory_interval:  parseInt(process.env.MEMORY_INTERVAL)                  || 5,
         seed:             parseInt(process.env.DEFAULT_SEED ?? "-1")             || -1,

@@ -7,7 +7,7 @@ Plataforma local de roleplay/chat com IA usando Ollama. Inspirado em TalkieAI, L
 - **Runtime**: Node.js 20+ (ESM — `"type": "module"` no package.json)
 - **Backend**: Express 4 — rotas em `src/services/webServer/routes/`
 - **Banco**: SQLite via `sql.js` (banco em memória, persistido manualmente em disco via `saveDB()`)
-- **IA**: Ollama local em `http://127.0.0.1:11434` (padrão: modelo `gemma4:e4b`)
+- **IA**: Ollama local em `http://127.0.0.1:11434` (padrão: modelo `gemma4:12b`, contexto automático)
 - **Frontend**: HTML/CSS/JS puro em `public/` — sem framework, sem bundler
 - **IDs**: UUIDs v4 via `uuid`
 - **Config centralizada**: `src/config.js` lê o `.env` via `dotenv` e exporta `appConfig`
@@ -35,7 +35,7 @@ src/
       retrieval.js                  ← getRelevantMemories/getMemoriesForPrompt: score por keyword (word-boundary, sem acentos)
   services/
     ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
-    ollama.models.js                ← garante existência dos modelos customizados (gemma4:e4b-32k / 64k) via Modelfile API
+    ollama.models.js                ← garante existência do modelo customizado gemma4:e4b-64k (preset "Máquina Forte") via Modelfile API
     database/
       db.js                         ← getDB() / saveDB() (debounced) / flushDB()
       migrations.js                 ← CREATE TABLE IF NOT EXISTS + seed de config inicial
@@ -297,7 +297,7 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
 | `think` | Ativa o raciocínio nativo (`message.thinking`) em modelos com suporte a reasoning (qwen3, deepseek-r1, gpt-oss...); nunca aparece no chat, só nos logs dev | **Alto** (soma tokens de raciocínio à resposta) |
 
-A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" — em vez de omitir `num_ctx` do request (o que faria o Ollama cair no default hardcoded de 4096 tokens para modelos sem `PARAMETER num_ctx` no Modelfile), `streamOllama()` resolve para o `context_length` real do modelo via `getModelContextLength()` em `src/services/ollama.models.js` (`POST /api/show`, cacheado em memória por nome de modelo). O único override é o modelo por conversa (`conversation_config`).
+A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" — em vez de omitir `num_ctx` do request (o que faria o Ollama cair no default hardcoded de 4096 tokens para modelos sem `PARAMETER num_ctx` no Modelfile), `streamOllama()` resolve para o `context_length` real do modelo via `getModelContextLength()` em `src/services/ollama.models.js` (`POST /api/show`, cacheado em memória por nome de modelo). **`NULL` (automático) é o padrão de fábrica** (`medium_spec.json` e `appConfig.defaults`) — um valor fixo só existe se o usuário desmarcar "Contexto automático" em `/settings`. O único override é o modelo por conversa (`conversation_config`); como o `context_size` continua global, trocar o modelo de uma conversa com contexto fixo (não automático) não adapta o `num_ctx` ao novo modelo — o modal "Modelo desta conversa" avisa quando o valor fixo não bate com o `context_length` do modelo selecionado.
 
 ## Estrutura de memória e prompt (ver `contexto/`)
 
@@ -387,7 +387,7 @@ Scripts de teste criados em `tests/` (ou em qualquer lugar) apenas para verifica
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
 - **Ollama é obrigatório** — redireciona para `/check` se não responder
 - Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; único override é o modelo por conversa
-- O modelo padrão é `gemma4:e4b` — pode ser alterado em `/settings`. Na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-32k` (32k ctx) e `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existirem
+- O modelo padrão é `gemma4:12b` com `context_size = NULL` (contexto automático, ver seção de parâmetros abaixo) — pode ser alterado em `/settings`. Os presets `low_spec`/`high_spec` (não o padrão de fábrica) ainda usam `gemma4:e4b`/`gemma4:e4b-64k` com `context_size` fixo; na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existir, para suportar o preset "Máquina Forte"
 - Avatar upload: enviado como base64 no body JSON (`avatar_uploads` array; múltiplos por request), validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx 8MB cada — a extensão salva vem do tipo detectado, nunca do nome enviado; o lote inteiro é validado antes de gravar qualquer arquivo) e salvo em `public/assets/uploads/` como `timestamp-i-rand-nome.ext`
 - Galeria de imagens: `character_images` guarda todas as imagens do personagem; `chat/loader.js` sorteia uma para o background a cada carregamento do chat (header/nav continuam com `avatar_url`, a imagem principal)
 - Todos os IDs são UUIDs v4

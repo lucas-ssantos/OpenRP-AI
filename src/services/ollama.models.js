@@ -2,8 +2,10 @@ import { appConfig } from "../config.js";
 
 const BASE_MODEL = "gemma4:e4b";
 
+// Usado pelo preset "Máquina Forte" (high_spec.json), que trava context_size=65536.
+// O preset padrão de fábrica (medium_spec.json) usa gemma4:12b com contexto automático,
+// então não depende de uma variante customizada.
 const CUSTOM_MODELS = [
-    { name: "gemma4:e4b-32k", numCtx: 32768 },
     { name: "gemma4:e4b-64k", numCtx: 65536 },
 ];
 

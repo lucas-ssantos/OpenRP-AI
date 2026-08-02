@@ -90,10 +90,14 @@ router.get("/conversations/:id/model", (req, res) => {
     try {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+        const globalConfig = resolveConfig();
         res.json({
             ok: true,
             model: getConversationModel(req.params.id),
-            inherited_model: resolveConfig().model,
+            inherited_model: globalConfig.model,
+            // null = "contexto automático" (usa o context_length real do modelo escolhido);
+            // número = valor fixo travado em /settings, o mesmo para qualquer modelo.
+            context_size: globalConfig.context_size,
         });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
