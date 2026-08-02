@@ -111,7 +111,7 @@ router.get("/api/viewdb/conversation/:id", (req, res) => {
         const memRows = db.exec(`
             SELECT id, type, content, summary, keywords, is_pinned, relevance_weight, created_at
             FROM memories WHERE conversation_id = ?
-            ORDER BY type ASC, created_at DESC
+            ORDER BY created_at DESC, rowid DESC
         `, [convId]);
         const allMem = memRows.length
             ? memRows[0].values.map(r => ({
