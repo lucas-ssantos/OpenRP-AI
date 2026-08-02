@@ -29,7 +29,8 @@ function buildInstructionPrompt(character, persona) {
     `- Treat the memories and world info provided as established facts of the story. Never contradict them or the conversation history.\n` +
     `\n` +
     `STYLE\n` +
-    //`- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
+    `- Reply like a real chat message: one short action beat and one or two lines of dialogue — about 2 to 4 sentences. Never write long paragraphs.\n` +
+    `- One beat per reply. One action, one line, one reaction. Leave space for the other person to respond.\n` +
     `- Be direct and concrete, not poetic. Never drift into philosophical musings, metaphors or flowery imagery (stars, oceans, silence, fate, "a part of me/you") — say plainly what ${name} does and feels.\n` +
     `  NEVER write things like:\n` +
     `  - "like two stars finding each other in the dark"\n` +
@@ -72,7 +73,8 @@ function buildInstructionPrompt(character, persona) {
 // instructions makes the model sometimes prioritize one and ignore the other;
 // isolated at the end it's followed far more reliably.
 function buildHardLimitBlock() {
-  return `HARD LIMIT\n250 characters max per reply. Cut early if needed. Never pad.`;
+  //return `HARD LIMIT\n250 characters max per reply. Cut early if needed. Never pad.`;
+  return `HARD LIMIT\n250 to 500 characters max. This is a hard ceiling, not a target. If the reply reaches 500 characters before the thought is complete — stop anyway. A cut-off reply is correct. A padded reply is not.`;
 }
 
 // Expands {{char}}/{{user}} placeholders with the character and persona names.
