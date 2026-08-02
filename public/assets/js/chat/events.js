@@ -28,7 +28,7 @@ let regenerateTargetRow = null;
 
 // ── Bubbles ───────────────────────────────────────────────────────────
 
-export function addBubble(role, content, messageId = null) {
+export function addBubble(role, content, messageId = null, isFirstMessage = false) {
   const isUser = role === 'user';
   const row = document.createElement('div');
   row.className = `msg-row msg-row-${isUser ? 'user' : 'char'}`;
@@ -47,7 +47,7 @@ export function addBubble(role, content, messageId = null) {
   actionsEl.className = 'msg-actions';
   row.appendChild(actionsEl);
 
-  if (!isUser) {
+  if (!isUser && !isFirstMessage) {
     const regenBtn = document.createElement('button');
     regenBtn.className = 'regenerate-btn';
     regenBtn.title = 'Regenerar resposta';
@@ -58,7 +58,7 @@ export function addBubble(role, content, messageId = null) {
   }
 
   if (messageId && !isUser) attachRollbackBtn(row, messageId);
-  if (messageId) attachEditBtn(row, messageId);
+  if (messageId && !isFirstMessage) attachEditBtn(row, messageId);
 
   dom.messagesEl.appendChild(row);
   scrollToBottom();
@@ -353,7 +353,7 @@ export function initResetModal() {
       renderScenarioBubble(state.scenarioText);
 
       if (data.first_message) {
-        addBubble('assistant', data.first_message.content, data.first_message.id);
+        addBubble('assistant', data.first_message.content, data.first_message.id, true);
       }
 
       if (data.affection) updateAffectionBadge(data.affection);

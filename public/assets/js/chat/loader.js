@@ -83,9 +83,11 @@ export async function init() {
     const msgsRes  = await fetch(`/api/conversations/${state.conversationId}/messages`);
     const msgsData = await msgsRes.json();
     if (msgsData.ok) {
+      let isFirstMessage = true;
       for (const msg of msgsData.messages) {
         if (msg.role === 'system') continue;
-        addBubble(msg.role, msg.content, msg.id);
+        addBubble(msg.role, msg.content, msg.id, isFirstMessage);
+        isFirstMessage = false;
       }
       updateLastCharRow();
     }
