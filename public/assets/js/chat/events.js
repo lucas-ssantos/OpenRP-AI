@@ -491,6 +491,130 @@ export async function sendMessage() {
   }
 }
 
+// ── Resume (reconecta a uma geração em andamento) ───────────────────────
+
+// Chamada no carregamento da página: se o backend ainda estiver gerando a
+// resposta desta conversa (o usuário trocou de página, fechou a aba ou a tela
+// apagou no meio de uma resposta), regruda no stream em vez de perder o que já
+// foi gerado. A geração roda no backend independente do frontend — isto só
+// volta a "assistir" a ela; se não houver nada em andamento, retorna sem efeito.
+export async function resumeActiveGeneration() {
+  if (!state.conversationId) return;
+
+  let res;
+  try {
+    res = await fetch(`/api/conversations/${state.conversationId}/generation`);
+  } catch {
+    return;
+  }
+  if (res.status !== 200 || !res.body) return;
+
+  state.isStreaming = true;
+  setInputEnabled(false);
+  addTypingIndicator();
+
+  let charRow  = null;
+  let charText = null;
+  let charRawText = '';
+
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let data;
+        try { data = JSON.parse(raw); } catch { continue; }
+
+        if (data.error) {
+          showError(`Erro: ${data.error}`);
+          continue;
+        }
+
+        if (data.type === 'affection') {
+          updateAffectionBadge(data);
+          if (data.leveled_up) showAffectionToast(data.name);
+          continue;
+        }
+
+        if (data.type === 'memory_processing') {
+          showChatStatus('Gerando memórias…');
+          continue;
+        }
+
+        if (data.type === 'memories_created') {
+          clearChatStatus();
+          if (data.pinned > 0) showPinnedMemoryToast(data.pinned);
+          continue;
+        }
+
+        if (data.sync) {
+          // Snapshot do que já foi gerado (e já está salvo no banco) até agora.
+          // Se a bolha já existe no DOM (mensagem parcial carregada pelo GET de
+          // mensagens), só sincroniza o texto; senão cria a bolha já com o conteúdo.
+          charRawText = data.delta || '';
+          if (data.message_id) {
+            charRow  = dom.messagesEl.querySelector(`.msg-row[data-message-id="${data.message_id}"]`);
+            charText = charRow?.querySelector('.bubble-text') ?? null;
+          }
+          if (charRawText) {
+            removeTypingIndicator();
+            if (!charRow) {
+              const b = addBubble('assistant', charRawText);
+              charRow = b.row;
+              charText = b.textEl;
+            } else {
+              renderBubbleText(charText, charRawText);
+            }
+          }
+          continue;
+        }
+
+        if (data.delta) {
+          removeTypingIndicator();
+          if (!charRow) {
+            const b = addBubble('assistant', '');
+            charRow = b.row;
+            charText = b.textEl;
+          }
+          charRawText += data.delta;
+          renderBubbleText(charText, charRawText);
+          scrollToBottom();
+        }
+
+        if (data.done) {
+          if (data.message_id && charRow && !charRow.dataset.messageId) {
+            attachRollbackBtn(charRow, data.message_id);
+            attachEditBtn(charRow, data.message_id);
+            charRow.dataset.messageId = data.message_id;
+          }
+          updateLastCharRow();
+        }
+      }
+    }
+  } catch (err) {
+    showError(`Conexão com a geração em andamento perdida: ${err.message}`);
+  } finally {
+    removeTypingIndicator();
+    clearChatStatus();
+    state.isStreaming = false;
+    setInputEnabled(true);
+    scrollToBottom();
+  }
+}
+
 // ── Input listeners ───────────────────────────────────────────────────
 
 export function initInputListeners() {

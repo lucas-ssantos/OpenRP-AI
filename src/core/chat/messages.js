@@ -10,6 +10,7 @@ import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
+import { isGenerating, beginGeneration, attachSubscriber, detachSubscriber, broadcast } from "./generationManager.js";
 
 const router = Router();
 
@@ -25,6 +26,12 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         const character  = getCharacter(conv.character_id);
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
+
+        // Uma geração por conversa por vez — evita duas respostas concorrentes
+        // pisando na mesma posição/mensagem.
+        if (isGenerating(conversationId)) {
+            return res.status(409).json({ ok: false, message: "Já existe uma resposta sendo gerada para esta conversa." });
+        }
 
         const persona    = getPersona();
         const config     = resolveConfig(conversationId);
@@ -51,14 +58,24 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
         const userMsgId = addMessage(conversationId, "user", content.trim());
+        const gen = beginGeneration(conversationId);
 
         const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
 
         startSSE(res);
+        attachSubscriber(conversationId, res);
+        res.on("close", () => detachSubscriber(conversationId, res));
+
         let turnSaved = false;
-        await streamOllama(res, ollamaMessages, sendConfig, async (fullContent, rawContent, rawThinking) => {
+        // A geração roda independente desta conexão: se o cliente desconectar
+        // (troca de página, tela apagou), ela continua e persiste no banco —
+        // ver generationManager.js e GET /conversations/:id/generation.
+        await streamOllama(conversationId, gen, ollamaMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
-            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent) : null;
+            if (asstMsgId) {
+                if (savedContent) updateMessage(asstMsgId, savedContent);
+                else deleteMessage(asstMsgId);
+            }
             turnSaved = !!fullContent;
             if (turnSaved) addAffectionPoints(conv.character_id, gained);
 
@@ -75,23 +92,25 @@ router.post("/conversations/:id/messages", async (req, res) => {
             });
 
             return { message_id: asstMsgId, user_message_id: userMsgId };
-        }, async (res) => {
-            // Roda após o evento done — o input do usuário já foi liberado no frontend
-            if (!turnSaved) return;
+        }, {
+            afterDone: async () => {
+                // Roda após o evento done — o input do usuário já foi liberado no frontend
+                if (!turnSaved) return;
 
-            res.write(`data: ${JSON.stringify({
-                type: "affection",
-                ...affection,
-                leveled_up: affection.level > prevAffection.level,
-            })}\n\n`);
+                broadcast(conversationId, {
+                    type: "affection",
+                    ...affection,
+                    leveled_up: affection.level > prevAffection.level,
+                });
 
-            const counts = await processMemoryBacklogIfDue(conversationId, {
-                character, persona, config,
-                onStart: () => res.write(`data: ${JSON.stringify({ type: "memory_processing" })}\n\n`),
-            });
-            if (counts) {
-                res.write(`data: ${JSON.stringify({ type: "memories_created", auto: counts.auto, pinned: counts.pinned })}\n\n`);
-            }
+                const counts = await processMemoryBacklogIfDue(conversationId, {
+                    character, persona, config,
+                    onStart: () => broadcast(conversationId, { type: "memory_processing" }),
+                });
+                if (counts) {
+                    broadcast(conversationId, { type: "memories_created", auto: counts.auto, pinned: counts.pinned });
+                }
+            },
         });
     } catch (err) {
         handleSSEError(res, err, "Chat error");
@@ -107,6 +126,10 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
 
         const character = getCharacter(conv.character_id);
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
+
+        if (isGenerating(conversationId)) {
+            return res.status(409).json({ ok: false, message: "Já existe uma resposta sendo gerada para esta conversa." });
+        }
 
         // Só remove a última resposta se ela for de fato a ÚLTIMA mensagem da
         // conversa — se a última for do usuário (ex.: geração anterior falhou),
@@ -137,11 +160,18 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         });
 
         const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };
+        const gen = beginGeneration(conversationId);
 
         startSSE(res);
-        await streamOllama(res, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking) => {
+        attachSubscriber(conversationId, res);
+        res.on("close", () => detachSubscriber(conversationId, res));
+
+        await streamOllama(conversationId, gen, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
-            const asstMsgId = savedContent ? addMessage(conversationId, "assistant", savedContent, insertPos) : null;
+            if (asstMsgId) {
+                if (savedContent) updateMessage(asstMsgId, savedContent);
+                else deleteMessage(asstMsgId);
+            }
 
             logConversationTurn({
                 conversationId,
@@ -157,7 +187,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             });
 
             return { message_id: asstMsgId };
-        });
+        }, { insertPosition: insertPos });
     } catch (err) {
         handleSSEError(res, err, "Regenerate error");
     }

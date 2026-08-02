@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { getGenerationConfig, getConversationModel } from "../../services/database/queries.js";
+import { getGenerationConfig, getConversationModel, addMessage, updateMessage } from "../../services/database/queries.js";
 import { getModelContextLength } from "../../services/ollama.models.js";
 import { appConfig } from "../../config.js";
+import { broadcast, closeGeneration } from "./generationManager.js";
 
 const OLLAMA_URL = appConfig.ollama.chatEndpoint;
 
@@ -125,21 +126,26 @@ export function handleSSEError(res, err, label) {
 // Sem nenhum chunk do Ollama por este tempo, o stream é abortado (modelo travado).
 const STREAM_STALL_TIMEOUT_MS = 120_000;
 
-// Streams Ollama response as SSE. onDone(filteredContent, rawContent) is called
-// when streaming finishes; it should persist the message and return extra fields for the done event.
-// afterDone(res) runs AFTER the done event is written but before res.end() — for background
-// work (e.g. memory extraction) that may still push SSE events without blocking the client's
-// perception of completion (the frontend unlocks the input on `done`).
-//
-// Se o cliente desconectar no meio do stream, a geração no Ollama é abortada
-// (libera a GPU); o conteúdo parcial já gerado ainda é persistido via onDone.
-export async function streamOllama(res, messages, config, onDone, afterDone = null) {
-    const controller = new AbortController();
-    let clientGone   = false;
-    let stallTimer   = null;
+// Progresso é persistido no banco à medida que chega, e não só no final — é o
+// que garante que a resposta sobrevive mesmo se ninguém estiver com o SSE
+// aberto para recebê-la. Throttled para não bater no banco a cada token.
+const PERSIST_THROTTLE_MS = 300;
 
-    const onClientClose = () => { clientGone = true; controller.abort(); };
-    res.on("close", onClientClose);
+// Gera a resposta do Ollama para `conversationId`, transmitindo cada delta para
+// todo subscriber atualmente registrado em `gen` (ver generationManager.js) e
+// persistindo o conteúdo progressivamente — a geração roda até o fim
+// independentemente de haver alguém conectado ouvindo. onDone(filteredContent,
+// rawContent, rawThinking, assistantMessageId) é chamado quando a geração
+// termina (com sucesso ou interrompida por stall, desde que tenha gerado algo);
+// deve persistir o conteúdo final (já trimado) e retornar campos extras para o
+// evento `done`. opts.afterDone() roda depois do evento `done` ser transmitido
+// — trabalho em background (ex.: extração de memória) que ainda pode emitir
+// eventos SSE próprios sem atrasar a percepção de conclusão do cliente.
+// opts.insertPosition replica a posição de uma mensagem substituída (regenerate).
+export async function streamOllama(conversationId, gen, messages, config, onDone, opts = {}) {
+    const { afterDone = null, insertPosition = null } = opts;
+    const controller = new AbortController();
+    let stallTimer   = null;
 
     const resetStallTimer = () => {
         if (stallTimer) clearTimeout(stallTimer);
@@ -148,20 +154,42 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
     };
     const cleanup = () => {
         if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-        res.off("close", onClientClose);
     };
 
-    let fullContent = "";  // filtered (without <think> blocks) — sent to SSE and saved
-    let rawContent  = "";  // verbatim output from the model — used for logging
-    let rawThinking = "";  // native Ollama reasoning (message.thinking) — logging only, never sent to SSE/saved
+    let fullContent = "";  // filtered (without <think> blocks) — transmitido e persistido
+    let rawContent  = "";  // saída verbatim do modelo — só para log
+    let rawThinking = "";  // raciocínio nativo (message.thinking) — só para log
 
-    const finish = async () => {
+    // gen.content acompanha fullContent em tempo real (não throttled) — é o que
+    // GET /conversations/:id/generation manda como snapshot pra quem reconecta,
+    // então não pode ficar atrás do que já foi transmitido aos subscribers.
+    let lastPersistAt = 0;
+    const persist = (force = false) => {
+        if (!fullContent) return;
+        const now = Date.now();
+        if (!force && now - lastPersistAt < PERSIST_THROTTLE_MS) return;
+        lastPersistAt = now;
+        if (!gen.assistantMessageId) {
+            gen.assistantMessageId = addMessage(conversationId, "assistant", fullContent, insertPosition);
+        } else {
+            updateMessage(gen.assistantMessageId, fullContent);
+        }
+    };
+
+    const finish = async (errorMsg = null) => {
         cleanup();
-        const extra = await onDone(fullContent, rawContent, rawThinking);
-        if (clientGone) return;
-        res.write(`data: ${JSON.stringify({ delta: "", done: true, ...extra })}\n\n`);
-        if (afterDone) { try { await afterDone(res); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
-        res.end();
+        persist(true);
+        let extra = {};
+        // No caminho de sucesso, onDone sempre roda (mesmo com fullContent vazio —
+        // é o que loga/trata uma resposta vazia do Ollama). No caminho de stall,
+        // só roda se algo chegou a ser gerado, preservando esse parcial.
+        if (!errorMsg || fullContent) {
+            try { extra = (await onDone(fullContent, rawContent, rawThinking, gen.assistantMessageId)) ?? {}; }
+            catch (e) { console.error("streamOllama onDone error:", e); }
+        }
+        broadcast(conversationId, { delta: "", done: true, ...extra, ...(errorMsg ? { error: errorMsg } : {}) });
+        if (!errorMsg && afterDone) { try { await afterDone(); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
+        closeGeneration(conversationId);
     };
 
     try {
@@ -196,8 +224,7 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
 
         if (!ollamaRes.ok) {
             cleanup();
-            res.write(`data: ${JSON.stringify({ error: `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}` })}\n\n`);
-            res.end();
+            closeGeneration(conversationId, { delta: "", done: true, error: `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}` });
             return;
         }
 
@@ -239,7 +266,8 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
                         const before   = delta.slice(0, startIdx);
                         if (before) {
                             fullContent += before;
-                            res.write(`data: ${JSON.stringify({ delta: before, done: false })}\n\n`);
+                            gen.content = fullContent;
+                            broadcast(conversationId, { delta: before, done: false });
                         }
                         const endIdx = delta.indexOf("</think>", startIdx);
                         if (endIdx !== -1) { delta = delta.slice(endIdx + 8); }
@@ -248,8 +276,11 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
 
                     if (delta) {
                         fullContent += delta;
-                        res.write(`data: ${JSON.stringify({ delta, done: false })}\n\n`);
+                        gen.content = fullContent;
+                        broadcast(conversationId, { delta, done: false });
                     }
+
+                    persist();
                 }
 
                 if (parsed.done) {
@@ -262,20 +293,17 @@ export async function streamOllama(res, messages, config, onDone, afterDone = nu
         // Fallback if stream ended without a parsed.done event
         if (fullContent) { await finish(); return; }
         cleanup();
-        res.end();
+        closeGeneration(conversationId);
     } catch (err) {
         cleanup();
         if (err?.name === "AbortError") {
-            // Cliente desconectou (ou o stream travou): persiste o parcial e encerra.
-            if (fullContent) { try { await onDone(fullContent, rawContent, rawThinking); } catch { /* já estamos encerrando */ } }
-            if (!clientGone) {
-                try {
-                    res.write(`data: ${JSON.stringify({ error: "Geração interrompida — o Ollama parou de responder." })}\n\n`);
-                    res.end();
-                } catch { /* conexão já fechada */ }
-            }
+            // Stall (Ollama parou de responder): persiste o parcial e encerra.
+            // Não depende mais de o cliente estar conectado — a única causa de
+            // abort agora é o próprio Ollama travar.
+            await finish("Geração interrompida — o Ollama parou de responder.");
             return;
         }
-        throw err;
+        console.error("streamOllama error:", err);
+        closeGeneration(conversationId, { delta: "", done: true, error: err.message });
     }
 }

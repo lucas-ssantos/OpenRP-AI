@@ -5,9 +5,10 @@ import {
     addMessage, getConversationMessages, resetConversation,
     getConversationModel, setConversationModel,
 } from "../../services/database/queries.js";
-import { resolveConfig } from "./helpers.js";
+import { resolveConfig, startSSE } from "./helpers.js";
 import { getEffectiveAffection } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
+import { getGeneration, attachSubscriber, detachSubscriber } from "./generationManager.js";
 
 const router = Router();
 
@@ -82,6 +83,25 @@ router.get("/conversations/:id/messages", (req, res) => {
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
+});
+
+// ── GET /api/conversations/:id/generation ────────────────────────────────────
+// Regruda numa geração em andamento — usado quando o cliente volta a olhar a
+// conversa (reload, troca de página, tela apagou e voltou) enquanto o Ollama
+// ainda está respondendo. A geração roda no backend independente do cliente
+// (ver generationManager.js); isto só serve para voltar a "assistir" a ela.
+// 204 sem corpo = nenhuma geração ativa para esta conversa.
+router.get("/conversations/:id/generation", (req, res) => {
+    const conversationId = req.params.id;
+    const gen = getGeneration(conversationId);
+    if (!gen) return res.status(204).end();
+
+    startSSE(res);
+    // Snapshot do que já foi gerado até agora — o cliente sincroniza a bolha
+    // com isso antes de continuar recebendo deltas normalmente.
+    res.write(`data: ${JSON.stringify({ delta: gen.content, done: false, sync: true, message_id: gen.assistantMessageId })}\n\n`);
+    attachSubscriber(conversationId, res);
+    res.on("close", () => detachSubscriber(conversationId, res));
 });
 
 // ── GET /api/conversations/:id/model ─────────────────────────────────────────

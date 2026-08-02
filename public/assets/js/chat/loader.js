@@ -1,6 +1,6 @@
 import { conversationId, state, dom } from './state.js';
 import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge, renderScenarioBubble } from './ui.js';
-import { addBubble, initInputListeners } from './events.js';
+import { addBubble, initInputListeners, resumeActiveGeneration } from './events.js';
 
 // Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
 function expandPlaceholders(text, charName, userName) {
@@ -96,6 +96,9 @@ export async function init() {
     dom.inputEl.focus();
     scrollToBottom();
     initInputListeners();
+    // Se o backend ainda estiver gerando uma resposta desta conversa (a página
+    // foi recarregada/trocada no meio de uma geração), regruda no stream.
+    resumeActiveGeneration();
   } catch (err) {
     dom.charNameEl.textContent = 'Erro';
     showError(`Falha ao carregar: ${err.message}`);

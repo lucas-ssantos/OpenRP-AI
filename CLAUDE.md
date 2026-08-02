@@ -24,8 +24,9 @@ src/
     affection.js                    ← sistema de afeto: escala de níveis, ganho de pontos, bloco [Relationship] do prompt
     chat.js                         ← entry point do router de chat (monta sub-routers)
     chat/
-      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama (com afterDone pós-`done`)
-      conversations.js              ← GET /characters/:id/conversation, POST/GET /conversations, GET messages, POST memories/generate
+      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama (persiste progressivamente no banco, com afterDone pós-`done`)
+      generationManager.js          ← registro em memória de gerações em andamento por conversa (beginGeneration/isGenerating/attachSubscriber/broadcast/closeGeneration) — desacopla a geração da conexão HTTP que a disparou
+      conversations.js              ← GET /characters/:id/conversation, POST/GET /conversations, GET messages, GET /conversations/:id/generation (resume), POST memories/generate
       messages.js                   ← POST enviar, POST regenerar, PATCH editar, DELETE rollback
     memory/
       index.js                      ← barrel do módulo de memória
@@ -87,8 +88,8 @@ public/
       chat/
         state.js                    ← characterId, state{conversationId,isStreaming}, dom refs, initDomRefs()
         ui.js                       ← helpers de UI puros: scrollToBottom, renderBubbleText, showError, etc.
-        events.js                   ← addBubble, rollback, edição inline, send, regenerate, initInputListeners
-        loader.js                   ← init() (carrega personagem/conversa/mensagens), initImmersiveMode()
+        events.js                   ← addBubble, rollback, edição inline, send, regenerate, resumeActiveGeneration (regruda numa geração em andamento), initInputListeners
+        loader.js                   ← init() (carrega personagem/conversa/mensagens, chama resumeActiveGeneration()), initImmersiveMode()
       check.js / index.js / persona.js / new-character.js / edit-character.js / settings.js / viewdb.js / lorebooks.js
   core/
     logger.js                       ← logConversationTurn(): log estruturado por turno — config, memórias injetadas/disponíveis, lorebooks
@@ -155,8 +156,9 @@ GET  /api/characters/:id/conversation       → busca ou cria conversa para o pe
 POST /api/conversations                     → cria conversa + insere first_message
 GET  /api/conversations/:id                 → dados da conversa
 GET  /api/conversations/:id/messages        → histórico ordenado por position
-POST /api/conversations/:id/messages        → envia mensagem → streaming SSE
-POST /api/conversations/:id/regenerate      → regenera última resposta → streaming SSE
+POST /api/conversations/:id/messages        → envia mensagem → streaming SSE (409 se já houver geração em andamento)
+POST /api/conversations/:id/regenerate      → regenera última resposta → streaming SSE (409 se já houver geração em andamento)
+GET  /api/conversations/:id/generation      → regruda numa geração em andamento (streaming SSE; 204 sem corpo se não houver nenhuma)
 POST /api/conversations/:id/reset          → apaga todas as mensagens e memórias, reinsere first_message
 PATCH /api/conversations/:id/messages/:msgId → edita conteúdo de uma mensagem
 DELETE /api/conversations/:id/rollback      → remove mensagens após messageId (body: {messageId})
@@ -187,11 +189,11 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 ## Padrão do chat (streaming)
 
 `POST /api/conversations/:id/messages` funciona assim:
-1. Valida e busca conversa + personagem + persona
+1. Valida e busca conversa + personagem + persona; 409 se já houver uma geração em andamento para a conversa (`isGenerating()`)
 2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. Exceção: `context_size = NULL` é "contexto automático" (deliberado) — resolvido em `streamOllama()` para o `context_length` real do modelo via `getModelContextLength()` (`/api/show`, cacheado em memória por nome de modelo), não simplesmente omitido do request. Único override: modelo da conversa (`conversation_config`)
 3. Monta mensagens via `buildPromptMessages()` (ver `src/core/promptBuilder.js` e `contexto/prompt_builder`)
 4. Busca últimas N mensagens (`getLastNMessages`) para contexto
-5. Salva mensagem do usuário no banco (`addMessage`)
+5. Salva mensagem do usuário no banco (`addMessage`) e registra a geração em `generationManager.beginGeneration()`
 6. Calcula `dynamicMaxTokens` — proporcional ao tamanho da mensagem do usuário
 7. Chama `http://127.0.0.1:11434/api/chat` com `stream: true` e `think: config.think` via `streamOllama()`
 8. Responde com **SSE** (`Content-Type: text/event-stream`)
@@ -200,7 +202,15 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 11. Filtra `<think>...</think>` (fallback para modelos que inlinam raciocínio no `content` mesmo com `think:false`) durante o stream
 12. Salva resposta completa no banco ao final
 
-Robustez do streaming (`streamOllama`): se o cliente desconectar, a geração no Ollama é **abortada** (AbortController) e o conteúdo parcial é persistido; há timeout de inatividade de 120s (stream travado → abort + evento de erro). O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
+### Geração desacoplada do frontend (`generationManager.js` + `streamOllama`)
+
+A resposta do Ollama **não depende da conexão HTTP que a disparou**. `src/core/chat/generationManager.js` mantém um registro em memória por `conversationId` (`assistantMessageId`, `content` acumulado, `subscribers`: o `Set` de conexões SSE atualmente escutando). `streamOllama()` nunca mais escreve direto num único `res` — ele transmite cada delta via `broadcast(conversationId, ...)` para todo subscriber conectado *no momento*, e persiste o conteúdo no banco progressivamente (`addMessage` no primeiro chunk, depois `updateMessage` throttled a cada 300ms, forçado no fim) — não só ao final.
+
+- **Cliente desconecta no meio (troca de página, aba fechada, tela apagou):** a rota apenas remove aquele `res` dos subscribers (`res.on("close", () => detachSubscriber(...))`) — a geração **continua rodando** e sendo salva no banco. A única causa de abort do fetch ao Ollama agora é o próprio modelo travar (timeout de inatividade de 120s → `AbortController`).
+- **Reconectar a uma geração em andamento:** `GET /api/conversations/:id/generation` — se `getGeneration(conversationId)` existir, abre SSE, manda um evento `{delta, done:false, sync:true, message_id}` com o snapshot do que já foi gerado (`gen.content`, atualizado em tempo real a cada broadcast — não fica atrás do throttle de persistência no banco) e vira subscriber dos deltas seguintes; sem geração ativa, retorna `204` sem corpo. O frontend chama isso automaticamente no load da página (`resumeActiveGeneration()` em `chat/events.js`, disparado por `loader.js`) — é assim que a resposta "continua aparecendo" mesmo depois de sair e voltar para o chat.
+- **Uma geração por conversa por vez:** `beginGeneration()` recusa (retorna `null`) se já houver uma ativa; as rotas de envio/regenerar respondem `409` nesse caso.
+- `regenerate` usa o mesmo mecanismo — `insertPosition` (opts do `streamOllama`) replica a posição da mensagem substituída.
+- O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
 
 ### Thinking (raciocínio do modelo)
 
@@ -215,6 +225,9 @@ Todos implementados em `public/assets/js/chat/events.js`.
 
 ### Enviar mensagem
 `sendMessage()` → POST `/api/conversations/:id/messages` → lê SSE token a token → renderiza via `renderBubbleText()`.
+
+### Retomar geração em andamento (resume)
+`resumeActiveGeneration()`, chamada por `loader.js` logo após popular o histórico: faz `GET /api/conversations/:id/generation`; `204` → nada em andamento, não faz nada. `200` → há uma geração ativa (a página foi recarregada/trocada de aba/tela apagou no meio de uma resposta) — lê o evento `sync` (snapshot do que já foi gerado, com `message_id`), reaproveita o balão já renderizado pelo histórico se ele corresponder a esse `message_id` (ou cria um novo, se a geração começou mas nada foi persistido ainda) e continua consumindo os deltas seguintes exatamente como `sendMessage()`. Enquanto isso, `state.isStreaming` fica `true` e o input desabilitado.
 
 ### Regenerar última resposta
 Botão `regenerate-btn` aparece apenas no último balão do personagem (`updateLastCharRow()`).
