@@ -101,10 +101,11 @@ router.get("/api/viewdb/conversation/:id", (req, res) => {
         const msgRows = db.exec(`
             SELECT id, role, content, position, created_at
             FROM messages WHERE conversation_id = ?
-            ORDER BY position ASC, created_at ASC
+            ORDER BY position DESC, created_at DESC
+            LIMIT 10
         `, [convId]);
         const messages = msgRows.length
-            ? msgRows[0].values.map(r => ({ id: r[0], role: r[1], content: r[2], position: r[3], created_at: r[4] }))
+            ? msgRows[0].values.map(r => ({ id: r[0], role: r[1], content: r[2], position: r[3], created_at: r[4] })).reverse()
             : [];
 
         const memRows = db.exec(`
