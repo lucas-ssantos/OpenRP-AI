@@ -45,7 +45,7 @@ function buildInstructionPrompt(character, persona) {
     `  NEVER do this:\n` +
     `  "Tá bom, pode falar."\n` +
     `  *she crosses her arms*\n` +
-    `  REGISTER: Casual Brazilian Portuguese. Informal, direct, occasionally crude. Never literary. Never formal. If a word sounds like it belongs in a book, find a simpler one.`
+    `  REGISTER: Casual Brazilian Portuguese. Informal, direct, occasionally crude. Never literary. Never formal. If a word sounds like it belongs in a book, find a simpler one.` +
     //`- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
     `PHYSICALITY
