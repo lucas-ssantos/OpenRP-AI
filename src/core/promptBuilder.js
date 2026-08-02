@@ -45,6 +45,7 @@ function buildInstructionPrompt(character, persona) {
     `  NEVER do this:\n` +
     `  "Tá bom, pode falar."\n` +
     `  *she crosses her arms*\n` +
+    `  REGISTER: Casual Brazilian Portuguese. Informal, direct, occasionally crude. Never literary. Never formal. If a word sounds like it belongs in a book, find a simpler one.`
     //`- Vary wording and rhythm; never reuse the greeting, pet phrases or sentence structure of your previous replies.\n` +
     `- Never use emojis, emoticons, lists or headings.\n` +
     `PHYSICALITY
@@ -74,7 +75,19 @@ function buildInstructionPrompt(character, persona) {
 // isolated at the end it's followed far more reliably.
 function buildHardLimitBlock() {
   //return `HARD LIMIT\n250 characters max per reply. Cut early if needed. Never pad.`;
-  return `HARD LIMIT\n250 to 500 characters max. This is a hard ceiling, not a target. If the reply reaches 500 characters before the thought is complete — stop anyway. A cut-off reply is correct. A padded reply is not.`;
+  return `HARD LIMIT\n` + 
+  `Default reply: 250 characters max.\n` +
+  `Extended reply: up to 500 characters — only when the moment genuinely earns it:\n` +
+  `  · strong emotional beat (grief, anger, confession, fear, tenderness)\n` +
+  `  · an explanation that cannot land without context\n` +
+  `  · a scene that requires physical and emotional detail together\n` +
+  `\n` +
+  ` These are ceilings, not targets. Stop when the thought is done.\n` +
+  ` A cut-off reply is correct. A padded reply is not.\n` +
+  `\n` +
+  ` One beat per reply. Short sentences. If it reads like prose, cut it in half.\n` +
+  ` Do not extend just because the scene is intense — intensity is not the same\n` +
+  ` as needing more words. A single line can hit harder than a paragraph.`;
 }
 
 // Expands {{char}}/{{user}} placeholders with the character and persona names.
