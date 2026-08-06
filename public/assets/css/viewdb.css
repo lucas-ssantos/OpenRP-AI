@@ -523,7 +523,8 @@
 
 .vdb-ef-content,
 .vdb-ef-keywords,
-.vdb-ef-summary {
+.vdb-ef-summary,
+.vdb-ef-weight {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 0.5rem;
@@ -539,9 +540,23 @@
 
 .vdb-ef-content { resize: vertical; min-height: 3.5rem; }
 
+.vdb-ef-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vdb-ef-row .vdb-ef-keywords { flex: 1; min-width: 0; }
+
+.vdb-ef-weight {
+  width: 5rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
 .vdb-ef-content:focus,
 .vdb-ef-keywords:focus,
-.vdb-ef-summary:focus {
+.vdb-ef-summary:focus,
+.vdb-ef-weight:focus {
   border-color: rgba(56, 189, 248, 0.4);
 }
 

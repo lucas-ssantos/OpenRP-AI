@@ -220,7 +220,10 @@ function renderMemories(type) {
       </div>
       <div class="vdb-mem-edit-form" style="display:none;">
         <textarea class="vdb-ef-content" rows="3">${escape(m.content)}</textarea>
-        <input class="vdb-ef-keywords" type="text" placeholder="Keywords" value="${escape(m.keywords || '')}" />
+        <div class="vdb-ef-row">
+          <input class="vdb-ef-keywords" type="text" placeholder="Keywords" value="${escape(m.keywords || '')}" />
+          <input class="vdb-ef-weight" type="number" step="0.1" min="0.1" placeholder="Peso" title="Peso de relevância" value="${m.relevance_weight ?? ''}" />
+        </div>
         <input class="vdb-ef-summary" type="text" placeholder="Resumo (opcional)" value="${escape(m.summary || '')}" />
         <div class="vdb-ef-actions">
           <button class="vdb-btn-cancel-edit" type="button">Cancelar</button>
@@ -294,23 +297,39 @@ function initMemoryActions() {
       const card     = btn.closest('.vdb-memory');
       const id       = card.dataset.memId;
       const memType  = card.dataset.memType;
-      const content  = card.querySelector('.vdb-ef-content').value.trim();
-      const keywords = card.querySelector('.vdb-ef-keywords').value.trim();
-      const summary  = card.querySelector('.vdb-ef-summary').value.trim();
+      const content    = card.querySelector('.vdb-ef-content').value.trim();
+      const keywords   = card.querySelector('.vdb-ef-keywords').value.trim();
+      const summary    = card.querySelector('.vdb-ef-summary').value.trim();
+      const weightRaw  = card.querySelector('.vdb-ef-weight').value.trim();
       if (!content) return;
+
+      const body = { content, keywords: keywords || null, summary: summary || null };
+      if (weightRaw !== '') {
+        const weight = Number(weightRaw);
+        if (!Number.isFinite(weight) || weight <= 0) {
+          showMemError('Peso inválido.');
+          return;
+        }
+        body.relevance_weight = weight;
+      }
 
       btn.disabled = true;
       try {
         const res  = await fetch(`/api/memories/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, keywords: keywords || null, summary: summary || null }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.message);
 
         const mem = currentMemories[memType]?.find(m => m.id === id);
-        if (mem) { mem.content = content; mem.keywords = keywords || null; mem.summary = summary || null; }
+        if (mem) {
+          mem.content  = content;
+          mem.keywords = keywords || null;
+          mem.summary  = summary || null;
+          if (body.relevance_weight !== undefined) mem.relevance_weight = body.relevance_weight;
+        }
         renderMemories(activeMemType);
       } catch (err) {
         showMemError(err.message);

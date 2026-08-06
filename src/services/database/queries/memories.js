@@ -52,13 +52,14 @@ export function getPinnedMemories(conversationId) {
   return result[0].values.map(mapMemory);
 }
 
-export function updateMemory(id, { content, keywords, summary, type } = {}) {
+export function updateMemory(id, { content, keywords, summary, type, relevanceWeight } = {}) {
   const db = getDB();
   const sets = [];
   const vals = [];
   if (content  !== undefined && content  !== null) { sets.push("content = ?");  vals.push(content); }
   if (keywords !== undefined)                      { sets.push("keywords = ?"); vals.push(keywords); }
   if (summary  !== undefined)                      { sets.push("summary = ?");  vals.push(summary); }
+  if (relevanceWeight !== undefined && relevanceWeight !== null) { sets.push("relevance_weight = ?"); vals.push(relevanceWeight); }
   if (type     !== undefined) {
     sets.push("type = ?");     vals.push(type);
     sets.push("is_pinned = ?"); vals.push(type === "pinned" ? 1 : 0);

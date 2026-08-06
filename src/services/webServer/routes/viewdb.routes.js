@@ -165,10 +165,18 @@ router.patch("/api/memories/:id", (req, res) => {
     try {
         const { id } = req.params;
         if (!isValidUUID(id)) return res.status(400).json({ ok: false, message: "ID inválido." });
-        const { content, keywords, summary, type } = req.body;
+        const { content, keywords, summary, type, relevance_weight } = req.body;
         if (type !== undefined && !["pinned", "auto", "manual"].includes(type))
             return res.status(400).json({ ok: false, message: "Tipo inválido. Use: pinned, auto, manual." });
-        const updated = updateMemory(id, { content, keywords, summary, type });
+
+        let relevanceWeight;
+        if (relevance_weight !== undefined && relevance_weight !== null && relevance_weight !== "") {
+            relevanceWeight = Number(relevance_weight);
+            if (!Number.isFinite(relevanceWeight) || relevanceWeight <= 0)
+                return res.status(400).json({ ok: false, message: "Peso inválido." });
+        }
+
+        const updated = updateMemory(id, { content, keywords, summary, type, relevanceWeight });
         if (!updated) return res.status(400).json({ ok: false, message: "Nenhum campo para atualizar." });
         res.json({ ok: true });
     } catch (err) {
