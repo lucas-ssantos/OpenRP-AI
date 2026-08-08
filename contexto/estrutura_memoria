@@ -50,10 +50,18 @@ Ex: "Ele adora café, odeia segunda-feira"
 Sempre incluída no contexto. Reservada para momentos que definem o personagem
 ou a relação daqui em diante — o que alguém lembraria anos depois:
 · eventos muito fortes (morte, violência, resgate, traição, primeira intimidade)
-· sentimentos intensos declarados (confissão de amor, ódio profundo, luto)
+· sentimentos intensos declarados pela PRIMEIRA vez (confissão de amor, ódio
+  profundo, luto — não a repetição de uma dinâmica já estabelecida)
 · grandes viradas emocionais (amor↔ódio, confiança↔traição, estranho→amante)
 · mudanças físicas (ferimento, cicatriz, transformação, gravidez)
-NÃO entra: variação de humor passageira, preferências, detalhes de cena.
+Teste da mundanidade: se podia acontecer de novo num dia comum sem mudar
+quem os dois são um para o outro, NÃO é pinned — por mais afetuosa que a
+cena tenha parecido no momento.
+NÃO entra: variação de humor passageira, preferências, detalhes de cena,
+afeto rotineiro (abraço, beijo, "eu te amo" já estabelecido), atividades
+do dia a dia (comer, dormir, trabalhar, conversar sobre o dia).
+Trava de código: extractAndSaveMemories() rebaixa para auto qualquer item
+que o modelo marcar pinned com importance < 4.
 
 >Lorebook
 Ativada por palavras-chave no chat

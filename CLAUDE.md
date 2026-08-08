@@ -336,23 +336,27 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 
 ### Memórias Pinned — critério e garantias
 
-Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **momentos que definem o personagem ou a relação daqui em diante** — o que uma pessoa ainda lembraria anos depois.
+Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **momentos que definem o personagem ou a relação daqui em diante** — o que uma pessoa ainda lembraria anos depois. O extrator aplica o **teste da mundanidade**: se o momento podia acontecer de novo num dia comum sem mudar quem os dois são um para o outro, não é pinned — por mais afetuoso ou emotivo que tenha parecido na hora.
 
 **Exemplos válidos (✓):**
 - Evento muito forte: "Quase morreu no incêndio do teatro; foi salva pelo usuário."
-- Sentimento intenso declarado: "Confessou estar apaixonada pelo usuário."
+- Sentimento intenso declarado pela primeira vez: "Confessou estar apaixonada pelo usuário."
 - Grande virada emocional: "Deixou de confiar no usuário após descobrir a mentira sobre a carta."
 - Mudança física: "Perdeu a visão do olho esquerdo na batalha de Ardenmoor."
 
-**Exemplos inválidos (✗ — use auto/manual com keywords):**
+**Exemplos inválidos (✗ — use auto/manual com keywords), incluindo vida cotidiana:**
 - Variação de humor passageira: "Ficou com raiva quando mencionaram cavalos."
 - Preferências: "Gosta de chá." → vai em description/personality do personagem.
 - Detalhe de cena: "Estavam no café quando o segredo foi revelado."
+- Afeto rotineiro já estabelecido: "Deram as mãos no parque." / "Disse 'eu te amo' de novo antes de dormir."
+- Atividade cotidiana: "Jantaram juntos e conversaram sobre o dia de trabalho."
 
 **Validações obrigatórias em `createPinnedMemory()`:**
 - `content` com mínimo de 20 caracteres (fatos curtos demais são vagos)
 - `keywords` obrigatório — mesmo sem usar no filtro, serve de referência semântica e auditoria
 - `relevanceWeight` gradua a prioridade entre pinned (extrator usa 1.2–2.0 conforme `importance`)
+
+**Trava de importância no extrator (`extractAndSaveMemories()`):** o prompt exige `importance` 4 ou 5 para qualquer item `pinned:true`; independente do modelo obedecer, o código rebaixa para `auto` (mesmo `relevanceWeight` recalculado) qualquer item marcado pinned com `importance < 4` — segunda camada de defesa contra memórias mundanas viradas permanentes.
 
 **Cap automático no retrieval:**
 `getRelevantMemories()` limita a 10 pinned por padrão (`maxPinned`), ordenando por `relevance_weight DESC`. Se houver mais de 10 pinned, as de menor peso são descartadas do prompt. Isso previne que o prompt estoure após conversas longas com muitas pinned acumuladas.

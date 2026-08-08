@@ -70,23 +70,46 @@ reactions that are completely predictable from the baseline,
 anything that won't matter in a future session.
 
 2. CORE memories ("pinned": true)
-Reserve for moments that permanently change the character, the relationship, 
-or the story. The bar is high. Ask: would this person still think about 
-this moment a year later?
+Reserve for moments that permanently change the character, the relationship,
+or the story. The bar is high — pinned memories must stay rare, not a
+running highlight reel of nice moments. Ask: would this person still think
+about this moment a year later, unprompted?
+
+THE MUNDANE TEST — apply before marking anything pinned:
+If this could plausibly happen again on an ordinary day between two people
+who already have this relationship — without changing who they are to each
+other — it is NOT pinned, no matter how warm, sweet, or emotionally charged
+the scene felt in the moment. The question is never "was this a nice
+moment?" but "does this permanently move the baseline of the relationship
+or the character going forward?"
 
 Pin only:
-- High-stakes events: death, violence, rescue, betrayal, serious injury, 
+- High-stakes events: death, violence, rescue, betrayal, serious injury,
   major loss, physical transformation
-- Explicit or unmistakable emotional turning points: love confession, 
-  grief, overwhelming fear, a moment of genuine rage
-- Relationship stage changes: strangers becoming close, trust broken, 
+- Emotional turning points that happen for the FIRST time: love confession,
+  grief, overwhelming fear, a moment of genuine rage — not a routine repeat
+  of a dynamic that's already established
+- Relationship stage changes: strangers becoming close, trust broken,
   forgiveness after real conflict, first physical intimacy
-- Decisions that close off other paths: "she left Rhodes Island", 
+- Decisions that close off other paths: "she left Rhodes Island",
   "he told her the truth about his past"
 
-Do NOT pin: ordinary mood shifts, passing frustration, mild embarrassment, 
-affectionate moments that fit the established relationship, anything 
-that could be forgotten without changing the story.
+Do NOT pin — everyday life, even when tender or emotional in the moment:
+- Routine affection once the relationship is already established: hugs,
+  kisses, cuddling, holding hands, saying "I love you" again
+- Shared daily activities: eating together, sleeping together, waking up
+  together, watching something, running errands, going to work, cooking
+- Ordinary conversation: talking about their day, making small plans,
+  minor complaints, jokes, compliments, comforting each other after an
+  everyday bad mood or a rough day at work
+- Ordinary mood shifts: passing frustration, mild embarrassment, being
+  tired, hungry, or sleepy
+- Anything that could plausibly repeat next week without either of them
+  remarking on it as unusual
+
+When in doubt, do NOT pin — extract it as a contextual (auto) memory
+instead. Missing a pin costs little; a mundane pin pollutes every future
+prompt for the rest of the conversation.
 
 ---
 FOR EVERY MEMORY:
@@ -109,11 +132,13 @@ most excerpts produce zero.
 
 "importance": 1-5
 1 — minor detail, useful but forgettable
-2 — worth keeping, adds texture  
+2 — worth keeping, adds texture
 3 — clearly relevant to future sessions
 4 — significantly shapes the character or relationship
-5 — would redefine the story if forgotten (reserve for pinned memories)
+5 — would redefine the story if forgotten
 Most contextual memories are 2-3. Inflating importance makes the system useless.
+Pinned memories REQUIRE importance 4 or 5 — if a moment doesn't reach a 4,
+it does not meet the CORE bar; set "pinned": false instead.
 
 ---
 OUTPUT RULES:
@@ -228,11 +253,17 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
             const keywords = item.keywords?.trim()
                 || extractKeywordsFromText(content).slice(0, 6).join(', ')
                 || null;
-            const weight  = importanceToWeight(item.importance, !!item.pinned);
             const summary = item.summary?.trim() || null;
 
+            // Trava de segurança independente do prompt: pinned exige importance >= 4
+            // (ver buildExtractionPrompt). Um modelo que desobedecer é rebaixado para
+            // auto em vez de virar memória mundana permanente no prompt para sempre.
+            const importance = Number.isFinite(item.importance) ? item.importance : 3;
+            const isPinned = !!item.pinned && importance >= 4;
+            const weight    = importanceToWeight(importance, isPinned);
+
             try {
-                if (item.pinned) {
+                if (isPinned) {
                     if (isTooSimilar(existingPinned, content)) continue;
                     const id = createPinnedMemory(conversationId, content, {
                         keywords, summary, relevanceWeight: weight, happenedAt,
