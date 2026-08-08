@@ -173,10 +173,17 @@ export function buildPromptMessages({
   affection = null,
   now = localDatetime(),
 }) {
-  // Context text for keyword matching: current message + last 5 history messages
+  // Context text for lorebook keyword matching: current message + the *entire*
+  // history window being sent to the model (same messages as [4] below, bounded
+  // upstream by num_ctx_messages). Previously this only looked at the last 5
+  // messages, which caused entries to flicker out of the prompt mid-scene the
+  // moment a keyword scrolled just past that tiny window — even though the model
+  // could still see the mention further back in its own context. Matching against
+  // the full visible window keeps world info active for as long as the model can
+  // actually see the thing that triggered it.
   const contextText = [
     userMessage ?? '',
-    ...historyMessages.slice(-5).map(m => m.content),
+    ...historyMessages.map(m => m.content),
   ].join(' ');
 
   // ── [0] Fixed behavioral instruction (own system message) ──────────────────

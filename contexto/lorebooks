@@ -34,8 +34,8 @@ character_lorebooks         ← tabela de associação many-to-many
 
 Em `src/core/promptBuilder.js`, a função `filterLorebooks(lorebooks, contextText)`:
 
-1. Concatena a mensagem atual do usuário com as últimas 5 mensagens do histórico → `contextText`
-2. Para cada lorebook, verifica se alguma keyword aparece em `contextText` (case-insensitive, substring match)
+1. Concatena a mensagem atual do usuário com **todo o histórico enviado ao modelo** (mesma janela de `num_ctx_messages` usada na seção [4] do prompt, não um recorte fixo) → `contextText`. Se o modelo ainda enxerga a menção no seu próprio contexto, a entrada de lore continua ativa — evita o "flicker" de uma entrada sumir do prompt no meio de uma cena só porque a keyword rolou para fora de uma janela pequena demais.
+2. Para cada lorebook, verifica se alguma keyword aparece em `contextText` — match com fronteira de palavra e insensível a acentos (mesmo matcher usado nas memórias: "ana" não casa em "banana")
 3. Lorebooks **sem keywords** são sempre injetados ("always-on")
 4. Os ativos são ordenados por `insertion_order ASC` e injetados na seção `[World info]` do system prompt
 
