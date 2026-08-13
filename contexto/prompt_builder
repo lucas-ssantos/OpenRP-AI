@@ -2,6 +2,10 @@
 │  [1] SYSTEM PROMPT          ~200-400 tokens │  ← quem é o personagem
 │      {{char}}, {{personality}}, {{scenario}}│
 ├─────────────────────────────────────────────┤
+│  [1b] PERSONA FACTS         ~50-300 tokens  │  ← quem é o USUÁRIO
+│      [About {{user}}] — perfil aprendido,   │    (sempre injetado, sem
+│      agrupado por categoria, cap de 30      │     keyword matching)
+├─────────────────────────────────────────────┤
 │  [2] MEMÓRIAS RELEVANTES    ~200-400 tokens │  ← resgatadas por keyword
 │      (pinned primeiro, depois por score)    │
 ├─────────────────────────────────────────────┤

@@ -35,6 +35,8 @@ const VALIDATORS = {
     context_size:       (v) => v === null || (isInt(v) && v > 0),
     num_ctx_messages:   (v) => isInt(v) && v > 0,
     memory_interval:    (v) => isInt(v) && v > 0,
+    // 0 = extração de persona facts desligada (deliberado, não inválido)
+    persona_interval:   (v) => isInt(v) && v >= 0,
     seed:               (v) => isInt(v),
     stream:             (v) => typeof v === "boolean",
     stop:               (v) => Array.isArray(v),

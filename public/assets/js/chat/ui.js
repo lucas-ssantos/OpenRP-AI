@@ -113,6 +113,29 @@ export function showAffectionToast(levelName) {
   }, 4500);
 }
 
+// Toast do perfil aprendido: fatos novos sobre o usuário (persona facts) ou
+// fatos antigos substituídos por contradição.
+export function showPersonaFactToast(created, superseded = 0) {
+  document.getElementById('persona-fact-toast')?.remove();
+
+  const text = created > 0
+    ? (created === 1 ? 'Aprendi algo novo sobre você' : `Aprendi ${created} coisas novas sobre você`)
+    : 'Atualizei o que sei sobre você';
+
+  const toast = document.createElement('div');
+  toast.id = 'persona-fact-toast';
+  toast.className = 'pinned-memory-toast persona-fact-toast';
+  toast.innerHTML = `<i class="bi bi-person-check-fill"></i><span>${text}</span>`;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 3500);
+}
+
 export function showPinnedMemoryToast(count) {
   document.getElementById('pinned-memory-toast')?.remove();
 

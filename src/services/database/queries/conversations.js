@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, created_at, updated_at`;
+const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, created_at, updated_at`;
 
 function mapConversationRow(row) {
   return {
@@ -13,8 +13,9 @@ function mapConversationRow(row) {
     scenario: row[4],
     first_message: row[5],
     last_memory_position: row[6] ?? 0,
-    created_at: row[7],
-    updated_at: row[8],
+    last_persona_position: row[7] ?? 0,
+    created_at: row[8],
+    updated_at: row[9],
   };
 }
 
@@ -59,6 +60,21 @@ export function getLastMemoryPosition(conversationId) {
 export function setLastMemoryPosition(conversationId, position) {
   const db = getDB();
   db.run(`UPDATE conversations SET last_memory_position = ? WHERE id = ?`, [position, conversationId]);
+  saveDB();
+}
+
+// Cursor da extração de persona facts (perfil do usuário) — irmão do cursor de
+// memórias, mas independente: os dois extratores têm gatilhos e ritmos próprios.
+export function getLastPersonaPosition(conversationId) {
+  const db = getDB();
+  const result = db.exec(`SELECT last_persona_position FROM conversations WHERE id = ?`, [conversationId]);
+  if (result.length === 0 || result[0].values.length === 0) return 0;
+  return result[0].values[0][0] ?? 0;
+}
+
+export function setLastPersonaPosition(conversationId, position) {
+  const db = getDB();
+  db.run(`UPDATE conversations SET last_persona_position = ? WHERE id = ?`, [position, conversationId]);
   saveDB();
 }
 

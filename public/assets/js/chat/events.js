@@ -2,7 +2,7 @@ import { state, dom } from './state.js';
 import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
-  showPinnedMemoryToast, showChatStatus, clearChatStatus,
+  showPinnedMemoryToast, showPersonaFactToast, showChatStatus, clearChatStatus,
   updateAffectionBadge, showAffectionToast, renderScenarioBubble,
 } from './ui.js';
 
@@ -445,6 +445,17 @@ export async function sendMessage() {
           continue;
         }
 
+        if (data.type === 'persona_processing') {
+          showChatStatus('Atualizando seu perfil…');
+          continue;
+        }
+
+        if (data.type === 'persona_facts') {
+          clearChatStatus();
+          if (data.created > 0 || data.superseded > 0) showPersonaFactToast(data.created, data.superseded);
+          continue;
+        }
+
         if (data.delta) {
           if (!charText) {
             removeTypingIndicator();
@@ -557,6 +568,17 @@ export async function resumeActiveGeneration() {
         if (data.type === 'memories_created') {
           clearChatStatus();
           if (data.pinned > 0) showPinnedMemoryToast(data.pinned);
+          continue;
+        }
+
+        if (data.type === 'persona_processing') {
+          showChatStatus('Atualizando seu perfil…');
+          continue;
+        }
+
+        if (data.type === 'persona_facts') {
+          clearChatStatus();
+          if (data.created > 0 || data.superseded > 0) showPersonaFactToast(data.created, data.superseded);
           continue;
         }
 

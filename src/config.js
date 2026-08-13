@@ -39,6 +39,9 @@ export const appConfig = {
         context_size:     process.env.DEFAULT_CONTEXT_SIZE ? parseInt(process.env.DEFAULT_CONTEXT_SIZE) : null,
         num_ctx_messages: parseInt(process.env.DEFAULT_NUM_CTX_MESSAGES)         || 20,
         memory_interval:  parseInt(process.env.MEMORY_INTERVAL)                  || 5,
+        // Persona facts: extrai a cada N mensagens DO USUÁRIO; 0 = desligado
+        // (por isso não usa `||`, que transformaria 0 em 10).
+        persona_interval: parseInt(process.env.PERSONA_INTERVAL) >= 0 ? parseInt(process.env.PERSONA_INTERVAL) : 10,
         seed:             parseInt(process.env.DEFAULT_SEED ?? "-1")             || -1,
         max_response_chars: parseInt(process.env.DEFAULT_MAX_RESPONSE_CHARS)   || 0,
         stream:           true,

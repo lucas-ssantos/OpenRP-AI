@@ -107,10 +107,15 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
 
     let memoriesInjected = false;
     let lorebookInjected = false;
+    let personaFactsInjected = false;
 
     for (let i = 1; i < systemParts.length; i++) {
         const part = systemParts[i];
-        if (part.startsWith("[Core memories") || part.startsWith("[Relevant memories")) {
+        if (part.startsWith("[About ")) {
+            personaFactsInjected = true;
+            lines.push(section("[1b] PERFIL DO USUÁRIO (persona facts — sempre injetado)"));
+            lines.push(part.replace(/^\[[^\]]*\]\n/, ""));
+        } else if (part.startsWith("[Core memories") || part.startsWith("[Relevant memories")) {
             const label = part.startsWith("[Core memories")
                 ? "[2] MEMÓRIAS CORE (pinned — sempre injetadas)"
                 : "[2] MEMÓRIAS CONTEXTUAIS (injetadas por relevância)";
@@ -129,6 +134,13 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
             lines.push(section("[?] SEÇÃO EXTRA"));
             lines.push(part);
         }
+    }
+
+    // Persona facts são sempre injetados quando existem — bloco ausente
+    // significa perfil ainda vazio (nenhum fato aprendido/ativo).
+    if (!personaFactsInjected) {
+        lines.push(section("[1b] PERFIL DO USUÁRIO (nenhum persona fact ativo)"));
+        lines.push("  (nenhum fato aprendido sobre o usuário até aqui)");
     }
 
     if (!memoriesInjected) {

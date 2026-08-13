@@ -66,3 +66,38 @@ que o modelo marcar pinned com importance < 4.
 >Lorebook
 Ativada por palavras-chave no chat
 Ex: Mencionar "castelo" injeta lore do castelo
+
+>Persona facts (memória de persona — sistema irmão, memory/personaFacts.js)
+Quem o USUÁRIO é, não o que aconteceu — perfil global (tabela persona_facts,
+sem conversation_id) que se atualiza em vez de acumular linha do tempo:
+· episódica: "Luke disse X em 12/08" → acontecimento, datado, some com o tempo
+· persona:   "Luke gosta de queijo"  → característica, atemporal, permanece
+             até ser contradita
+
+Categorias: preference, dislike, trait (padrão observado), fact (biografia),
+relationship, goal.
+
+Extração: cursor próprio (conversations.last_persona_position), dispara a cada
+persona_interval mensagens DO USUÁRIO (0 = desligado) após o `done`, em
+sequência à extração episódica. NÃO espera sair da janela de contexto — fato
+de perfil não duplica histórico. Teste de enquadramento no prompt: "hoje estou
+com fome" não é fato; "sempre reclama de fome à tarde" é (padrão).
+
+O extrator recebe os fatos já conhecidos (indexados) e decide por item:
+· new       → cria (confidence 0.5–0.9 conforme certainty 1-5 do modelo)
+· reinforce → fato reconfirmado: times_confirmed+1, confidence +0.1 (cap 1.0),
+              nunca duplica
+· supersede → contradição (trocou de emprego, mudou de gosto): o antigo vira
+              status='superseded' apontando superseded_by — sai do prompt mas
+              fica no banco como histórico auditável; nunca é deletado
+Rede mecânica sob o modelo: dedup por sobreposição de keywords/conteúdo NA
+MESMA categoria vira reforço (entre categorias não — keywords iguais em
+categorias opostas costumam ser contradição, decisão que é do modelo).
+
+Injeção: bloco fixo [About {{user}}] logo após o character card — sem keyword
+matching (o perfil é sempre relevante, como a ficha do personagem), agrupado
+por categoria, ordenado por confiança, cap de 30 fatos.
+
+Gestão: página /persona lista os fatos ativos (excluir individualmente) e o
+histórico de substituídos. Reset de conversa NÃO apaga persona facts (são do
+usuário, não da conversa); rollback clampeia o cursor, reset zera.

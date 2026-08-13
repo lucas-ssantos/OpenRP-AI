@@ -151,6 +151,17 @@ body {
   color: #f472b6;
 }
 
+/* Toast de perfil aprendido (persona facts) — verde, distinto do azul (memória
+   fixada) e do rosa (afeição) */
+.persona-fact-toast {
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #86efac;
+}
+
+.persona-fact-toast i {
+  color: #4ade80;
+}
+
 /* ── Messages ── */
 .messages {
   flex: 1;

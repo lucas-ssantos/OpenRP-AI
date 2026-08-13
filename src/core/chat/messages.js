@@ -8,7 +8,7 @@ import {
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
-import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
+import { getMemoriesForPrompt, processMemoryBacklogIfDue, getPersonaFactsForPrompt, processPersonaBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 import { isGenerating, beginGeneration, attachSubscriber, detachSubscriber, broadcast } from "./generationManager.js";
 
@@ -36,9 +36,10 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const persona    = getPersona();
         const config     = resolveConfig(conversationId);
 
-        const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
-        const memories   = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
-        const lorebooks  = getAllLorebooks(conv.character_id);
+        const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+        const memories     = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
+        const personaFacts = getPersonaFactsForPrompt();
+        const lorebooks    = getAllLorebooks(conv.character_id);
 
         // Afeto: cada mensagem do usuário rende pontos ao personagem (compartilhados
         // entre todas as conversas dele). O prompt já reflete o nível novo, mas os
@@ -53,7 +54,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
-            memories, lorebooks, affection,
+            memories, personaFacts, lorebooks, affection,
         });
 
         // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
@@ -110,6 +111,17 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 if (counts) {
                     broadcast(conversationId, { type: "memories_created", auto: counts.auto, pinned: counts.pinned });
                 }
+
+                // Perfil do usuário (persona facts) — sequencial à extração de
+                // memórias de propósito: o Ollama local processa uma chamada por
+                // vez, então rodar em paralelo só criaria fila e timeout.
+                const factCounts = await processPersonaBacklogIfDue(conversationId, {
+                    character, persona, config,
+                    onStart: () => broadcast(conversationId, { type: "persona_processing" }),
+                });
+                if (factCounts) {
+                    broadcast(conversationId, { type: "persona_facts", ...factCounts });
+                }
             },
         });
     } catch (err) {
@@ -146,16 +158,17 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const persona    = getPersona();
         const config     = resolveConfig(conversationId);
 
-        const recentMsgs = getLastNMessages(conversationId, config.num_ctx_messages || 20);
-        const lastUser   = [...recentMsgs].reverse().find(m => m.role === "user");
-        const memories   = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
-        const lorebooks  = getAllLorebooks(conv.character_id);
+        const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+        const lastUser     = [...recentMsgs].reverse().find(m => m.role === "user");
+        const memories     = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
+        const personaFacts = getPersonaFactsForPrompt();
+        const lorebooks    = getAllLorebooks(conv.character_id);
 
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
-            memories, lorebooks,
+            memories, personaFacts, lorebooks,
             affection: getEffectiveAffection(character),
         });
 

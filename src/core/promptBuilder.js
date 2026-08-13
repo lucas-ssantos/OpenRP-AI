@@ -132,6 +132,35 @@ function buildBaseSystemPrompt(character, persona, conversation) {
   return parts.join('\n\n');
 }
 
+// Fixed block with the user's learned profile (persona facts) — the user-side
+// counterpart of the character card. Unlike memories, facts never compete for
+// relevance: the whole active set is always injected (capped upstream by
+// getPersonaFactsForPrompt), grouped by category, highest-confidence first.
+const PERSONA_FACT_LABELS = {
+  preference:   'Preferences',
+  dislike:      'Dislikes',
+  trait:        'Behavioral traits',
+  fact:         'Biographical facts',
+  relationship: 'Relationships',
+  goal:         'Goals',
+};
+
+function buildPersonaFactsBlock(personaFacts, persona) {
+  if (!personaFacts?.length) return null;
+  const userName = persona?.name || 'the user';
+  const lines = [];
+  for (const [category, label] of Object.entries(PERSONA_FACT_LABELS)) {
+    const items = personaFacts.filter(f => f.category === category);
+    if (items.length) lines.push(`${label}: ${items.map(f => f.content).join('; ')}`);
+  }
+  if (!lines.length) return null;
+  return (
+    `[About ${userName} — persistent profile learned from previous conversations]\n` +
+    `Treat these as established background knowledge about ${userName}. Let them shape how you interact naturally — never recite this list, never bring these facts up out of nowhere.\n` +
+    lines.join('\n')
+  );
+}
+
 // Returns lorebook entries with matching keywords, or no keywords (always-on), sorted by insertion_order
 function filterLorebooks(lorebooks, contextText) {
   const normalizedContext = normalize(contextText || '');
@@ -144,6 +173,7 @@ function filterLorebooks(lorebooks, contextText) {
  * Builds the Ollama messages array using the following structure:
  *
  *  [1] SYSTEM PROMPT   — character identity + persona
+ *  [1b] PERSONA FACTS  — fixed [About {{user}}] profile block (always injected)
  *  [2] MEMORIES        — already selected by the retrieval layer (getMemoriesForPrompt);
  *                        split into [Core memories] (pinned) and [Relevant memories] (contextual)
  *  [3] LOREBOOK        — keyword-activated world-info entries (appended to system prompt)
@@ -157,6 +187,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object[]} opts.historyMessages  - recent messages from DB (role !== 'system' are forwarded)
  * @param {string}   opts.userMessage      - current user message; null for regenerate
  * @param {object[]} opts.memories         - memories already selected by the retrieval layer
+ * @param {object[]} opts.personaFacts     - active persona facts (getPersonaFactsForPrompt); always injected
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
  * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
@@ -169,6 +200,7 @@ export function buildPromptMessages({
   historyMessages = [],
   userMessage = null,
   memories = [],
+  personaFacts = [],
   lorebooks = [],
   affection = null,
   now = localDatetime(),
@@ -201,6 +233,9 @@ export function buildPromptMessages({
 
   // Compose final system content by joining the sections
   const systemParts = [basePrompt];
+  // ── [1b] Persona facts — profile block, right after the character card ─────
+  const personaFactsBlock = buildPersonaFactsBlock(personaFacts, persona);
+  if (personaFactsBlock) systemParts.push(personaFactsBlock);
   const affectionBlock = buildAffectionPrompt(affection, character, persona);
   if (affectionBlock) systemParts.push(affectionBlock);
   // Cada memória vem prefixada com quando aconteceu relativo a agora — "(yesterday)",

@@ -34,6 +34,7 @@ src/
       extraction.js                 ← extractAndSaveMemories(): UMA chamada Ollama → memórias auto + pinned classificadas
       trigger.js                    ← processMemoryBacklogIfDue(): gatilho por cursor (last_memory_position)
       retrieval.js                  ← getRelevantMemories/getMemoriesForPrompt: score por keyword (word-boundary, sem acentos)
+      personaFacts.js               ← memória de persona (perfil do usuário): extração new/reinforce/supersede, gatilho por cursor próprio, getPersonaFactsForPrompt()
   services/
     ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
     ollama.models.js                ← garante existência do modelo customizado gemma4:e4b-64k (preset "Máquina Forte") via Modelfile API
@@ -49,6 +50,7 @@ src/
         conversations.js            ← createConversation, getConversation, getLatestConversationForCharacter, getRecentCharactersWithConversations
         messages.js                 ← addMessage, updateMessage, getLastMessage, deleteMessage, rollbackConversation, resetConversation, getConversationMessages, getLastNMessages, getMemoryBacklog
         memories.js                 ← createMemory, getMemories, getPinnedMemories, getMemoriesByType
+        personaFacts.js             ← createPersonaFact, getActive/AllPersonaFacts, reinforce/supersede/deletePersonaFact
         lorebooks.js                ← createLorebook, getLorebook, getGlobal/CharacterLorebooks, getAllLorebooks, updateLorebook, deleteLorebook, getCharacterLorebookIds, setCharacterLorebooks
         config.js                   ← getGenerationConfig, setGenerationConfig, get/setConversationModel
     webServer/
@@ -56,7 +58,7 @@ src/
       routes/
         index.routes.js             ← GET /
         check.routes.js             ← GET /check, GET /api/status + exporta getHealthStatus()
-        persona.routes.js           ← GET /persona, GET/POST /api/persona
+        persona.routes.js           ← GET /persona, GET/POST /api/persona, GET/DELETE /api/persona/facts
         character.routes.js         ← factory characterRouter(uploadDir) com todas as rotas de personagem
         chat.routes.js              ← GET /chat/:characterId + monta chatRouter de core/chat.js
         settings.routes.js          ← GET /settings, GET /api/presets, GET/POST /api/config, GET /api/models, POST /api/models/pull
@@ -116,13 +118,14 @@ contexto/
 |--------|-----------|
 | `characters` | id, name, description, personality, physical_traits (tiques físicos/tells por personagem — injetado no prompt como seção própria "PHYSICAL TELLS"), avatar_url (imagem principal = primeira da galeria), scenario, first_message, affection_points (pontos de afeto acumulados), affection_override (estágio fixado manualmente; NULL = automático) |
 | `character_images` | id, character_id, url, position — galeria de imagens do personagem; o chat sorteia uma como background a cada carregamento. Migração: DBs antigos herdam avatar_url como primeira imagem |
-| `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias) |
+| `conversations` | id, character_id, user_persona, title, scenario, first_message, last_memory_position (cursor da extração de memórias), last_persona_position (cursor da extração de persona facts) |
 | `messages` | id, conversation_id, role (user/assistant/system), content, position |
 | `persona` | id='self', name, description, avatar_url (única linha) |
 | `memories` | id, conversation_id, type (auto/manual/pinned), content, summary, keywords, is_pinned, relevance_weight |
+| `persona_facts` | id, category (preference/dislike/trait/fact/relationship/goal), content, keywords, confidence, times_confirmed, status (active/superseded), superseded_by, source_conversation_id — perfil GLOBAL do usuário (não pertence a conversa); fato contradito nunca é deletado, vira superseded |
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
-| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval, think (raciocínio nativo do Ollama, desligado por padrão) |
+| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval, persona_interval (extração de persona facts a cada N mensagens do usuário; 0 = desligado), think (raciocínio nativo do Ollama, desligado por padrão) |
 | `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel); único override existente |
 
 **Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita. `saveDB()` é **debounced** (~500ms); a gravação imediata é `flushDB()`, chamada no shutdown. A coluna `stop` é CSV (o parseStop ainda lê o formato JSON legado de bancos antigos).
@@ -169,6 +172,8 @@ DELETE /api/conversations/:id/rollback      → remove mensagens após messageId
 GET  /api/status            → health check (Ollama + DB)
 GET  /api/persona           → retorna persona atual
 POST /api/persona           → salva persona
+GET  /api/persona/facts     → todos os persona facts (ativos + superseded; front separa por status)
+DELETE /api/persona/facts/:id → exclui um persona fact definitivamente
 GET  /api/config            → config global de geração
 POST /api/config            → salva config global
 GET  /api/presets           → presets de hardware (low/medium/high)
@@ -316,6 +321,7 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 
 `contexto/prompt_builder` — diagrama da ordem de montagem do prompt:
 1. System prompt do personagem (description + personality + scenario + persona do usuário)
+1b. Persona facts — bloco fixo `[About {{user}}]` com o perfil aprendido do usuário (sempre injetado)
 2. Memórias relevantes (pinned primeiro, depois por score/keyword)
 3. Lorebook entries (ativadas por keyword no chat)
 4. Histórico das últimas N mensagens
@@ -326,6 +332,7 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 - **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto (sem keywords informadas, são derivadas do content — memória sem keywords seria irrecuperável)
 - **Pinned**: sempre injetada no prompt (ver regras abaixo)
 - **Lorebook**: ativada por palavras-chave mencionadas no chat
+- **Persona facts**: memória de persona — quem o usuário É, não o que aconteceu (ver seção própria abaixo)
 
 ### Geração automática de memórias (extrator unificado)
 
@@ -366,6 +373,19 @@ Pinned bypassa o filtro de keyword e é sempre injetada. Reservada para **moment
 - Matching por keyword com **fronteira de palavra** e **insensível a acentos** ("coração" ≡ "coracao"; "ana" não casa em "banana").
 - Score não-pinned = `(hits / total_keywords) * relevance_weight`; empate → mais recente. Top 5 por padrão.
 - O `promptBuilder` **não re-filtra** — recebe as memórias já selecionadas pelo retrieval e injeta o `content` completo em dois blocos: `[Core memories …]` (pinned) e `[Relevant memories …]` (contextuais).
+
+### Memória de persona (persona facts — `memory/personaFacts.js`)
+
+Sistema irmão da memória episódica, com comportamento de **perfil que se atualiza** em vez de linha do tempo: memória episódica registra *o que aconteceu* ("disse X em 12/08" — datado, perde relevância); persona facts registram *quem o usuário é* ("gosta de queijo" — atemporal, permanece até ser contradito).
+
+- **Escopo global**: a tabela `persona_facts` não tem `conversation_id` — o perfil é do usuário (como a própria persona), compartilhado por todos os personagens e conversas. `source_conversation_id` registra só a origem, para auditoria. Reset/delete de conversa **não** apaga fatos.
+- **Categorias**: `preference` (gosta), `dislike` (evita), `trait` (padrão de comportamento observado, não o que ele diz que é), `fact` (biografia concreta), `relationship` (relações fora do roleplay), `goal` (o que busca).
+- **Gatilho** (`processPersonaBacklogIfDue`): cursor próprio `conversations.last_persona_position`; dispara no mesmo `afterDone` da extração episódica (sequencial a ela — Ollama local processa uma chamada por vez), a cada `persona_interval` mensagens **do usuário** (0 = desligado; configurável em `/settings`). Não espera mensagens saírem da janela de contexto — fato de perfil não duplica histórico. Mesmas garantias do cursor episódico: só avança com extração bem-sucedida, rollback clampeia, reset zera, lock por conversa, timeout 120s.
+- **Extração** (`extractAndSavePersonaFacts`): UMA chamada Ollama (structured outputs + parsing defensivo) que recebe o PERSONA BASELINE (description da persona — nunca re-extrai o que já está lá) e os fatos já conhecidos indexados (`#N`), e decide por item: `new` (cria; `certainty` 1-5 do modelo → `confidence` 0.5–0.9), `reinforce` (fato reconfirmado: `times_confirmed`+1, `confidence`+0.1 cap 1.0 — **nunca duplica**) ou `supersede` (contradição: o antigo vira `status='superseded'` + `superseded_by` — sai do prompt mas fica no banco como histórico; **nunca é deletado**). Teste de enquadramento no prompt: "hoje estou com fome" não é fato; "sempre reclama de fome à tarde" é.
+- **Rede mecânica sob o modelo**: item `new` passa por dedup de sobreposição (keywords ≥0.6 ou conteúdo ≥0.7, **na mesma categoria**) e vira reforço se bater. Entre categorias não há dedup automático — keywords iguais em categorias opostas ("gosta de queijo" × "não gosta de queijo") costumam ser contradição, decisão semântica que pertence ao modelo (`supersede`). Supersede com conteúdo idêntico ao alvo é rebaixado a reforço.
+- **Injeção**: `getPersonaFactsForPrompt()` (ativos, ordenados por confiança, cap 30) → bloco fixo `[About {{user}} — persistent profile…]` logo após o character card, agrupado por categoria — **sem keyword matching**, sempre presente (o perfil do usuário é sempre relevante, como a ficha do personagem). O bloco instrui a não recitar a lista nem puxar os fatos do nada.
+- **SSE**: após a extração episódica, `{type:"persona_processing"}` → `{type:"persona_facts", created, reinforced, superseded}` — o frontend mostra status e toast verde ("Aprendi algo novo sobre você") quando `created`/`superseded` > 0.
+- **Gestão**: página `/persona` lista os fatos ativos (badge de categoria, confirmações, confiança, exclusão individual) e os substituídos num histórico colapsado. `GET/DELETE /api/persona/facts`.
 
 ## Sistema de afeto (`src/core/affection.js`)
 

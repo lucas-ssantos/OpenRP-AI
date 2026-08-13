@@ -78,22 +78,26 @@ export function rollbackConversation(conversationId, messageId) {
     `DELETE FROM messages WHERE conversation_id = ? AND position > ?`,
     [conversationId, position]
   );
-  // Clampeia o cursor de extração de memórias: mensagens reescritas após o
-  // rollback não podem ser consideradas "já processadas"
+  // Clampeia os cursores de extração (memórias e persona facts): mensagens
+  // reescritas após o rollback não podem ser consideradas "já processadas"
   db.run(
-    `UPDATE conversations SET last_memory_position = MIN(last_memory_position, ?) WHERE id = ?`,
-    [position, conversationId]
+    `UPDATE conversations SET
+       last_memory_position  = MIN(last_memory_position, ?),
+       last_persona_position = MIN(last_persona_position, ?)
+     WHERE id = ?`,
+    [position, position, conversationId]
   );
   saveDB();
   return true;
 }
 
-// Apaga todas as mensagens e memórias — usado pelo reset de conversa
+// Apaga todas as mensagens e memórias — usado pelo reset de conversa.
+// Persona facts NÃO são apagados: pertencem ao usuário, não à conversa.
 export function resetConversation(conversationId) {
   const db = getDB();
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
-  db.run(`UPDATE conversations SET last_memory_position = 0 WHERE id = ?`, [conversationId]);
+  db.run(`UPDATE conversations SET last_memory_position = 0, last_persona_position = 0 WHERE id = ?`, [conversationId]);
   saveDB();
 }
 
@@ -121,6 +125,23 @@ export function getLastNMessages(conversationId, n = 20) {
   );
   if (result.length === 0) return [];
   return result[0].values.map(mapRow).reverse();
+}
+
+// Backlog da extração de persona facts: mensagens após o cursor, mais antigas
+// primeiro. Diferente do backlog de memórias, NÃO espera sair da janela de
+// contexto — um fato sobre quem o usuário é não duplica o histórico, então
+// pode (e deve) ser aprendido o quanto antes.
+export function getPersonaBacklog(conversationId, lastProcessed, limit) {
+  const db = getDB();
+  const result = db.exec(
+    `SELECT id, conversation_id, role, content, position, created_at
+     FROM messages
+     WHERE conversation_id = ? AND role != 'system' AND position > ?
+     ORDER BY position ASC LIMIT ?`,
+    [conversationId, lastProcessed, limit]
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map(mapRow);
 }
 
 // Mensagens fora da janela de contexto (as numCtx mais recentes) e ainda não

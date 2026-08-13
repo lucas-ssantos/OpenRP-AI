@@ -108,6 +108,7 @@ export async function migrate() {
       scenario TEXT,
       first_message TEXT,
       last_memory_position INTEGER DEFAULT 0,
+      last_persona_position INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -116,6 +117,11 @@ export async function migrate() {
 
   // Migration para DBs criados antes do cursor de extração de memórias
   try { db.run(`ALTER TABLE conversations ADD COLUMN last_memory_position INTEGER DEFAULT 0`); } catch {}
+
+  // Migration: cursor da extração de persona facts (perfil do usuário) — em DBs
+  // antigos começa em 0, então o histórico existente vira backlog e é minerado
+  // gradualmente (mesmo comportamento do cursor de memórias episódicas).
+  try { db.run(`ALTER TABLE conversations ADD COLUMN last_persona_position INTEGER DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`
@@ -160,6 +166,28 @@ export async function migrate() {
     );
   `);
 
+  // ===== PERSONA FACTS (perfil do usuário — quem ele é, não o que aconteceu) =====
+  // Sistema irmão das memórias episódicas: fatos atemporais sobre o usuário,
+  // globais (não pertencem a uma conversa), sempre injetados no prompt.
+  // Um fato reconfirmado é reforçado (times_confirmed/confidence sobem); um fato
+  // contradito nunca é deletado — vira status='superseded' apontando o substituto,
+  // sai do prompt mas permanece no banco como histórico auditável.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS persona_facts (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL DEFAULT 'fact',
+      content TEXT NOT NULL,
+      keywords TEXT,
+      confidence REAL DEFAULT 0.6,
+      times_confirmed INTEGER DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'active',
+      superseded_by TEXT,
+      source_conversation_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // ===== LOREBOOKS (World Info, ativado por keywords) =====
   db.run(`
     CREATE TABLE IF NOT EXISTS lorebooks (
@@ -195,6 +223,7 @@ export async function migrate() {
       num_ctx_messages INTEGER DEFAULT 20,
       min_tokens INTEGER DEFAULT 60,
       memory_interval INTEGER DEFAULT 5,
+      persona_interval INTEGER DEFAULT 10,
       think INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -203,6 +232,10 @@ export async function migrate() {
 
   // Migration para DBs existentes sem a coluna memory_interval
   try { db.run(`ALTER TABLE generation_config ADD COLUMN memory_interval INTEGER DEFAULT 5`); } catch {}
+
+  // Migration: intervalo da extração de persona facts (a cada N mensagens do
+  // usuário; 0 = desligado).
+  try { db.run(`ALTER TABLE generation_config ADD COLUMN persona_interval INTEGER DEFAULT 10`); } catch {}
 
   // Migration: raciocínio nativo do Ollama (thinking) — desligado por padrão,
   // preserva o comportamento anterior (hardcoded think:false) em DBs existentes.
@@ -224,13 +257,13 @@ export async function migrate() {
     INSERT OR IGNORE INTO generation_config
       (id, model, temperature, top_p, top_k, min_p,
        repeat_penalty, repeat_last_n, max_tokens,
-       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, think)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, persona_interval, think)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
     d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
-    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.think ? 1 : 0,
+    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.persona_interval ?? 10, d.think ? 1 : 0,
   ]);
 
   // O override de config por personagem foi removido — o único override que
@@ -268,6 +301,7 @@ export async function migrate() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_conv ON memories(conversation_id);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_type ON memories(type);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_pinned ON memories(is_pinned);`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_pfacts_status ON persona_facts(status);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_scope ON lorebooks(scope);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_char ON lorebooks(character_id, scope);`);
 

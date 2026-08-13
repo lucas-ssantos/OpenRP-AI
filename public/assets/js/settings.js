@@ -256,6 +256,7 @@ function fillForm(config) {
   document.getElementById('num_ctx_messages').value  = config.num_ctx_messages  ?? '';
   document.getElementById('min_tokens').value        = config.min_tokens        ?? '';
   document.getElementById('memory_interval').value   = config.memory_interval   ?? 5;
+  document.getElementById('persona_interval').value  = config.persona_interval  ?? 10;
   document.getElementById('max_tokens').value     = config.max_tokens     ?? '';
   document.getElementById('stream').value         = config.stream ? '1' : '0';
   document.getElementById('seed').value           = config.seed           ?? '';
@@ -299,6 +300,10 @@ async function handleSubmit(e) {
   // Contexto automático → não envia num_ctx ao Ollama (context_size = null).
   const contextAuto = document.getElementById('context_auto').checked;
 
+  // 0 = perfil desligado (deliberado) — por isso não usa `|| 10`, que engoliria o 0.
+  const personaIntervalRaw = parseInt(document.getElementById('persona_interval').value);
+  const personaInterval    = Number.isInteger(personaIntervalRaw) && personaIntervalRaw >= 0 ? personaIntervalRaw : 10;
+
   const config = {
     model:            document.getElementById('model').value.trim(),
     temperature:      parseFloat(document.getElementById('temperature').value)    || null,
@@ -312,6 +317,7 @@ async function handleSubmit(e) {
     min_tokens:       parseInt(document.getElementById('min_tokens').value)       || null,
     max_tokens:       parseInt(document.getElementById('max_tokens').value)       || null,
     memory_interval:  parseInt(document.getElementById('memory_interval').value)  || 5,
+    persona_interval: personaInterval,
     stream:           parseInt(document.getElementById('stream').value)           || null,
     seed:             parseInt(document.getElementById('seed').value)             || -1,
     think:            document.getElementById('think').checked,

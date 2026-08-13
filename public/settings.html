@@ -253,12 +253,23 @@
                     <input type="number" id="memory_interval" name="memory_interval"
                            class="form-control" min="1" max="50" step="1" value="5" />
                   </div>
+                  <div class="col-12 col-sm-6 col-lg-4">
+                    <label class="form-label d-flex align-items-center gap-1">
+                      Perfil a cada N mensagens suas
+                      <i class="bi bi-info-circle text-secondary" style="font-size:.8rem;"
+                         data-bs-toggle="tooltip"
+                         title="A cada N mensagens SUAS, o modelo extrai fatos atemporais sobre você (preferências, traços, biografia) e atualiza um perfil sempre visível ao personagem. 0 = desligado."></i>
+                    </label>
+                    <input type="number" id="persona_interval" name="persona_interval"
+                           class="form-control" min="0" max="100" step="1" value="10" />
+                  </div>
                 </div>
                 <div class="ctx-alert mt-3">
                   <i class="bi bi-info-circle-fill flex-shrink-0" style="margin-top:.1rem;"></i>
                   <span>
                     A cada <strong>N pares</strong> de mensagens, o modelo lê o trecho recente e cria uma memória resumindo o que aconteceu.
                     Memórias de extrema importância (mudanças permanentes, segredos revelados) são salvas automaticamente como <strong>memórias fixas</strong> e sempre incluídas no contexto.
+                    Já o <strong>perfil</strong> aprende quem <em>você</em> é (gostos, traços, fatos da sua vida): fatos reconfirmados ganham confiança, fatos contraditos são substituídos — gerencie-os na página <a href="/persona">Persona</a>.
                   </span>
                 </div>
               </div>
