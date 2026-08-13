@@ -69,6 +69,22 @@ function buildInstructionPrompt(character, persona) {
   );
 }
 
+// Escopo do raciocínio nativo (generation_config.think) — verificação, não
+// composição. Sem esta trava, o thinking do modelo compete com a resposta pelo
+// mesmo num_predict planejando a cena inteira; com ela, vira um check de 1-2
+// linhas (consistência de personagem + tom emocional) e o orçamento sobra
+// quase todo para a resposta real. O conteúdo do thinking nunca chega ao chat
+// (message.thinking → só logs), então o bloco pode ser explícito sobre isso.
+function buildThinkingScopeBlock(character) {
+  return `THINKING (private reasoning — never part of the reply)\n` +
+    `Use minimal reasoning: one short check, two lines max, before answering.\n` +
+    `Check only two things:\n` +
+    `1. Consistency — does the reply fit ${character.name}'s personality, the established facts and the current relationship stage?\n` +
+    `2. Emotional tone — does it match the emotional temperature of the scene right now?\n` +
+    `Answer both in one or two short lines, then write the reply.\n` +
+    `Never draft, rehearse or compose the reply inside the thinking — verification only. Never think longer than necessary.`;
+}
+
 // Hard length cap, kept isolated as its own block at the very end of the system
 // prompt — never mixed into STYLE. A size constraint sitting next to tone
 // instructions makes the model sometimes prioritize one and ignore the other;
@@ -190,6 +206,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object[]} opts.personaFacts     - active persona facts (getPersonaFactsForPrompt); always injected
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
+ * @param {boolean}  opts.thinkingEnabled  - generation_config.think ativo → injeta o bloco THINKING de raciocínio mínimo
  * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
  * @returns {{ role: string, content: string }[]}
  */
@@ -203,6 +220,7 @@ export function buildPromptMessages({
   personaFacts = [],
   lorebooks = [],
   affection = null,
+  thinkingEnabled = false,
   now = localDatetime(),
 }) {
   // Context text for lorebook keyword matching: current message + the *entire*
@@ -263,6 +281,9 @@ export function buildPromptMessages({
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');
     systemParts.push(`[World info]\n${loreText}`);
   }
+  // Escopo do thinking entra logo antes do hard limit — só quando o raciocínio
+  // nativo está ativo na config; com think:false o bloco seria ruído.
+  if (thinkingEnabled) systemParts.push(buildThinkingScopeBlock(character));
   // Isolated, always last — see buildHardLimitBlock() for why it's not in STYLE.
   systemParts.push(buildHardLimitBlock());
   const systemContent = expandPlaceholders(systemParts.join('\n\n---\n\n'), character, persona);
