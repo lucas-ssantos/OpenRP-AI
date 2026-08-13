@@ -64,6 +64,16 @@ function estimateTokens(text) {
     return Math.ceil(text.trim().split(/\s+/).length * 1.3);
 }
 
+// Com thinking ativo, os tokens de raciocínio saem do mesmo num_predict que a
+// resposta — sem folga, o check (por mais mínimo que a instrução THINKING peça)
+// rouba espaço da resposta real. O bônus só se aplica a orçamentos positivos:
+// -1 (parada natural) já não tem teto a estourar.
+const THINKING_TOKEN_BONUS = 400;
+export function withThinkingBudget(tokens, config) {
+    if (!tokens || tokens <= 0 || config.think !== true) return tokens;
+    return tokens + THINKING_TOKEN_BONUS;
+}
+
 // When max_tokens <= 0 (i.e. -1), passes -1 through to Ollama (natural stop).
 // Dynamic capping only applies when the user sets a positive max_tokens ceiling.
 export function dynamicMaxTokens(userMessage, config) {
@@ -71,7 +81,8 @@ export function dynamicMaxTokens(userMessage, config) {
     const FLOOR   = config.min_tokens ?? 60;
     const CEILING = config.max_tokens;
     const RATIO   = 1.4;
-    return Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));
+    const base = Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));
+    return withThinkingBudget(base, config);
 }
 
 function lastSentenceBoundary(str) {

@@ -6,7 +6,7 @@ import {
     getAllLorebooks, getMemories, addAffectionPoints,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
-import { resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
+import { resolveConfig, dynamicMaxTokens, withThinkingBudget, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
@@ -54,6 +54,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             historyMessages: recentMsgs,
             userMessage: content.trim(),
             memories, lorebooks, affection,
+            thinkingEnabled: config.think === true,
         });
 
         // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
@@ -157,9 +158,10 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             userMessage: null,
             memories, lorebooks,
             affection: getEffectiveAffection(character),
+            thinkingEnabled: config.think === true,
         });
 
-        const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : (config.min_tokens ?? 60) * 2 };
+        const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : withThinkingBudget((config.min_tokens ?? 60) * 2, config) };
         const gen = beginGeneration(conversationId);
 
         startSSE(res);
