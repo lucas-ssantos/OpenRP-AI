@@ -52,7 +52,7 @@ ${personaName} is the human user; ${characterName} is the AI character they talk
 
 Your job: read the conversation excerpt and update the persistent profile of
 ${personaName} — WHO they are, not what happened. Think of it as a character
-sheet for the user, filled in gradually as they reveal themselves.
+sheet for the USER ONLY, filled in gradually as they reveal themselves.
 
 THE FRAMING TEST — the most important rule:
 Events belong to another system. You only record TIMELESS characteristics.
