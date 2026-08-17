@@ -1,5 +1,37 @@
 import { spawnSync } from "child_process";
+import { connect } from "net";
 import { registerTailscale } from "../core/shutdown.js";
+
+const INTERNET_CHECK_TIMEOUT_MS = 3000;
+// Evita travar a inicialização se um comando ficar pendurado (ex: tailscaled
+// tentando se conectar sem rede disponível) — mata o processo e segue em frente.
+const COMMAND_TIMEOUT_MS = 8000;
+
+// Testa conectividade real (não só resolução DNS) abrindo um socket TCP contra
+// um host confiável. Usado para pular a etapa do Tailscale sem travar a
+// inicialização quando não há internet.
+function hasInternetConnection(timeoutMs = INTERNET_CHECK_TIMEOUT_MS) {
+    return new Promise((resolve) => {
+        const socket = connect({ host: "1.1.1.1", port: 443, timeout: timeoutMs });
+        const finish = (result) => {
+            socket.destroy();
+            resolve(result);
+        };
+        socket.once("connect", () => finish(true));
+        socket.once("timeout", () => finish(false));
+        socket.once("error", () => finish(false));
+    });
+}
+
+// spawnSync com timeout: se o comando demorar demais, ele é morto (SIGTERM)
+// em vez de travar a inicialização indefinidamente.
+function spawnWithTimeout(cmd, args, timeoutMs = COMMAND_TIMEOUT_MS) {
+    const result = spawnSync(cmd, args, { timeout: timeoutMs });
+    if (result.error?.code === "ETIMEDOUT" || result.signal) {
+        console.warn(`Comando '${cmd} ${args.join(" ")}' demorou mais que ${timeoutMs}ms e foi encerrado.`);
+    }
+    return result;
+}
 
 export function isTailscaleServiceActive() {
     const hasSystemctl = spawnSync("which", ["systemctl"]).status === 0;
@@ -64,23 +96,29 @@ export async function initTailscale() {
         return;
     }
 
+    console.log("Verificando conexão com a internet...");
+    if (!(await hasInternetConnection())) {
+        console.warn("Sem conexão com a internet — pulando inicialização do Tailscale.");
+        return;
+    }
+
     const isActive = spawnSync("systemctl", ["is-active", "--quiet", "tailscaled"]);
     if (isActive.status !== 0) {
         console.log("Tailscale service not running. Starting via systemd...");
-        const start = spawnSync("systemctl", ["start", "tailscaled", "--no-ask-password"]);
+        const start = spawnWithTimeout("systemctl", ["start", "tailscaled", "--no-ask-password"]);
         if (start.status !== 0) {
-            console.warn("Falha ao iniciar tailscaled via systemctl. Tente: sudo systemctl start tailscaled");
+            console.warn("Falha ao iniciar tailscaled via systemctl (ou demorou demais) — pulando Tailscale. Tente: sudo systemctl start tailscaled");
             return;
         }
     }
 
     // Conecta à rede Tailscale (sem-op se já estiver conectado)
-    const up = spawnSync("tailscale", ["up"]);
+    const up = spawnWithTimeout("tailscale", ["up"]);
     if (up.status !== 0) {
         const stderr = up.stderr?.toString().trim();
         // "already running" não é erro real
         if (!stderr?.includes("already")) {
-            console.warn("Falha ao executar 'tailscale up':", stderr || "(sem saída)");
+            console.warn("Falha ao executar 'tailscale up' (ou demorou demais) — pulando Tailscale:", stderr || "(sem saída)");
             return;
         }
     }
