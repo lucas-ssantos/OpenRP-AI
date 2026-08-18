@@ -22,6 +22,8 @@ export function isDevMode() {
  * @param {string}   opts.filteredResponse - resposta após remover tokens de raciocínio
  * @param {string}   [opts.thinking]       - raciocínio nativo do Ollama (message.thinking, quando think:true na config)
  * @param {string}   [opts.thinkingTrigger] - motivo da ativação do thinking neste turno ('always' | 'forced' | 'level_up' | 'emotional' | 'memory_load'), null se desativado
+ * @param {number}   [opts.prepMs]         - tempo (ms) desde a requisição até o envio ao Ollama (montagem do prompt, retrieval de memórias/lorebook)
+ * @param {number}   [opts.generationMs]   - tempo (ms) que o Ollama levou para gerar a resposta (streaming completo)
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
  */
 export function logConversationTurn({
@@ -33,6 +35,8 @@ export function logConversationTurn({
     filteredResponse,
     thinking = "",
     thinkingTrigger = null,
+    prepMs = null,
+    generationMs = null,
     allMemories  = [],
     allLorebooks = [],
     isRegen = false,
@@ -54,6 +58,7 @@ export function logConversationTurn({
         const entry = buildLogEntry({
             character, model, messages,
             rawResponse, filteredResponse, thinking, thinkingTrigger,
+            prepMs, generationMs,
             allMemories, allLorebooks,
             isRegen,
         });
@@ -75,17 +80,25 @@ function section(label) {
     return `\n── ${label} ${dashes}`;
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, allMemories, allLorebooks, isRegen }) {
+// ms < 1s em "Xms", acima disso em "X.XXs" — mais legível para gerações longas.
+function formatDuration(ms) {
+    if (ms == null || !Number.isFinite(ms)) return null;
+    return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(2)}s`;
+}
+
+function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, prepMs, generationMs, allMemories, allLorebooks, isRegen }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
     });
 
     const turnType = isRegen ? "REGENERAÇÃO" : "MENSAGEM";
+    const prepStr = formatDuration(prepMs);
+    const genStr  = formatDuration(generationMs);
     const lines = [];
 
     lines.push(`\n${DIVIDER}`);
-    lines.push(`  ${now}  |  ${turnType}  |  Personagem: ${character?.name}  |  Modelo: ${model}${thinkingTrigger ? `  |  Thinking: ${thinkingTrigger}` : ""}`);
+    lines.push(`  ${now}  |  ${turnType}  |  Personagem: ${character?.name}  |  Modelo: ${model}${thinkingTrigger ? `  |  Thinking: ${thinkingTrigger}` : ""}${prepStr ? `  |  Preparo: ${prepStr}` : ""}${genStr ? `  |  Geração: ${genStr}` : ""}`);
     lines.push(DIVIDER);
 
     if (!messages?.length) {

@@ -52,6 +52,7 @@ function buildAfterDoneHook(conversationId, { character, persona, config, affect
 // ── POST /api/conversations/:id/messages (streaming) ─────────────────────────
 router.post("/conversations/:id/messages", async (req, res) => {
     const conversationId = req.params.id;
+    const requestStartTime = Date.now();
     try {
         const { content, force_thinking } = req.body;
         if (!content?.trim()) return res.status(400).json({ ok: false, message: "Conteúdo da mensagem é obrigatório." });
@@ -117,10 +118,15 @@ router.post("/conversations/:id/messages", async (req, res) => {
         res.on("close", () => detachSubscriber(conversationId, res));
 
         let turnSaved = false;
+        // Preparo = da chegada da requisição até aqui (montagem do prompt, retrieval
+        // de memórias/lorebook, cálculo de afeto/thinking) — antes de chamar o Ollama.
+        const prepMs = Date.now() - requestStartTime;
+        const genStartTime = Date.now();
         // A geração roda independente desta conexão: se o cliente desconectar
         // (troca de página, tela apagou), ela continua e persiste no banco —
         // ver generationManager.js e GET /conversations/:id/generation.
         await streamOllama(conversationId, gen, ollamaMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+            const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
                 if (savedContent) updateMessage(asstMsgId, savedContent);
@@ -138,6 +144,8 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 filteredResponse: fullContent,
                 thinking: rawThinking,
                 thinkingTrigger,
+                prepMs,
+                generationMs,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
             });
@@ -158,6 +166,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 // ── POST /api/conversations/:id/regenerate ────────────────────────────────────
 router.post("/conversations/:id/regenerate", async (req, res) => {
     const conversationId = req.params.id;
+    const requestStartTime = Date.now();
     try {
         const conv = getConversation(conversationId);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
@@ -232,7 +241,10 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         res.on("close", () => detachSubscriber(conversationId, res));
 
         let turnSaved = false;
+        const prepMs = Date.now() - requestStartTime;
+        const genStartTime = Date.now();
         await streamOllama(conversationId, gen, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+            const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
                 if (savedContent) updateMessage(asstMsgId, savedContent);
@@ -250,6 +262,8 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 filteredResponse: fullContent,
                 thinking: rawThinking,
                 thinkingTrigger,
+                prepMs,
+                generationMs,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
                 isRegen: true,
