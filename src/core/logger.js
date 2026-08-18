@@ -21,6 +21,7 @@ export function isDevMode() {
  * @param {string}   opts.rawResponse      - resposta bruta do modelo (com <think> se houver)
  * @param {string}   opts.filteredResponse - resposta após remover tokens de raciocínio
  * @param {string}   [opts.thinking]       - raciocínio nativo do Ollama (message.thinking, quando think:true na config)
+ * @param {string}   [opts.thinkingTrigger] - motivo da ativação do thinking neste turno ('always' | 'forced' | 'level_up' | 'emotional' | 'memory_load'), null se desativado
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
  */
 export function logConversationTurn({
@@ -31,6 +32,7 @@ export function logConversationTurn({
     rawResponse,
     filteredResponse,
     thinking = "",
+    thinkingTrigger = null,
     allMemories  = [],
     allLorebooks = [],
     isRegen = false,
@@ -51,7 +53,7 @@ export function logConversationTurn({
 
         const entry = buildLogEntry({
             character, model, messages,
-            rawResponse, filteredResponse, thinking,
+            rawResponse, filteredResponse, thinking, thinkingTrigger,
             allMemories, allLorebooks,
             isRegen,
         });
@@ -73,7 +75,7 @@ function section(label) {
     return `\n── ${label} ${dashes}`;
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, allMemories, allLorebooks, isRegen }) {
+function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, allMemories, allLorebooks, isRegen }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -83,7 +85,7 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
     const lines = [];
 
     lines.push(`\n${DIVIDER}`);
-    lines.push(`  ${now}  |  ${turnType}  |  Personagem: ${character?.name}  |  Modelo: ${model}`);
+    lines.push(`  ${now}  |  ${turnType}  |  Personagem: ${character?.name}  |  Modelo: ${model}${thinkingTrigger ? `  |  Thinking: ${thinkingTrigger}` : ""}`);
     lines.push(DIVIDER);
 
     if (!messages?.length) {

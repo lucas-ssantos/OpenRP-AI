@@ -225,6 +225,7 @@ export async function migrate() {
       memory_interval INTEGER DEFAULT 5,
       persona_interval INTEGER DEFAULT 10,
       think INTEGER DEFAULT 0,
+      think_mode TEXT DEFAULT 'off',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -240,6 +241,13 @@ export async function migrate() {
   // Migration: raciocínio nativo do Ollama (thinking) — desligado por padrão,
   // preserva o comportamento anterior (hardcoded think:false) em DBs existentes.
   try { db.run(`ALTER TABLE generation_config ADD COLUMN think INTEGER DEFAULT 0`); } catch {}
+
+  // Migration: modo de thinking ('off' | 'scoped' | 'always'). Adicionada SEM
+  // default para que linhas existentes fiquem NULL e o backfill abaixo rode uma
+  // única vez — think=1 legado vira 'always' (comportamento equivalente). O
+  // UPDATE é no-op em toda inicialização seguinte (nenhuma linha NULL).
+  try { db.run(`ALTER TABLE generation_config ADD COLUMN think_mode TEXT`); } catch {}
+  db.run(`UPDATE generation_config SET think_mode = CASE WHEN think = 1 THEN 'always' ELSE 'off' END WHERE think_mode IS NULL`);
 
   // Seed inicial: usa o preset de "PC médio" (mesclado sobre os defaults do .env, que
   // preenchem campos que o preset não traz, como num_ctx_messages/memory_interval).
@@ -257,13 +265,14 @@ export async function migrate() {
     INSERT OR IGNORE INTO generation_config
       (id, model, temperature, top_p, top_k, min_p,
        repeat_penalty, repeat_last_n, max_tokens,
-       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, persona_interval, think)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, persona_interval, think, think_mode)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
     d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
-    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.persona_interval ?? 10, d.think ? 1 : 0,
+    stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.persona_interval ?? 10,
+    d.think_mode && d.think_mode !== 'off' ? 1 : 0, d.think_mode ?? 'off',
   ]);
 
   // O override de config por personagem foi removido — o único override que

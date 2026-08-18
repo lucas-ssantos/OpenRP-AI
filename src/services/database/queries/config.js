@@ -16,6 +16,13 @@ const parseStop = (raw) => {
   return [...new Set(str.split(",").map((s) => s.trim()).filter(Boolean))];
 };
 
+// think_mode: 'off' | 'scoped' | 'always'. Bancos antigos só têm a coluna
+// booleana legada `think` — 1 vira 'always' (comportamento equivalente).
+const parseThinkMode = (mode, legacyThink) => {
+  if (mode === "off" || mode === "scoped" || mode === "always") return mode;
+  return legacyThink === 1 ? "always" : "off";
+};
+
 // Mapeia uma linha de db.exec() por nome de coluna — independe da ordem física
 // das colunas (bancos antigos podem ter colunas extras, ex.: tfs_z).
 function rowToObject(result) {
@@ -38,7 +45,7 @@ export function getGenerationConfig() {
     min_tokens: row.min_tokens ?? 60,
     memory_interval: row.memory_interval ?? 5,
     persona_interval: row.persona_interval ?? 10,
-    think: row.think === 1,
+    think_mode: parseThinkMode(row.think_mode, row.think),
   };
 }
 
@@ -72,21 +79,24 @@ export function setGenerationConfig(config = {}) {
   const toStop = (v) => (Array.isArray(v) ? v.join(", ") : v || "");
   const toStream = (v) => (v === 1 || v === true || v === "1" ? 1 : 0);
   const toSeed = (v) => (v !== null && v !== undefined ? v : -1);
-  const toThink = (v) => (v === 1 || v === true || v === "1" ? 1 : 0);
+  // Aceita payloads antigos (think boolean) e novos (think_mode string).
+  const thinkMode = parseThinkMode(config.think_mode, (config.think === true || config.think === 1 || config.think === "1") ? 1 : 0);
 
   const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
           max_tokens, context_size, stream, seed, stop, num_ctx_messages,
-          min_tokens, memory_interval, persona_interval, think } = config;
+          min_tokens, memory_interval, persona_interval } = config;
   db.run(
     `INSERT OR REPLACE INTO generation_config
      (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
       max_tokens, context_size, stream, seed, stop, num_ctx_messages, min_tokens,
-      memory_interval, persona_interval, think, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      memory_interval, persona_interval, think, think_mode, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
      max_tokens, context_size, toStream(stream), toSeed(seed),
      toStop(stop), num_ctx_messages || 20, min_tokens ?? 60,
-     memory_interval ?? 5, persona_interval ?? 10, toThink(think), now]
+     memory_interval ?? 5, persona_interval ?? 10,
+     // coluna legada `think` mantida em sincronia (1 = qualquer modo ativo)
+     thinkMode !== "off" ? 1 : 0, thinkMode, now]
   );
 
   saveDB();

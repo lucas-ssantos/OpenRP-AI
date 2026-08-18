@@ -242,7 +242,9 @@ async function loadConfig() {
 function fillForm(config) {
   ensureModelOption(config.model);
   document.getElementById('model').value          = config.model          || '';
-  document.getElementById('think').checked        = !!config.think;
+  // think_mode ausente (presets antigos / payload legado com boolean think):
+  // think=true equivale a 'always'; sem nada, 'off'.
+  document.getElementById('think_mode').value     = config.think_mode || (config.think ? 'always' : 'off');
   document.getElementById('temperature').value    = config.temperature    ?? '';
   document.getElementById('top_p').value          = config.top_p          ?? '';
   document.getElementById('top_k').value          = config.top_k          ?? '';
@@ -320,7 +322,7 @@ async function handleSubmit(e) {
     persona_interval: personaInterval,
     stream:           parseInt(document.getElementById('stream').value)           || null,
     seed:             parseInt(document.getElementById('seed').value)             || -1,
-    think:            document.getElementById('think').checked,
+    think_mode:       document.getElementById('think_mode').value,
     stop,
   };
 

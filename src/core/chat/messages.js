@@ -6,7 +6,7 @@ import {
     getAllLorebooks, getMemories, addAffectionPoints,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
-import { resolveConfig, dynamicMaxTokens, withThinkingBudget, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
+import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue, getPersonaFactsForPrompt, processPersonaBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
@@ -18,7 +18,7 @@ const router = Router();
 router.post("/conversations/:id/messages", async (req, res) => {
     const conversationId = req.params.id;
     try {
-        const { content } = req.body;
+        const { content, force_thinking } = req.body;
         if (!content?.trim()) return res.status(400).json({ ok: false, message: "Conteúdo da mensagem é obrigatório." });
 
         const conv = getConversation(conversationId);
@@ -50,19 +50,32 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const prevAffection = getEffectiveAffection(character);
         const affection     = getEffectiveAffection(character, gained);
 
+        // Decisão de thinking por turno: 'always' liga sempre; 'scoped' só quando
+        // a cena pede (level-up de afeto, carga emocional, muitas memórias);
+        // force_thinking no body força pontualmente (teste de cena), exceto com
+        // modo 'off' — off é interruptor mestre. O motivo vai para o log do turno.
+        const thinkingTrigger = resolveThinkingTrigger({
+            mode: config.think_mode,
+            forced: force_thinking === true,
+            userMessage: content.trim(),
+            memories,
+            leveledUp: affection.level > prevAffection.level,
+        });
+        const genConfig = { ...config, think: thinkingTrigger !== null };
+
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
             memories, personaFacts, lorebooks, affection,
-            thinkingEnabled: config.think === true,
+            thinkingEnabled: genConfig.think,
         });
 
         // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
         const userMsgId = addMessage(conversationId, "user", content.trim());
         const gen = beginGeneration(conversationId);
 
-        const sendConfig = { ...config, max_tokens: dynamicMaxTokens(content.trim(), config) };
+        const sendConfig = { ...genConfig, max_tokens: dynamicMaxTokens(content.trim(), genConfig) };
 
         startSSE(res);
         attachSubscriber(conversationId, res);
@@ -89,6 +102,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,
+                thinkingTrigger,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
             });
@@ -165,16 +179,26 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const personaFacts = getPersonaFactsForPrompt();
         const lorebooks    = getAllLorebooks(conv.character_id);
 
+        // Mesma decisão por turno do envio, sem gatilho de level-up (regenerar
+        // não pontua afeto); o check emocional usa a última mensagem do usuário.
+        const thinkingTrigger = resolveThinkingTrigger({
+            mode: config.think_mode,
+            forced: req.body?.force_thinking === true,
+            userMessage: lastUser?.content ?? '',
+            memories,
+        });
+        const genConfig = { ...config, think: thinkingTrigger !== null };
+
         const ollamaMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
             memories, personaFacts, lorebooks,
             affection: getEffectiveAffection(character),
-            thinkingEnabled: config.think === true,
+            thinkingEnabled: genConfig.think,
         });
 
-        const regenConfig  = { ...config, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, config) : withThinkingBudget((config.min_tokens ?? 60) * 2, config) };
+        const regenConfig  = { ...genConfig, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, genConfig) : withThinkingBudget((config.min_tokens ?? 60) * 2, genConfig) };
         const gen = beginGeneration(conversationId);
 
         startSSE(res);
@@ -196,6 +220,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,
+                thinkingTrigger,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
                 isRegen: true,

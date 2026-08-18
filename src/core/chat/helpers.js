@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getGenerationConfig, getConversationModel, addMessage, updateMessage } from "../../services/database/queries.js";
+import { normalize } from "../memory/retrieval.js";
 import { getModelContextLength } from "../../services/ollama.models.js";
 import { appConfig } from "../../config.js";
 import { broadcast, closeGeneration } from "./generationManager.js";
@@ -41,7 +42,10 @@ const VALIDATORS = {
     stream:             (v) => typeof v === "boolean",
     stop:               (v) => Array.isArray(v),
     max_response_chars: (v) => isInt(v) && v >= 0,
-    think:              (v) => typeof v === "boolean",
+    // 'off' = nunca; 'always' = todo turno; 'scoped' = só quando a cena pede
+    // (ver resolveThinkingTrigger). O boolean por turno (config.think) é
+    // computado nas rotas de chat — nunca vem direto de uma fonte de config.
+    think_mode:         (v) => v === "off" || v === "scoped" || v === "always",
 };
 
 // Hierarquia por campo: global (banco) → defaults (.env) → medium_spec.json.
@@ -64,6 +68,40 @@ export function resolveConfig(conversationId = null) {
 
 function estimateTokens(text) {
     return Math.ceil(text.trim().split(/\s+/).length * 1.3);
+}
+
+// ── Thinking scoped: decide por turno se o raciocínio vale o custo ───────────
+// Gatilhos do modo 'scoped' — momentos onde consistência de personagem é mais
+// fácil de escorregar. Palavras já normalizadas (sem acento — o texto do
+// usuário passa por normalize() antes do match, então "coração" ≡ "coracao").
+const EMOTIONAL_KEYWORDS = [
+    "triste", "tristeza", "chorar", "chorando", "chorei", "choro",
+    "medo", "assustado", "assustada", "panico",
+    "amo", "amor", "apaixonado", "apaixonada", "paixao", "beijo", "beijar",
+    "perdao", "perdoa", "perdoar", "desculpa", "magoou", "magoado", "magoada",
+    "morrer", "morte", "morreu", "morrendo", "adeus", "despedida",
+    "odeio", "odio", "raiva", "trair", "traiu", "ciume", "ciumes",
+    "saudade", "sofrer", "sofrendo", "sozinho", "sozinha", "abandonar", "abandonou",
+    "segredo", "confessar", "confesso", "prometo", "promessa",
+    "casar", "casamento", "terminar", "separar",
+];
+const EMOTIONAL_RE = new RegExp(`\\b(?:${EMOTIONAL_KEYWORDS.join("|")})\\b`, "i");
+
+// Retorna o motivo da ativação do thinking neste turno, ou null (desativado).
+// 'forced'      → force_thinking:true no body (teste manual pontual)
+// 'always'      → modo always: todo turno
+// 'level_up'    → a relação acabou de mudar de estágio (afeto)
+// 'emotional'   → a mensagem do usuário carrega palavras emocionalmente pesadas
+// 'memory_load' → 3+ memórias injetadas de uma vez — muito fato para conciliar
+// O motivo vai para o log do turno — é o que permite calibrar os gatilhos depois.
+export function resolveThinkingTrigger({ mode, forced = false, userMessage = "", memories = [], leveledUp = false }) {
+    if (mode !== "scoped" && mode !== "always") return null;
+    if (forced) return "forced";
+    if (mode === "always") return "always";
+    if (leveledUp) return "level_up";
+    if (EMOTIONAL_RE.test(normalize(userMessage))) return "emotional";
+    if (memories.length >= 3) return "memory_load";
+    return null;
 }
 
 // Com thinking ativo, os tokens de raciocínio saem do mesmo num_predict que a
