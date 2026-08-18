@@ -32,17 +32,19 @@ export function renderScenarioBubble(text) {
   dom.messagesEl.prepend(el);
 }
 
-export function updateLastCharRow() {
-  const charRows = [...dom.messagesEl.querySelectorAll('.msg-row-char')];
-  charRows.forEach(r => {
+// O botão `.regenerate-btn` só aparece na última mensagem da conversa — em
+// cima de um balão do personagem ele regenera; em cima de um balão do usuário
+// (última msg sem resposta ainda, ex.: geração anterior pausada/falhou) ele
+// vira "gerar resposta" (ver addBubble()). Nunca os dois ao mesmo tempo.
+export function updateLastRowActions() {
+  const rows = [...dom.messagesEl.querySelectorAll('.msg-row')];
+  rows.forEach(r => {
     const btn = r.querySelector('.regenerate-btn');
     if (btn) btn.style.display = 'none';
   });
-  const last = charRows[charRows.length - 1];
-  if (last) {
-    const btn = last.querySelector('.regenerate-btn');
-    if (btn) btn.style.display = '';
-  }
+  const last = rows[rows.length - 1];
+  const btn = last?.querySelector('.regenerate-btn');
+  if (btn) btn.style.display = '';
 }
 
 export function addTypingIndicator() {

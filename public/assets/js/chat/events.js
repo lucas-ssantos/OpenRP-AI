@@ -1,6 +1,6 @@
 import { state, dom } from './state.js';
 import {
-  scrollToBottom, renderBubbleText, updateLastCharRow,
+  scrollToBottom, renderBubbleText, updateLastRowActions,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
   showPinnedMemoryToast, showPersonaFactToast, showChatStatus, clearChatStatus,
   updateAffectionBadge, showAffectionToast, renderScenarioBubble, setStreamingUI,
@@ -64,13 +64,24 @@ export function addBubble(role, content, messageId = null, isFirstMessage = fals
   actionsEl.className = 'msg-actions';
   row.appendChild(actionsEl);
 
-  if (!isUser && !isFirstMessage) {
+  if (!isFirstMessage) {
+    // Mesmo botão, dois comportamentos — só um aparece por vez (o da última
+    // mensagem, ver updateLastRowActions()). Em cima do personagem: regenera
+    // (com confirmação, porque apaga a resposta atual). Em cima do usuário:
+    // significa que ainda não há resposta para essa mensagem (ex.: pause
+    // descartou a anterior) — gera uma, sem confirmação, como um envio normal.
     const regenBtn = document.createElement('button');
     regenBtn.className = 'regenerate-btn';
-    regenBtn.title = 'Regenerar resposta';
-    regenBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
     regenBtn.style.display = 'none';
-    regenBtn.addEventListener('click', (e) => { e.stopPropagation(); openRegenerateModal(row); });
+    if (isUser) {
+      regenBtn.title = 'Gerar resposta';
+      regenBtn.innerHTML = '<i class="bi bi-send-fill"></i>';
+      regenBtn.addEventListener('click', (e) => { e.stopPropagation(); continueGeneration(row); });
+    } else {
+      regenBtn.title = 'Regenerar resposta';
+      regenBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+      regenBtn.addEventListener('click', (e) => { e.stopPropagation(); openRegenerateModal(row); });
+    }
     actionsEl.appendChild(regenBtn);
   }
 
@@ -119,7 +130,7 @@ export function initRollbackModal() {
       const rows = [...dom.messagesEl.querySelectorAll('.msg-row')];
       const idx = rows.indexOf(rollbackTargetRow);
       if (idx !== -1) rows.slice(idx + 1).forEach(r => r.remove());
-      updateLastCharRow();
+      updateLastRowActions();
     } catch (err) {
       showError(`Erro ao retroceder: ${err.message}`);
     } finally {
@@ -310,7 +321,7 @@ export async function regenerateLastMessage(rowEl) {
           // resposta (regenerate) — como a nova também foi descartada, não
           // sobra nenhuma mensagem do personagem nesta posição.
           rowEl.remove();
-          updateLastCharRow();
+          updateLastRowActions();
           return;
         }
 
@@ -340,6 +351,137 @@ export async function regenerateLastMessage(rowEl) {
     showError(`Erro ao regenerar: ${err.message}`);
   } finally {
     if (regenBtn) regenBtn.disabled = false;
+    state.isStreaming = false;
+    setInputEnabled(true);
+    setStreamingUI(false);
+    dom.inputEl.focus();
+    scrollToBottom();
+  }
+}
+
+// ── Continuar (última mensagem é do usuário, sem resposta ainda) ────────
+
+// Mesmo endpoint de regenerate — quando a última mensagem da conversa já é do
+// usuário (ex.: uma geração anterior foi pausada ou falhou), o backend não
+// apaga nada e só gera a resposta para ela, exatamente como o fluxo normal de
+// envio (pontua afeto, dispara extração de memória/persona). Diferente de
+// regenerateLastMessage(), aqui a resposta é uma bolha nova, não substitui o
+// balão do usuário.
+export async function continueGeneration(userRowEl) {
+  if (state.isStreaming) return;
+  state.isStreaming = true;
+  setInputEnabled(false);
+  setStreamingUI(true);
+
+  const genBtn = userRowEl.querySelector('.regenerate-btn');
+  if (genBtn) genBtn.disabled = true;
+  addTypingIndicator();
+
+  let charRow     = null;
+  let charText    = null;
+  let charRawText = '';
+
+  try {
+    const res = await fetch(`/api/conversations/${state.conversationId}/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Erro ao gerar resposta.');
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let data;
+        try { data = JSON.parse(raw); } catch { continue; }
+
+        if (data.error) {
+          removeTypingIndicator();
+          showError(`Erro: ${data.error}`);
+          return;
+        }
+
+        if (data.cancelled) {
+          removeTypingIndicator();
+          charRow?.remove();
+          return;
+        }
+
+        if (data.type === 'affection') {
+          updateAffectionBadge(data);
+          if (data.leveled_up) showAffectionToast(data.name);
+          continue;
+        }
+
+        if (data.type === 'memory_processing') {
+          showChatStatus('Gerando memórias…');
+          continue;
+        }
+
+        if (data.type === 'memories_created') {
+          clearChatStatus();
+          if (data.pinned > 0) showPinnedMemoryToast(data.pinned);
+          continue;
+        }
+
+        if (data.type === 'persona_processing') {
+          showChatStatus('Atualizando seu perfil…');
+          continue;
+        }
+
+        if (data.type === 'persona_facts') {
+          clearChatStatus();
+          if (data.created > 0 || data.superseded > 0) showPersonaFactToast(data.created, data.superseded);
+          continue;
+        }
+
+        if (data.delta) {
+          if (!charText) {
+            removeTypingIndicator();
+            const b = addBubble('assistant', '');
+            charRow  = b.row;
+            charText = b.textEl;
+          }
+          charRawText += data.delta;
+          renderBubbleText(charText, charRawText);
+          scrollToBottom();
+        }
+
+        if (data.done) {
+          if (data.message_id && charRow) {
+            attachRollbackBtn(charRow, data.message_id);
+            charRow.dataset.messageId = data.message_id;
+            attachEditBtn(charRow, data.message_id);
+          }
+          updateLastRowActions();
+        }
+      }
+    }
+  } catch (err) {
+    removeTypingIndicator();
+    charRow?.remove();
+    showError(`Erro: ${err.message}`);
+  } finally {
+    removeTypingIndicator();
+    clearChatStatus();
+    if (genBtn) genBtn.disabled = false;
     state.isStreaming = false;
     setInputEnabled(true);
     setStreamingUI(false);
@@ -385,7 +527,7 @@ export function initResetModal() {
       }
 
       if (data.affection) updateAffectionBadge(data.affection);
-      updateLastCharRow();
+      updateLastRowActions();
     } catch (err) {
       showError(`Erro ao reiniciar conversa: ${err.message}`);
     }
@@ -514,7 +656,7 @@ export async function sendMessage() {
             userRow.dataset.messageId = data.user_message_id;
             attachEditBtn(userRow, data.user_message_id);
           }
-          updateLastCharRow();
+          updateLastRowActions();
           // Libera o input imediatamente — a extração de memórias continua no
           // mesmo stream depois do done, sem travar o usuário
           state.isStreaming = false;
@@ -594,7 +736,7 @@ export async function resumeActiveGeneration() {
         if (data.cancelled) {
           removeTypingIndicator();
           charRow?.remove();
-          updateLastCharRow();
+          updateLastRowActions();
           return;
         }
 
@@ -666,7 +808,7 @@ export async function resumeActiveGeneration() {
             attachEditBtn(charRow, data.message_id);
             charRow.dataset.messageId = data.message_id;
           }
-          updateLastCharRow();
+          updateLastRowActions();
         }
       }
     }

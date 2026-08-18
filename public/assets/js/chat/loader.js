@@ -1,5 +1,5 @@
 import { conversationId, state, dom } from './state.js';
-import { showError, setInputEnabled, scrollToBottom, updateLastCharRow, updateAffectionBadge, renderScenarioBubble } from './ui.js';
+import { showError, setInputEnabled, scrollToBottom, updateLastRowActions, updateAffectionBadge, renderScenarioBubble } from './ui.js';
 import { addBubble, initInputListeners, resumeActiveGeneration } from './events.js';
 
 // Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
@@ -89,7 +89,7 @@ export async function init() {
         addBubble(msg.role, msg.content, msg.id, isFirstMessage);
         isFirstMessage = false;
       }
-      updateLastCharRow();
+      updateLastRowActions();
     }
 
     setInputEnabled(true);

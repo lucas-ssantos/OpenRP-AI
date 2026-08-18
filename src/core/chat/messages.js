@@ -14,6 +14,41 @@ import { isGenerating, beginGeneration, attachSubscriber, detachSubscriber, broa
 
 const router = Router();
 
+// Roda depois do evento `done`: emite o novo estágio de afeto e dispara (se
+// devido) o backlog de extração de memória/persona facts. Compartilhado entre
+// o envio normal e o "continuar" do regenerate (última mensagem já é do
+// usuário — tratado como se fosse um envio comum, ver rota de regenerate).
+function buildAfterDoneHook(conversationId, { character, persona, config, affection, prevAffection, getTurnSaved }) {
+    return async () => {
+        if (!getTurnSaved()) return;
+
+        broadcast(conversationId, {
+            type: "affection",
+            ...affection,
+            leveled_up: affection.level > prevAffection.level,
+        });
+
+        const counts = await processMemoryBacklogIfDue(conversationId, {
+            character, persona, config,
+            onStart: () => broadcast(conversationId, { type: "memory_processing" }),
+        });
+        if (counts) {
+            broadcast(conversationId, { type: "memories_created", auto: counts.auto, pinned: counts.pinned });
+        }
+
+        // Perfil do usuário (persona facts) — sequencial à extração de
+        // memórias de propósito: o Ollama local processa uma chamada por
+        // vez, então rodar em paralelo só criaria fila e timeout.
+        const factCounts = await processPersonaBacklogIfDue(conversationId, {
+            character, persona, config,
+            onStart: () => broadcast(conversationId, { type: "persona_processing" }),
+        });
+        if (factCounts) {
+            broadcast(conversationId, { type: "persona_facts", ...factCounts });
+        }
+    };
+}
+
 // ── POST /api/conversations/:id/messages (streaming) ─────────────────────────
 router.post("/conversations/:id/messages", async (req, res) => {
     const conversationId = req.params.id;
@@ -109,35 +144,11 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
             return { message_id: asstMsgId, user_message_id: userMsgId };
         }, {
-            afterDone: async () => {
-                // Roda após o evento done — o input do usuário já foi liberado no frontend
-                if (!turnSaved) return;
-
-                broadcast(conversationId, {
-                    type: "affection",
-                    ...affection,
-                    leveled_up: affection.level > prevAffection.level,
-                });
-
-                const counts = await processMemoryBacklogIfDue(conversationId, {
-                    character, persona, config,
-                    onStart: () => broadcast(conversationId, { type: "memory_processing" }),
-                });
-                if (counts) {
-                    broadcast(conversationId, { type: "memories_created", auto: counts.auto, pinned: counts.pinned });
-                }
-
-                // Perfil do usuário (persona facts) — sequencial à extração de
-                // memórias de propósito: o Ollama local processa uma chamada por
-                // vez, então rodar em paralelo só criaria fila e timeout.
-                const factCounts = await processPersonaBacklogIfDue(conversationId, {
-                    character, persona, config,
-                    onStart: () => broadcast(conversationId, { type: "persona_processing" }),
-                });
-                if (factCounts) {
-                    broadcast(conversationId, { type: "persona_facts", ...factCounts });
-                }
-            },
+            // Roda após o evento done — o input do usuário já foi liberado no frontend
+            afterDone: buildAfterDoneHook(conversationId, {
+                character, persona, config, affection, prevAffection,
+                getTurnSaved: () => turnSaved,
+            }),
         });
     } catch (err) {
         handleSSEError(res, err, "Chat error");
@@ -159,13 +170,18 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         }
 
         // Só remove a última resposta se ela for de fato a ÚLTIMA mensagem da
-        // conversa — se a última for do usuário (ex.: geração anterior falhou),
-        // nada é apagado e a nova resposta entra no fim, sem reordenar o histórico.
+        // conversa. Se a última já for do usuário (geração anterior pausada pelo
+        // botão de pause, ou falhou), nada é apagado — isto é "continuar": gera a
+        // resposta para essa mensagem exatamente como o fluxo normal de envio
+        // (pontua afeto, dispara extração de memória/persona no afterDone), só
+        // que sem inserir uma nova mensagem de usuário (ela já existe no banco).
         const lastMsg = getLastMessage(conversationId);
         if (!lastMsg) return res.status(400).json({ ok: false, message: "Nenhuma mensagem para regenerar." });
 
+        const isContinue = lastMsg.role === "user";
+
         let insertPos = null; // null → MAX(position)+1 no insert
-        if (lastMsg.role === "assistant") {
+        if (!isContinue) {
             deleteMessage(lastMsg.id);
             insertPos = lastMsg.position;
         }
@@ -174,18 +190,28 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const config     = resolveConfig(conversationId);
 
         const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
-        const lastUser     = [...recentMsgs].reverse().find(m => m.role === "user");
+        const lastUser     = isContinue ? lastMsg : [...recentMsgs].reverse().find(m => m.role === "user");
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
         const personaFacts = getPersonaFactsForPrompt();
         const lorebooks    = getAllLorebooks(conv.character_id);
 
-        // Mesma decisão por turno do envio, sem gatilho de level-up (regenerar
-        // não pontua afeto); o check emocional usa a última mensagem do usuário.
+        // "Continuar" pontua afeto igual a um envio normal (é a resposta que
+        // faltou para a mensagem do usuário); regenerar de fato (substituir uma
+        // resposta existente) não pontua de novo — a mensagem já rendeu pontos
+        // na primeira vez que foi enviada.
+        const gained        = isContinue ? computeAffectionGain(lastUser.content) : 0;
+        const prevAffection = getEffectiveAffection(character);
+        const affection     = isContinue ? getEffectiveAffection(character, gained) : prevAffection;
+
+        // Mesma decisão por turno do envio; level-up só é possível no modo
+        // "continuar" (regenerar de fato não pontua, então nunca muda de estágio).
+        // O check emocional sempre usa a última mensagem do usuário.
         const thinkingTrigger = resolveThinkingTrigger({
             mode: config.think_mode,
             forced: req.body?.force_thinking === true,
             userMessage: lastUser?.content ?? '',
             memories,
+            leveledUp: isContinue && affection.level > prevAffection.level,
         });
         const genConfig = { ...config, think: thinkingTrigger !== null };
 
@@ -194,7 +220,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             historyMessages: recentMsgs,
             userMessage: null,
             memories, personaFacts, lorebooks,
-            affection: getEffectiveAffection(character),
+            affection,
             thinkingEnabled: genConfig.think,
         });
 
@@ -205,12 +231,15 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         attachSubscriber(conversationId, res);
         res.on("close", () => detachSubscriber(conversationId, res));
 
+        let turnSaved = false;
         await streamOllama(conversationId, gen, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
                 if (savedContent) updateMessage(asstMsgId, savedContent);
                 else deleteMessage(asstMsgId);
             }
+            turnSaved = !!fullContent;
+            if (isContinue && turnSaved) addAffectionPoints(conv.character_id, gained);
 
             logConversationTurn({
                 conversationId,
@@ -227,7 +256,15 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             });
 
             return { message_id: asstMsgId };
-        }, { insertPosition: insertPos });
+        }, {
+            insertPosition: insertPos,
+            // Só dispara afeto/memória/persona no "continuar" — regenerar de fato
+            // não é um novo turno, é a substituição de um já contabilizado.
+            afterDone: isContinue ? buildAfterDoneHook(conversationId, {
+                character, persona, config, affection, prevAffection,
+                getTurnSaved: () => turnSaved,
+            }) : null,
+        });
     } catch (err) {
         handleSSEError(res, err, "Regenerate error");
     }
