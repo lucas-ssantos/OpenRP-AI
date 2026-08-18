@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { getGenerationConfig, getConversationModel, addMessage, updateMessage } from "../../services/database/queries.js";
+import { getGenerationConfig, getConversationModel, addMessage, updateMessage, deleteMessage } from "../../services/database/queries.js";
 import { normalize } from "../memory/retrieval.js";
 import { getModelContextLength } from "../../services/ollama.models.js";
 import { appConfig } from "../../config.js";
@@ -196,6 +196,7 @@ const PERSIST_THROTTLE_MS = 300;
 export async function streamOllama(conversationId, gen, messages, config, onDone, opts = {}) {
     const { afterDone = null, insertPosition = null } = opts;
     const controller = new AbortController();
+    gen.controller = controller; // cancelGeneration() usa isto para abortar de fora
     let stallTimer   = null;
 
     const resetStallTimer = () => {
@@ -348,6 +349,15 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
     } catch (err) {
         cleanup();
         if (err?.name === "AbortError") {
+            if (gen.cancelled) {
+                // Pause do usuário: descarta a mensagem parcial (se já persistida
+                // pelo throttle de persist()) em vez de salvá-la, e pula onDone —
+                // nada de pontuar afeto ou disparar extração de memória para um
+                // turno que o próprio usuário descartou.
+                if (gen.assistantMessageId) deleteMessage(gen.assistantMessageId);
+                closeGeneration(conversationId, { delta: "", done: true, cancelled: true });
+                return;
+            }
             // Stall (Ollama parou de responder): persiste o parcial e encerra.
             // Não depende mais de o cliente estar conectado — a única causa de
             // abort agora é o próprio Ollama travar.

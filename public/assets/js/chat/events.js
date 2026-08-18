@@ -3,8 +3,25 @@ import {
   scrollToBottom, renderBubbleText, updateLastCharRow,
   addTypingIndicator, removeTypingIndicator, showError, setInputEnabled,
   showPinnedMemoryToast, showPersonaFactToast, showChatStatus, clearChatStatus,
-  updateAffectionBadge, showAffectionToast, renderScenarioBubble,
+  updateAffectionBadge, showAffectionToast, renderScenarioBubble, setStreamingUI,
 } from './ui.js';
+
+// ── Pause (cancela a geração em andamento) ───────────────────────────────
+
+// Pede ao backend para abortar a chamada ao Ollama e descartar a mensagem
+// parcial. O próprio loop de leitura do SSE (em sendMessage/regenerate/resume)
+// recebe o evento `cancelled` pela mesma conexão e remove a bolha — este
+// request só dispara o cancelamento, não espera confirmação de conteúdo.
+async function requestCancelGeneration() {
+  if (!state.conversationId) return;
+  dom.pauseBtn.disabled = true;
+  try {
+    await fetch(`/api/conversations/${state.conversationId}/generation`, { method: 'DELETE' });
+  } catch (err) {
+    showError(`Erro ao pausar: ${err.message}`);
+    dom.pauseBtn.disabled = false;
+  }
+}
 
 // ── Rollback state ────────────────────────────────────────────────────
 
@@ -242,6 +259,7 @@ export async function regenerateLastMessage(rowEl) {
   if (state.isStreaming) return;
   state.isStreaming = true;
   setInputEnabled(false);
+  setStreamingUI(true);
 
   const bubble = rowEl.querySelector('.bubble');
   const regenBtn = rowEl.querySelector('.regenerate-btn');
@@ -287,6 +305,15 @@ export async function regenerateLastMessage(rowEl) {
 
         if (data.error) throw new Error(data.error);
 
+        if (data.cancelled) {
+          // A mensagem antiga já tinha sido apagada para dar lugar à nova
+          // resposta (regenerate) — como a nova também foi descartada, não
+          // sobra nenhuma mensagem do personagem nesta posição.
+          rowEl.remove();
+          updateLastCharRow();
+          return;
+        }
+
         if (data.delta) {
           if (!newTextEl) {
             bubble.classList.remove('typing-bubble');
@@ -315,6 +342,7 @@ export async function regenerateLastMessage(rowEl) {
     if (regenBtn) regenBtn.disabled = false;
     state.isStreaming = false;
     setInputEnabled(true);
+    setStreamingUI(false);
     dom.inputEl.focus();
     scrollToBottom();
   }
@@ -385,6 +413,7 @@ export async function sendMessage() {
 
   state.isStreaming = true;
   setInputEnabled(false);
+  setStreamingUI(true);
 
   let charRow     = null;
   let charText    = null;
@@ -425,6 +454,12 @@ export async function sendMessage() {
         if (data.error) {
           removeTypingIndicator();
           showError(`Erro: ${data.error}`);
+          return;
+        }
+
+        if (data.cancelled) {
+          removeTypingIndicator();
+          charRow?.remove();
           return;
         }
 
@@ -497,6 +532,7 @@ export async function sendMessage() {
     clearChatStatus();
     state.isStreaming = false;
     setInputEnabled(true);
+    setStreamingUI(false);
     dom.inputEl.focus();
     scrollToBottom();
   }
@@ -522,6 +558,7 @@ export async function resumeActiveGeneration() {
 
   state.isStreaming = true;
   setInputEnabled(false);
+  setStreamingUI(true);
   addTypingIndicator();
 
   let charRow  = null;
@@ -552,6 +589,13 @@ export async function resumeActiveGeneration() {
         if (data.error) {
           showError(`Erro: ${data.error}`);
           continue;
+        }
+
+        if (data.cancelled) {
+          removeTypingIndicator();
+          charRow?.remove();
+          updateLastCharRow();
+          return;
         }
 
         if (data.type === 'affection') {
@@ -633,6 +677,7 @@ export async function resumeActiveGeneration() {
     clearChatStatus();
     state.isStreaming = false;
     setInputEnabled(true);
+    setStreamingUI(false);
     scrollToBottom();
   }
 }
@@ -648,4 +693,5 @@ export function initInputListeners() {
     }
   });
   dom.sendBtn.addEventListener('click', sendMessage);
+  dom.pauseBtn.addEventListener('click', requestCancelGeneration);
 }

@@ -600,6 +600,34 @@ body.immersive .input-area {
   transform: none;
 }
 
+/* Substitui o send-btn enquanto uma resposta está sendo gerada (mesmo lugar,
+   mesmo tamanho) — clicar aborta a geração e descarta a mensagem parcial. */
+.pause-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 50%;
+  background: #f87171;
+  color: #020617;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.pause-btn:hover:not(:disabled) {
+  background: #ef4444;
+  transform: scale(1.06);
+}
+
+.pause-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ── Ideias de ação ── */
 .ideas-btn {
   width: 2.75rem;

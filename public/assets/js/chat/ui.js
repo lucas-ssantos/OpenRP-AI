@@ -73,6 +73,14 @@ export function setInputEnabled(enabled) {
   if (ideasBtn) ideasBtn.disabled = !enabled;
 }
 
+// Troca o send-btn pelo pause-btn (mesmo lugar) enquanto uma geração está
+// em andamento — clicar nele aborta a geração e descarta a resposta parcial.
+export function setStreamingUI(streaming) {
+  dom.sendBtn.style.display  = streaming ? 'none' : '';
+  dom.pauseBtn.style.display = streaming ? '' : 'none';
+  dom.pauseBtn.disabled = false;
+}
+
 export function showChatStatus(text) {
   document.getElementById('chat-status-text').textContent = text;
   document.getElementById('chat-status').style.display = 'flex';

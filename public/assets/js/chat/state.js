@@ -16,6 +16,7 @@ export const dom = {
   messagesEl: null,
   inputEl: null,
   sendBtn: null,
+  pauseBtn: null,
 };
 
 export function initDomRefs() {
@@ -26,4 +27,5 @@ export function initDomRefs() {
   dom.messagesEl = document.getElementById('messages');
   dom.inputEl    = document.getElementById('msg-input');
   dom.sendBtn    = document.getElementById('send-btn');
+  dom.pauseBtn   = document.getElementById('pause-btn');
 }

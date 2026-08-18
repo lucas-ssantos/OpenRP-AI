@@ -8,7 +8,7 @@ import {
 import { resolveConfig, startSSE } from "./helpers.js";
 import { getEffectiveAffection } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
-import { getGeneration, attachSubscriber, detachSubscriber } from "./generationManager.js";
+import { getGeneration, attachSubscriber, detachSubscriber, cancelGeneration } from "./generationManager.js";
 
 const router = Router();
 
@@ -102,6 +102,18 @@ router.get("/conversations/:id/generation", (req, res) => {
     res.write(`data: ${JSON.stringify({ delta: gen.content, done: false, sync: true, message_id: gen.assistantMessageId })}\n\n`);
     attachSubscriber(conversationId, res);
     res.on("close", () => detachSubscriber(conversationId, res));
+});
+
+// ── DELETE /api/conversations/:id/generation ─────────────────────────────────
+// Botão de pause do chat: aborta a chamada em andamento ao Ollama e descarta a
+// mensagem do assistente que estava sendo gerada — do banco (se algum chunk já
+// tinha sido persistido) e do stream (o evento `cancelled` chega pela mesma
+// conexão SSE que originou o envio/regenerate, então o frontend remove a bolha
+// parcial). 204 sem corpo = não havia nenhuma geração ativa para cancelar.
+router.delete("/conversations/:id/generation", (req, res) => {
+    const ok = cancelGeneration(req.params.id);
+    if (!ok) return res.status(204).end();
+    res.json({ ok: true });
 });
 
 // ── GET /api/conversations/:id/model ─────────────────────────────────────────

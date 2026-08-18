@@ -4,7 +4,7 @@
 // rodando aqui e sendo persistida no banco por streamOllama() normalmente.
 // GET /conversations/:id/generation usa este registro para "regrudar" num
 // stream já em andamento quando alguém volta a olhar a conversa.
-const active = new Map(); // conversationId -> { assistantMessageId, content, subscribers }
+const active = new Map(); // conversationId -> { assistantMessageId, content, subscribers, controller, cancelled }
 
 export function isGenerating(conversationId) {
     return active.has(conversationId);
@@ -14,9 +14,24 @@ export function isGenerating(conversationId) {
 // gerações concorrentes pisando na mesma mensagem/posição.
 export function beginGeneration(conversationId) {
     if (active.has(conversationId)) return null;
-    const gen = { assistantMessageId: null, content: "", subscribers: new Set() };
+    // controller é preenchido por streamOllama() assim que o AbortController
+    // existe — cancelGeneration() precisa dele para interromper a chamada ao
+    // Ollama de fora do próprio streamOllama.
+    const gen = { assistantMessageId: null, content: "", subscribers: new Set(), controller: null, cancelled: false };
     active.set(conversationId, gen);
     return gen;
+}
+
+// Pausa/cancela a geração em andamento (botão de pause no frontend): aborta a
+// chamada ao Ollama e marca `cancelled` — streamOllama() usa essa flag para
+// descartar a mensagem parcial em vez de tratá-la como um stall recuperável.
+// Retorna false se não havia nenhuma geração ativa para a conversa.
+export function cancelGeneration(conversationId) {
+    const gen = active.get(conversationId);
+    if (!gen) return false;
+    gen.cancelled = true;
+    gen.controller?.abort();
+    return true;
 }
 
 export function getGeneration(conversationId) {
