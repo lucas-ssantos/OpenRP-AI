@@ -652,12 +652,15 @@
     grid-template-columns: 1fr;
   }
 
-  /* Remover clamps de altura — no mobile o usuário faz scroll na página */
+  /* Remover clamp de linhas, mas manter um teto de altura com scroll próprio —
+     campos longos (descrição, personalidade) não empurram o resto da página. */
   .vdb-field-value {
-    max-height: none;
+    max-height: 500px;
     -webkit-line-clamp: unset;
     display: block;
-    overflow: visible;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.15) transparent;
   }
 
   .vdb-msg-content {
