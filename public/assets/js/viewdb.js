@@ -108,6 +108,10 @@ function renderCharacter(ch, conv) {
   const link = document.getElementById('char-link');
   link.href = `/chat/${conv.id}`;
 
+  // O nome do arquivo de log é derivado do conversationId no back-end (ver logger.js) —
+  // repassa o id bruto e deixa a página de logs resolver o arquivo correspondente.
+  document.getElementById('char-logs-link').href = `/logs?conv=${conv.id}`;
+
   const fields = [
     { label: 'Descrição',      value: ch.description },
     { label: 'Personalidade',  value: ch.personality },

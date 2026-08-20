@@ -19,8 +19,29 @@ async function loadFiles() {
     const data = await res.json();
     if (!data.ok) throw new Error(data.message);
     renderList(data.files);
+    selectFromQueryString(data.files);
   } catch (err) {
     listEl.innerHTML = `<p class="text-danger small p-3 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>${escape(err.message)}</p>`;
+  }
+}
+
+// Vindo do link "Ver logs" na página do banco de dados (?conv=<conversationId>) —
+// o nome do arquivo é derivado do id no back-end (ver logger.js: nome_ID8.log),
+// então localiza o arquivo pelo sufixo em vez de replicar o slug do nome aqui.
+function selectFromQueryString(files) {
+  const conv = new URLSearchParams(window.location.search).get('conv');
+  if (!conv) return;
+
+  const suffix = `_${conv.replace(/-/g, '').slice(0, 8)}.log`;
+  const match  = files.find(f => f.name.endsWith(suffix));
+
+  if (match) {
+    selectFile(match.name);
+  } else {
+    emptyEl.innerHTML = `
+      <i class="bi bi-journal-x vdb-empty-icon"></i>
+      <p class="mb-0">Nenhum log encontrado para esta conversa.</p>
+      <p class="mb-0 text-secondary" style="font-size:.8rem;">O log só é gravado em modo de desenvolvimento, e apenas após a primeira resposta gerada.</p>`;
   }
 }
 
