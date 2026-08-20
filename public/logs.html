@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Logs de conversas — OpenRP AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/assets/css/styles.css" />
+    <link rel="stylesheet" href="/assets/css/sidebar.css" />
+    <link rel="stylesheet" href="/assets/css/viewdb.css" />
+    <link rel="stylesheet" href="/assets/css/logs.css" />
+  </head>
+  <body>
+    <div class="d-flex vdb-outer">
+      <div id="sidebar-root" class="flex-shrink-0"></div>
+
+      <div class="vdb-page flex-grow-1">
+
+        <!-- Left: file list -->
+        <aside class="vdb-convs-panel">
+          <div class="vdb-panel-header">
+            <span class="fw-semibold">Logs de conversas</span>
+            <span id="log-count" class="badge-count">0</span>
+          </div>
+          <div id="log-list" class="vdb-conv-list">
+            <p class="text-secondary small p-3 mb-0">
+              <i class="bi bi-hourglass-split me-1"></i>Carregando…
+            </p>
+          </div>
+        </aside>
+
+        <!-- Right: log content -->
+        <main class="vdb-detail-panel log-detail-panel">
+
+          <div id="log-empty" class="vdb-empty">
+            <i class="bi bi-journal-text vdb-empty-icon"></i>
+            <p class="mb-0">Selecione um log para ver o conteúdo</p>
+          </div>
+
+          <div id="log-content-wrap" class="log-content-wrap d-none">
+            <div class="log-toolbar">
+              <div class="log-toolbar-info">
+                <div id="log-name" class="log-name"></div>
+                <div id="log-meta" class="log-meta"></div>
+              </div>
+              <a id="log-download" class="btn-muted log-toolbar-btn" href="#" download>
+                <i class="bi bi-download me-1"></i>Baixar
+              </a>
+            </div>
+
+            <div id="log-truncated" class="log-truncated-note d-none">
+              <i class="bi bi-info-circle-fill flex-shrink-0" style="margin-top:.1rem;"></i>
+              <span>
+                Arquivo grande — mostrando apenas o trecho mais recente.
+                <button type="button" id="log-load-full" class="log-load-full-btn">Carregar arquivo completo</button>
+              </span>
+            </div>
+
+            <pre id="log-pre" class="log-pre"></pre>
+          </div>
+
+        </main>
+
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
+    <script src="/assets/js/logs.js"></script>
+  </body>
+</html>

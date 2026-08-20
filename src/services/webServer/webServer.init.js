@@ -12,6 +12,7 @@ import chatRouter      from "./routes/chat.routes.js";
 import settingsRouter  from "./routes/settings.routes.js";
 import viewdbRouter    from "./routes/viewdb.routes.js";
 import lorebookRouter  from "./routes/lorebook.routes.js";
+import logsRouter      from "./routes/logs.routes.js";
 
 // Basic auth opcional: ativo apenas se AUTH_PASSWORD estiver definido no .env.
 // Importante quando o app é exposto via Tailscale — sem isso, qualquer
@@ -51,6 +52,7 @@ export async function startWebServer(port = appConfig.port) {
     app.use(settingsRouter);
     app.use(viewdbRouter);
     app.use(lorebookRouter);
+    app.use(logsRouter);
 
     app.use(express.static(publicPath));
 
