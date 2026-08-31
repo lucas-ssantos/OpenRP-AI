@@ -175,7 +175,9 @@ export function handleSSEError(res, err, label) {
 }
 
 // Sem nenhum chunk do Ollama por este tempo, o stream é abortado (modelo travado).
-const STREAM_STALL_TIMEOUT_MS = 120_000;
+// 5 min: cobre load a frio + prompt eval de contextos grandes em hardware lento
+// antes de declarar timeout.
+const STREAM_STALL_TIMEOUT_MS = 300_000;
 
 // Progresso é persistido no banco à medida que chega, e não só no final — é o
 // que garante que a resposta sobrevive mesmo se ninguém estiver com o SSE
