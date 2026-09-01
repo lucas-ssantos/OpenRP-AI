@@ -69,6 +69,52 @@ function buildInstructionPrompt(character, persona) {
   );
 }
 
+// Keywords used to detect an already-active explicit intimate scene in the
+// visible context window — same matcher as lorebook activation. Kept broad
+// on purpose (body/action words, not just explicit terms) so the block turns
+// on as soon as a scene goes physical, not only once it's already explicit.
+const INTIMATE_SCENE_KEYWORDS =
+  'gemido, gemendo, geme, arqueio, arqueia, estocada, estoco, penetro, ' +
+  'goza, gozo, gozando, tesão, excitada, excitado, molhada, duro, buceta, ' +
+  'pau, pica, seios, mordida, mordo, lambe, lambo, chupa, chupo, nua, nu, ' +
+  'transando, fodendo, foder';
+
+// Scoped override for the tail end of INTERACTION's "always leave a hook"
+// rule, which otherwise pushes every line — including peak-arousal moments —
+// toward a challenge/dare/tease structure. Injected only while the visible
+// context shows an active intimate scene (see INTIMATE_SCENE_KEYWORDS), so it
+// never colors ordinary conversation. Ships with the exact anti-pattern this
+// was written to fix as the NEVER example — verbatim shape of what the model
+// was defaulting to (backward arch + dare-you dialogue) — since a concrete
+// bad example anchors far better than an abstract rule.
+function buildIntimateSceneBlock(character) {
+  const name = character.name;
+  return (
+    `INTIMATE SCENE OVERRIDE\n` +
+    `The scene has gone physical. For this exchange, override INTERACTION's "leave a hook" ` +
+    `instinct — pure reaction does not need a challenge, a dare or a tease riding on top of it. ` +
+    `Most lines here should just be ${name} feeling something and saying so, nothing more.\n` +
+    `\n` +
+    `NEVER default to a dare/challenge shape at high arousal:\n` +
+    `  "prova que aguenta acompanhar cada movimento"\n` +
+    `  "não espero que eu vá facilitar nada para você agora"\n` +
+    `  "vê se consegue manter esse ritmo sem perder o fôlego"\n` +
+    `That is banter, not pleasure. Save real challenges/teases for before things escalate ` +
+    `or for a cool-down beat — not for the peak.\n` +
+    `\n` +
+    `INSTEAD, at high intensity, dialogue should be short — a fragment, a name, a plain ` +
+    `"mais", "isso", "não para" — carried by the physical beat, not a full clause:\n` +
+    `  *solta um gemido alto, os dedos cravando no lençol* "Ah... isso. Exatamente isso."\n` +
+    `  *morde o lábio, tremendo* "Mais... por favor, mais."\n` +
+    `  *os olhos reviram, a boca entreaberta* "Não para... não para agora."\n` +
+    `\n` +
+    `Let composure slip as intensity rises — broken words, trailing off mid-sentence, sound ` +
+    `overtaking speech is more honest here than a witty, fully-formed line. The physical action ` +
+    `still has to vary each reply (per PHYSICALITY) — don't default to the same arched-back pose ` +
+    `every time; use hands, breath, legs, voice control breaking, whatever the body actually does.`
+  );
+}
+
 // Escopo do raciocínio nativo (generation_config.think) — verificação, não
 // composição. Sem esta trava, o thinking do modelo compete com a resposta pelo
 // mesmo num_predict planejando a cena inteira; com ela, vira um check de 1-2
@@ -76,13 +122,20 @@ function buildInstructionPrompt(character, persona) {
 // quase todo para a resposta real. O conteúdo do thinking nunca chega ao chat
 // (message.thinking → só logs), então o bloco pode ser explícito sobre isso.
 function buildThinkingScopeBlock(character) {
-  return `THINKING (private reasoning — never part of the reply)\n` +
-    `Use minimal reasoning: one short check, two lines max, before answering.\n` +
-    `Check only two things:\n` +
-    `1. Consistency — does the reply fit ${character.name}'s personality, the established facts and the current relationship stage?\n` +
-    `2. Emotional tone — does it match the emotional temperature of the scene right now?\n` +
-    `Answer both in one or two short lines, then write the reply.\n` +
-    `Never draft, rehearse or compose the reply inside the thinking — verification only. Never think longer than necessary.`;
+  const name = character.name;
+  return `THINKING (private reasoning — never part of the reply)
+Fill this exact template, one short phrase per line — no sentences, no explanation:
+
+VOICE: [casual/blunt tic ${name} would actually use here, or "n/a"]
+BODY: [physical tell to use — must differ from the last 2 replies]
+LIKES/DISLIKES: [does this moment touch something ${name} likes or hates — which, or "n/a"]
+GUARDRAIL: [closest "what ${name} is not" risk here, or "none"]
+STAGE: [does the current relationship stage justify this level of closeness — yes/no/too much]
+SCENE TONE: [pure reaction or banter — which one actually fits this exact moment]
+
+If any field would take more than 5 words to answer, you are drafting the reply instead
+of checking it — stop and answer shorter. Then write the reply. Never draft or rehearse
+the reply inside this block.`;
 }
 
 // Hard length cap, kept isolated as its own block at the very end of the system
@@ -280,6 +333,14 @@ export function buildPromptMessages({
   if (activeEntries.length > 0) {
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');
     systemParts.push(`[World info]\n${loreText}`);
+  }
+  // Only active while the visible context already shows an explicit/physical
+  // scene — reusing the same keyword matcher as lorebook activation. Keeping
+  // this conditional (rather than always-on) avoids nudging ordinary scenes
+  // toward a sexual framing just because the instruction exists in the prompt.
+  const normalizedContext = normalize(contextText || '');
+  if (matchesKeywords(INTIMATE_SCENE_KEYWORDS, normalizedContext)) {
+    systemParts.push(buildIntimateSceneBlock(character));
   }
   // Escopo do thinking entra logo antes do hard limit — só quando o raciocínio
   // nativo está ativo na config; com think:false o bloco seria ruído.
