@@ -122,13 +122,13 @@ function buildIntimateSceneBlock(character) {
     `Let composure slip as intensity rises — broken words, trailing off mid-sentence, sound ` +
     `overtaking speech is more honest here than a witty, fully-formed line. The physical action ` +
     `still has to vary each reply (per PHYSICALITY) — DON't default to the same arched-back pose ` +
-    `every time; USE hands, breath, legs, voice control breaking, whatever the body actually does.`
+    `every time; USE hands, breath, legs, voice control breaking, whatever the body actually does.` +
     `\n` +
     `MAKE HER FACE DEMONSTRADE THE PLEASURE SHE IS FEELING like:\n` +
     `  *arregalo os olhos*\n` +
     `  *abro a boca deixando minha língua exposta*\n` +
     `  *fecho os olhos com força*\n` +
-    `  *reviro os olhos*\n`
+    `  *reviro os olhos*\n` +
     `You also can and MAY combine then.\n`
   );
 }
