@@ -42,7 +42,27 @@ export async function startWebServer(port = appConfig.port) {
         console.log("Basic auth habilitado (AUTH_PASSWORD definido).");
     }
 
-    app.use(express.json({ limit: "10mb" }));
+    const defaultJsonParser = express.json({ limit: "10mb" });
+    const characterJsonParser = express.json({ limit: "50mb" });
+    app.use((req, res, next) => {
+        const isCharacterMutation =
+            (req.method === "POST" && req.path === "/api/characters") ||
+            (req.method === "PUT" && /^\/api\/characters\/[^/]+$/.test(req.path));
+        (isCharacterMutation ? characterJsonParser : defaultJsonParser)(req, res, next);
+    });
+    app.use((err, req, res, next) => {
+        if (!req.path.startsWith("/api/")) return next(err);
+        if (err.type === "entity.too.large") {
+            return res.status(413).json({
+                ok: false,
+                message: "Requisição muito grande. O limite total para envio de imagens é 50 MB.",
+            });
+        }
+        if (err.type === "entity.parse.failed") {
+            return res.status(400).json({ ok: false, message: "O corpo da requisição contém JSON inválido." });
+        }
+        next(err);
+    });
 
     app.use(indexRouter);
     app.use(checkRouter);

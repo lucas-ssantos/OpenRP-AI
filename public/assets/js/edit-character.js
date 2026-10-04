@@ -160,6 +160,15 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Resposta inesperada do servidor (HTTP ${response.status}).`);
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   msgError.style.display = 'none';
@@ -213,7 +222,7 @@ async function handleSubmit(event) {
       }),
     ]);
 
-    const result = await charRes.json();
+    const result = await readJsonResponse(charRes);
     if (!charRes.ok || !result.ok) throw new Error(result.message || 'Falha ao salvar alterações.');
 
     showSuccess('Alterações salvas! Redirecionando...');
