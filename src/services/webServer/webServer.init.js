@@ -43,7 +43,7 @@ export async function startWebServer(port = appConfig.port) {
     }
 
     const defaultJsonParser = express.json({ limit: "10mb" });
-    const characterJsonParser = express.json({ limit: "50mb" });
+    const characterJsonParser = express.json({ limit: "60gb" });
     app.use((req, res, next) => {
         const isCharacterMutation =
             (req.method === "POST" && req.path === "/api/characters") ||
@@ -55,7 +55,7 @@ export async function startWebServer(port = appConfig.port) {
         if (err.type === "entity.too.large") {
             return res.status(413).json({
                 ok: false,
-                message: "Requisição muito grande. O limite total para envio de imagens é 50 MB.",
+                message: "Requisição muito grande. O limite total para envio de imagens é 60 GB.",
             });
         }
         if (err.type === "entity.parse.failed") {

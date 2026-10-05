@@ -19,7 +19,7 @@ const publicPath = path.resolve(process.cwd(), "public");
 // O arquivo vai parar em public/ e é servido pelo Express — sem validação de
 // tipo, um .html/.svg enviado como "avatar" viraria página executável (XSS).
 // A extensão vem do tipo real detectado (magic bytes), nunca do nome enviado.
-const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 15 * 1024 * 1024 * 1024;
 
 function detectImageType(buffer) {
     if (buffer.length < 12) return null;
@@ -33,7 +33,7 @@ function detectImageType(buffer) {
 function decodeAndValidateAvatar(base64Data, filename) {
     const buffer = Buffer.from(base64Data, "base64");
     if (buffer.length > MAX_AVATAR_BYTES) {
-        throw new Error("Imagem muito grande — cada imagem deve ter no máximo 8MB.");
+        throw new Error("Imagem muito grande — cada imagem deve ter no máximo 15 GB.");
     }
     const type = detectImageType(buffer);
     if (!type) {
