@@ -46,7 +46,7 @@ async function loadCharacters() {
             ${thumb}
             <div class="card-body d-flex flex-column gap-2">
               <h5 class="card-title mb-0 fw-semibold">${name}</h5>
-              <p class="text-secondary small mb-0" style="line-height:1.5;">${escHtml(description) || 'Sem descrição disponível.'}</p>
+              <p class="text-secondary small mb-0 char-description">${escHtml(description) || 'Sem descrição disponível.'}</p>
               <div class="d-flex align-items-center justify-content-between pt-2 mt-1" style="border-top:1px solid rgba(148,163,184,0.1);">
                 <span class="badge-blue">${name}</span>
                 <div class="d-flex align-items-center gap-2">

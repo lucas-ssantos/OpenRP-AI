@@ -25,6 +25,15 @@
   font-size: 0.9rem;
 }
 
+.char-description {
+  display: -webkit-box;
+  height: 7.5em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-height: 1.5;
+}
+
 .add-card {
   cursor: pointer;
   border-style: dashed !important;
