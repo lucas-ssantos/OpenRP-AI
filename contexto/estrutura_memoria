@@ -16,6 +16,8 @@ Histórico completo da conversa
     │        · memórias contextuais → type=auto
     │        · momentos marcantes   → type=pinned
     │        · importance 1-5 → relevance_weight
+    │        · cada memória aponta para a posição da mensagem de origem,
+    │          salvando o horário da mensagem em vez do horário da extração
     │        · cursor só avança se a extração deu certo
     ▼               ▼
 ┌─────────────────────────────────────────────┐

@@ -17,10 +17,11 @@ const RESPONSE_FORMAT = {
                     content:    { type: "string" },
                     keywords:   { type: "string" },
                     summary:    { type: ["string", "null"] },
+                    source_position: { type: "integer" },
                     pinned:     { type: "boolean" },
                     importance: { type: "integer", minimum: 1, maximum: 5 },
                 },
-                required: ["content", "keywords", "pinned", "importance"],
+                required: ["content", "keywords", "source_position", "pinned", "importance"],
             },
         },
     },
@@ -127,6 +128,11 @@ Bad: "conversation", "moment", "feeling", "reaction", "event", "chat"
 
 "summary": 3-6 word label, or null if the content is already short enough.
 
+"source_position": the exact position of the message where this event happened
+or this fact was first established. Use the message position shown in the
+excerpt; never use the newest message just because it is newest. If multiple
+messages are needed, choose the one that best anchors when the event happened.
+
 "pinned": true only if it meets the CORE criteria. Core memories are rare —
 most excerpts produce zero.
 
@@ -145,9 +151,11 @@ OUTPUT RULES:
 - Typically 1-4 contextual memories per excerpt, 0-1 core memories
 - Never merge unrelated facts into one entry
 - Never restate the baseline
+- Every memory must include a valid source_position from the excerpt
 - Respond ONLY with valid JSON, no markdown, no preamble, no explanation
-- Format: {"memories": [{"content": "...", "keywords": "kw1, kw2, kw3", 
-  "summary": "short label or null", "pinned": false, "importance": 2}]}
+- Format: {"memories": [{"content": "...", "keywords": "kw1, kw2, kw3",
+  "summary": "short label or null", "source_position": 12,
+  "pinned": false, "importance": 2}]}
 - If nothing notable happened: {"memories": []}`;
 }
 
@@ -211,10 +219,11 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
     const personaName   = persona?.name   || 'User';
     const model         = config?.model   || appConfig.defaults.model;
 
-    const excerpt = recentMessages
-        .filter(m => m.role !== 'system')
-        .map(m => `${m.role === 'user' ? personaName : characterName}: ${m.content}`)
+    const sourceMessages = recentMessages.filter(m => m.role !== 'system');
+    const excerpt = sourceMessages
+        .map(m => `[position=${m.position}, sent_at=${m.created_at}]\n${m.role === 'user' ? personaName : characterName}: ${m.content}`)
         .join('\n');
+    const messagesByPosition = new Map(sourceMessages.map(message => [message.position, message]));
 
     const systemPrompt = buildExtractionPrompt(character, personaName);
 
@@ -240,14 +249,23 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
         const existingAuto   = getMemories(conversationId).filter(m => !m.is_pinned);
         const created = { auto: [], pinned: [] };
 
-        // A memória registra QUANDO o fato aconteceu (horário das mensagens de
-        // origem), não quando a extração rodou — se o usuário voltar dias depois
-        // e o backlog for processado, o prompt ainda mostra "3 days ago" correto.
-        const happenedAt = recentMessages.at(-1)?.created_at ?? null;
+        // Validate all source references before saving anything: an unanchored
+        // memory would otherwise be dated at extraction time and look recent.
+        for (const item of parsed.memories) {
+            if (!item?.content?.trim()) continue;
+            const source = Number.isInteger(item.source_position)
+                ? messagesByPosition.get(item.source_position)
+                : null;
+            if (!source?.created_at) {
+                console.warn(`Memory extraction skipped for conversation ${conversationId}: invalid source_position.`);
+                return null;
+            }
+        }
 
         for (const item of parsed.memories) {
             const content = item?.content?.trim();
             if (!content) continue;
+            const happenedAt = messagesByPosition.get(item.source_position).created_at;
 
             // Nenhuma memória fica órfã: sem keywords do modelo, deriva do próprio content
             const keywords = item.keywords?.trim()
