@@ -48,7 +48,7 @@ export function getAllCharacters() {
   return result[0].values.map(mapCharacterRow);
 }
 
-export function updateCharacter(id, { name, description, personality, likes, dislikes, physical_traits, avatar_url, affection_override }) {
+export function updateCharacter(id, { name, description, personality, likes, dislikes, physical_traits, avatar_url, affection_points, affection_override }) {
   const db = getDB();
   const sets = [];
   const vals = [];
@@ -60,7 +60,8 @@ export function updateCharacter(id, { name, description, personality, likes, dis
   if (dislikes !== undefined)      { sets.push("dislikes = ?");      vals.push(dislikes); }
   if (physical_traits !== undefined) { sets.push("physical_traits = ?"); vals.push(physical_traits); }
   if (avatar_url !== undefined)    { sets.push("avatar_url = ?");    vals.push(avatar_url); }
-  // null = volta para a progressão automática por pontos
+  if (affection_points !== undefined) { sets.push("affection_points = ?"); vals.push(affection_points); }
+  // null = progressão por pontos sem estágio inicial manual
   if (affection_override !== undefined) { sets.push("affection_override = ?"); vals.push(affection_override); }
 
   if (sets.length === 0) return false;

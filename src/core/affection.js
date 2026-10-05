@@ -51,26 +51,19 @@ export function getAffectionLevel(points = 0) {
   };
 }
 
-// Estágio efetivo do personagem: se characters.affection_override estiver
-// definido, o estágio é fixado nesse nível (sem progressão exibida — os pontos
-// continuam acumulando em segundo plano); NULL → progressão normal por pontos.
-// extraPoints permite calcular o nível prospectivo antes de persistir o ganho.
+// Um estágio escolhido manualmente define um nível inicial mínimo. Os pontos
+// continuam avançando a partir dele; extraPoints calcula o ganho prospectivo.
 export function getEffectiveAffection(character, extraPoints = 0) {
   const override = character?.affection_override;
+  let points = (character?.affection_points ?? 0) + extraPoints;
+
   if (override !== null && override !== undefined) {
     const idx = Math.min(Math.max(0, override), AFFECTION_LEVELS.length - 1);
-    const lvl = AFFECTION_LEVELS[idx];
-    return {
-      points: character?.affection_points ?? 0,
-      level: lvl.level,
-      name: lvl.name,
-      next_threshold: null,
-      next_name: null,
-      progress: 1,
-      override: true,
-    };
+    points = Math.max(points, AFFECTION_LEVELS[idx].threshold);
+    return { ...getAffectionLevel(points), override: true };
   }
-  return getAffectionLevel((character?.affection_points ?? 0) + extraPoints);
+
+  return getAffectionLevel(points);
 }
 
 // Pontos ganhos por uma mensagem do usuário: 1 base, +1 se a mensagem é longa

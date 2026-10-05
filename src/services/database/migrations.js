@@ -3,6 +3,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getDB, saveDB } from "./db.js";
 import { appConfig } from "../../config.js";
+import { AFFECTION_LEVELS } from "../../core/affection.js";
 
 export async function migrate() {
   console.log("Running migrations...");
@@ -68,6 +69,15 @@ export async function migrate() {
 
   // Migration: override manual do estágio de afeição (NULL = progressão automática)
   try { db.run(`ALTER TABLE characters ADD COLUMN affection_override INTEGER`); } catch {}
+  // O estágio escolhido manualmente é um ponto de partida; preserva pontos já
+  // acumulados e inicializa o mínimo necessário para continuar a progressão.
+  for (const level of AFFECTION_LEVELS) {
+    db.run(
+      `UPDATE characters SET affection_points = MAX(COALESCE(affection_points, 0), ?)
+       WHERE affection_override = ?`,
+      [level.threshold, level.level]
+    );
+  }
 
   // ===== CHARACTER IMAGES (galeria — o chat sorteia uma por sessão) =====
   // characters.avatar_url continua existindo como imagem principal (cards, sidebar,
