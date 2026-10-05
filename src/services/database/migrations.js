@@ -79,6 +79,18 @@ export async function migrate() {
     );
   }
 
+  // Um resultado por personagem e dia local (mood NULL significa que a chance
+  // diária não ativou); o registro é substituído quando começa um novo dia.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS character_moods (
+      character_id TEXT PRIMARY KEY,
+      mood_date TEXT NOT NULL,
+      mood TEXT,
+      cause_hint TEXT,
+      FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+    );
+  `);
+
   // ===== CHARACTER IMAGES (galeria — o chat sorteia uma por sessão) =====
   // characters.avatar_url continua existindo como imagem principal (cards, sidebar,
   // header do chat) e é sempre a primeira imagem da galeria.

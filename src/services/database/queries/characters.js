@@ -93,6 +93,7 @@ export function deleteCharacter(characterId) {
     [characterId]
   );
   db.run(`DELETE FROM conversations WHERE character_id = ?`, [characterId]);
+  db.run(`DELETE FROM character_moods WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM character_lorebooks WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM character_images WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM characters WHERE id = ?`, [characterId]);

@@ -248,6 +248,15 @@ function buildPersonaFactsBlock(personaFacts, persona) {
   );
 }
 
+function buildDailyMoodBlock(dailyMood, character) {
+  if (!dailyMood) return null;
+  return (
+    `[Today's subtle emotional undercurrent — ${dailyMood.date}]\n` +
+    `For ${character.name} today: ${dailyMood.mood}. A plausible everyday source is ${dailyMood.cause}.\n` +
+    `Filter this through ${character.name}'s established personality, circumstances, and the scene; adapt the cause if needed rather than contradicting established facts. Keep this as a mild-to-moderate, temporary influence, not a personality change or a major plot event. Let it appear only through small, varied shifts in tone, patience, energy, or behavior. Never announce or name the mood, explain it at the start, or force the cause into the conversation. Let it surface only when it fits naturally or the other person asks. Do not claim hormonal changes unless they are established and appropriate for this character.`
+  );
+}
+
 // Returns lorebook entries with matching keywords, or no keywords (always-on), sorted by insertion_order
 function filterLorebooks(lorebooks, contextText) {
   const normalizedContext = normalize(contextText || '');
@@ -261,6 +270,7 @@ function filterLorebooks(lorebooks, contextText) {
  *
  *  [1] SYSTEM PROMPT   — character identity + persona
  *  [1b] PERSONA FACTS  — fixed [About {{user}}] profile block (always injected)
+ *  [1c] DAILY MOOD     — subtle, temporary character mood; omitted when inactive
  *  [2] MEMORIES        — already selected by the retrieval layer (getMemoriesForPrompt);
  *                        split into [Core memories] (pinned) and [Relevant memories] (contextual)
  *  [3] LOREBOOK        — keyword-activated world-info entries (appended to system prompt)
@@ -277,6 +287,7 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object[]} opts.personaFacts     - active persona facts (getPersonaFactsForPrompt); always injected
  * @param {object[]} opts.lorebooks        - global + character lorebooks
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
+ * @param {object}   opts.dailyMood        - mood selected for this character and local day; may be null
  * @param {boolean}  opts.thinkingEnabled  - generation_config.think ativo → injeta o bloco THINKING de raciocínio mínimo
  * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
  * @returns {{ role: string, content: string }[]}
@@ -291,6 +302,7 @@ export function buildPromptMessages({
   personaFacts = [],
   lorebooks = [],
   affection = null,
+  dailyMood = null,
   thinkingEnabled = false,
   now = localDatetime(),
 }) {
@@ -325,6 +337,8 @@ export function buildPromptMessages({
   // ── [1b] Persona facts — profile block, right after the character card ─────
   const personaFactsBlock = buildPersonaFactsBlock(personaFacts, persona);
   if (personaFactsBlock) systemParts.push(personaFactsBlock);
+  const dailyMoodBlock = buildDailyMoodBlock(dailyMood, character);
+  if (dailyMoodBlock) systemParts.push(dailyMoodBlock);
   const affectionBlock = buildAffectionPrompt(affection, character, persona);
   if (affectionBlock) systemParts.push(affectionBlock);
   // Cada memória vem prefixada com quando aconteceu relativo a agora — "(yesterday)",

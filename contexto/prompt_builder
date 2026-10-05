@@ -6,6 +6,9 @@
 │      [About {{user}}] — perfil aprendido,   │    (sempre injetado, sem
 │      agrupado por categoria, cap de 30      │     keyword matching)
 ├─────────────────────────────────────────────┤
+│  [1c] DAILY MOOD            ~50-100 tokens  │  ← chance de 35% por personagem/dia
+│      subtexto breve, sem anunciar a mood   │
+├─────────────────────────────────────────────┤
 │  [2] MEMÓRIAS RELEVANTES    ~200-400 tokens │  ← resgatadas por keyword
 │      (pinned primeiro, depois por score)    │
 ├─────────────────────────────────────────────┤
@@ -22,3 +25,9 @@
 └─────────────────────────────────────────────┘
                     ↓
             Modelo gera resposta
+
+O resultado da chance diária fica salvo por personagem usando a data local:
+35% seleciona uma mood temporária com uma causa cotidiana; 65% registra que não
+há mood especial naquele dia. Quando ativa, a instrução pede que o modelo adapte
+a mood à personalidade e ao contexto, mostrando-a apenas em sinais sutis e sem
+anunciá-la ou inventar um acontecimento importante.

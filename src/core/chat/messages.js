@@ -3,7 +3,7 @@ import {
     getCharacter, getPersona,
     getConversation, addMessage, updateMessage, rollbackConversation,
     getLastMessage, deleteMessage, getLastNMessages,
-    getAllLorebooks, getMemories, addAffectionPoints,
+    getAllLorebooks, getMemories, addAffectionPoints, getDailyMoodForCharacter,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
 import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
@@ -76,6 +76,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
         const personaFacts = getPersonaFactsForPrompt();
         const lorebooks    = getAllLorebooks(conv.character_id);
+        const dailyMood    = getDailyMoodForCharacter(conv.character_id);
 
         // Afeto: cada mensagem do usuário rende pontos ao personagem (compartilhados
         // entre todas as conversas dele). O prompt já reflete o nível novo, mas os
@@ -103,7 +104,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
-            memories, personaFacts, lorebooks, affection,
+            memories, personaFacts, lorebooks, affection, dailyMood,
             thinkingEnabled: genConfig.think,
         });
 
@@ -203,6 +204,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
         const personaFacts = getPersonaFactsForPrompt();
         const lorebooks    = getAllLorebooks(conv.character_id);
+        const dailyMood    = getDailyMoodForCharacter(conv.character_id);
 
         // "Continuar" pontua afeto igual a um envio normal (é a resposta que
         // faltou para a mensagem do usuário); regenerar de fato (substituir uma
@@ -228,7 +230,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
-            memories, personaFacts, lorebooks,
+            memories, personaFacts, lorebooks, dailyMood,
             affection,
             thinkingEnabled: genConfig.think,
         });
