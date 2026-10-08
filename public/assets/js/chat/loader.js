@@ -2,6 +2,9 @@ import { conversationId, state, dom } from './state.js';
 import { showError, setInputEnabled, scrollToBottom, updateLastRowActions, updateAffectionBadge, renderScenarioBubble } from './ui.js';
 import { addBubble, initInputListeners, resumeActiveGeneration } from './events.js';
 
+let backgroundGallery = [];
+let currentBackgroundUrl = null;
+
 // Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
 function expandPlaceholders(text, charName, userName) {
   if (!text) return text;
@@ -48,12 +51,9 @@ export async function init() {
 
     // Background: sorteia uma imagem da galeria do personagem a cada visita.
     // O avatar do header/nav continua fixo no avatar principal (avatar_url).
-    const galleryUrls = (character.images || []).map((img) => img.url);
-    if (!galleryUrls.length && character.avatar_url) galleryUrls.push(character.avatar_url);
-    if (galleryUrls.length) {
-      const bgUrl = galleryUrls[Math.floor(Math.random() * galleryUrls.length)];
-      dom.bg.style.backgroundImage = `url('${bgUrl}')`;
-    }
+    backgroundGallery = (character.images || []).map((img) => img.url);
+    if (!backgroundGallery.length && character.avatar_url) backgroundGallery.push(character.avatar_url);
+    changeBackground();
     if (character.avatar_url) {
       dom.headerAvt.src = character.avatar_url;
       dom.headerAvt.style.display = 'block';
@@ -113,4 +113,16 @@ export function initImmersiveMode() {
     icon.className = on ? 'bi bi-eye-slash' : 'bi bi-eye';
     btn.title = on ? 'Mostrar chat' : 'Ocultar chat';
   });
+
+  document.getElementById('change-background-btn').addEventListener('click', changeBackground);
+}
+
+function changeBackground() {
+  if (!backgroundGallery.length) return;
+
+  const availableUrls = backgroundGallery.length > 1
+    ? backgroundGallery.filter((url) => url !== currentBackgroundUrl)
+    : backgroundGallery;
+  currentBackgroundUrl = availableUrls[Math.floor(Math.random() * availableUrls.length)];
+  dom.bg.style.backgroundImage = `url('${currentBackgroundUrl}')`;
 }

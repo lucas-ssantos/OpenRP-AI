@@ -431,6 +431,37 @@ body.immersive #immersive-btn:hover {
   color: #e2e8f0;
 }
 
+#change-background-btn {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 4.25rem;
+  z-index: 50;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #cbd5e1;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+body.immersive #change-background-btn {
+  display: flex;
+}
+
+#change-background-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #e2e8f0;
+}
+
 .chat-header,
 .messages,
 .input-area {
@@ -1120,6 +1151,10 @@ body.selection-mode .msg-row.selected .bubble-user {
   }
 
   #immersive-btn {
+    bottom: 5.5rem;
+  }
+
+  #change-background-btn {
     bottom: 5.5rem;
   }
 
