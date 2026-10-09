@@ -2,7 +2,7 @@ import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 
-const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, created_at, updated_at`;
+const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, auto_messages_enabled, auto_message_next_at, auto_message_ignored_count, created_at, updated_at`;
 
 function mapConversationRow(row) {
   return {
@@ -14,8 +14,11 @@ function mapConversationRow(row) {
     first_message: row[5],
     last_memory_position: row[6] ?? 0,
     last_persona_position: row[7] ?? 0,
-    created_at: row[8],
-    updated_at: row[9],
+    auto_messages_enabled: row[8] === 1,
+    auto_message_next_at: row[9] ?? null,
+    auto_message_ignored_count: Number(row[10] ?? 0),
+    created_at: row[11],
+    updated_at: row[12],
   };
 }
 
@@ -76,6 +79,41 @@ export function setLastPersonaPosition(conversationId, position) {
   const db = getDB();
   db.run(`UPDATE conversations SET last_persona_position = ? WHERE id = ?`, [position, conversationId]);
   saveDB();
+}
+
+export function setAutoMessages(conversationId, enabled, nextAt = null, ignoredCount = null) {
+  const db = getDB();
+  if (ignoredCount === null) {
+    db.run(
+      `UPDATE conversations
+       SET auto_messages_enabled = ?, auto_message_next_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [enabled ? 1 : 0, nextAt, localDatetime(), conversationId]
+    );
+  } else {
+    db.run(
+      `UPDATE conversations
+       SET auto_messages_enabled = ?, auto_message_next_at = ?, auto_message_ignored_count = ?, updated_at = ?
+       WHERE id = ?`,
+      [enabled ? 1 : 0, nextAt, ignoredCount, localDatetime(), conversationId]
+    );
+  }
+  const changed = db.getRowsModified() > 0;
+  if (changed) saveDB();
+  return changed;
+}
+
+export function getEnabledAutoMessageConversations() {
+  const db = getDB();
+  const result = db.exec(
+    `SELECT id, auto_message_next_at, auto_message_ignored_count FROM conversations WHERE auto_messages_enabled = 1`
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map(([id, nextAt, ignoredCount]) => ({
+    id,
+    next_at: nextAt,
+    ignored_count: Number(ignoredCount ?? 0),
+  }));
 }
 
 // Lista todas as conversas de um personagem, mais recentes (por última atividade) primeiro.

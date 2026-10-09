@@ -11,6 +11,7 @@ import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue, getPersonaFactsForPrompt, processPersonaBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 import { isGenerating, beginGeneration, attachSubscriber, detachSubscriber, broadcast } from "./generationManager.js";
+import { resetAutoMessageTimer } from "./autoMessages.js";
 
 const router = Router();
 
@@ -110,6 +111,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         // position null → MAX(position)+1 calculado no SQL (sem corrida entre requisições)
         const userMsgId = addMessage(conversationId, "user", content.trim());
+        resetAutoMessageTimer(conversationId);
         const gen = beginGeneration(conversationId);
 
         const sendConfig = { ...genConfig, max_tokens: dynamicMaxTokens(content.trim(), genConfig) };

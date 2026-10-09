@@ -14,7 +14,11 @@
 ├─────────────────────────────────────────────┤
 │  [3] LOREBOOK ENTRIES       ~0-300 tokens   │  ← ativadas por keyword
 ├─────────────────────────────────────────────┤
-│  [4] EXAMPLE DIALOGUES      ~0-200 tokens   │  ← few-shot do personagem
+│  [3b] AUTOMATIC MESSAGE     opcional        │  ← turnos espontâneos:
+│      proximidade e silêncio                 │    juntos: segue a cena;
+│                                             │    longe: contato plausível
+├─────────────────────────────────────────────┤
+│  [4] EXAMPLE DIALOGUES      ~0-200 tokens  │  ← few-shot do personagem
 │      (só se couber no budget)               │
 ├─────────────────────────────────────────────┤
 │  [5] HISTÓRICO              ~resto do budget│  ← msgs mais recentes

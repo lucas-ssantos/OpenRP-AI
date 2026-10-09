@@ -4,25 +4,25 @@ import { localDatetime } from "../../../utils/datetime.js";
 
 const mapRow = (row) => ({
   id: row[0], conversation_id: row[1], role: row[2],
-  content: row[3], position: row[4], created_at: row[5],
+  content: row[3], position: row[4], automated: row[5] === 1, created_at: row[6],
 });
 
 // position null → calcula MAX(position)+1 no próprio SQL, evitando colisão
 // quando duas requisições calculam a posição em paralelo no JS.
-export function addMessage(conversationId, role, content, position = null) {
+export function addMessage(conversationId, role, content, position = null, automated = false) {
   const db = getDB();
   const id = uuidv4();
   if (position === null || position === undefined) {
     db.run(
-      `INSERT INTO messages (id, conversation_id, role, content, position, created_at)
-       VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM messages WHERE conversation_id = ?), ?)`,
-      [id, conversationId, role, content, conversationId, localDatetime()]
+      `INSERT INTO messages (id, conversation_id, role, content, position, automated, created_at)
+       VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM messages WHERE conversation_id = ?), ?, ?)`,
+      [id, conversationId, role, content, conversationId, automated ? 1 : 0, localDatetime()]
     );
   } else {
     db.run(
-      `INSERT INTO messages (id, conversation_id, role, content, position, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, conversationId, role, content, position, localDatetime()]
+      `INSERT INTO messages (id, conversation_id, role, content, position, automated, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, conversationId, role, content, position, automated ? 1 : 0, localDatetime()]
     );
   }
   saveDB();
@@ -49,7 +49,7 @@ export function updateMessage(messageId, content, conversationId = null) {
 export function getLastMessage(conversationId) {
   const db = getDB();
   const result = db.exec(
-    `SELECT id, conversation_id, role, content, position, created_at
+    `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages WHERE conversation_id = ? AND role != 'system'
      ORDER BY position DESC LIMIT 1`,
     [conversationId]
@@ -104,7 +104,7 @@ export function resetConversation(conversationId) {
 export function getConversationMessages(conversationId) {
   const db = getDB();
   const result = db.exec(
-    `SELECT id, conversation_id, role, content, position, created_at
+    `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages WHERE conversation_id = ? ORDER BY position ASC, created_at ASC`,
     [conversationId]
   );
@@ -118,7 +118,7 @@ export function getConversationMessages(conversationId) {
 export function getLastNMessages(conversationId, n = 20) {
   const db = getDB();
   const result = db.exec(
-    `SELECT id, conversation_id, role, content, position, created_at
+    `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages WHERE conversation_id = ? AND role != 'system'
      ORDER BY position DESC LIMIT ?`,
     [conversationId, n]
@@ -134,7 +134,7 @@ export function getLastNMessages(conversationId, n = 20) {
 export function getPersonaBacklog(conversationId, lastProcessed, limit) {
   const db = getDB();
   const result = db.exec(
-    `SELECT id, conversation_id, role, content, position, created_at
+    `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages
      WHERE conversation_id = ? AND role != 'system' AND position > ?
      ORDER BY position ASC LIMIT ?`,
@@ -150,7 +150,7 @@ export function getPersonaBacklog(conversationId, lastProcessed, limit) {
 export function getMemoryBacklog(conversationId, numCtx, lastProcessed, limit) {
   const db = getDB();
   const result = db.exec(
-    `SELECT id, conversation_id, role, content, position, created_at
+    `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages
      WHERE conversation_id = ? AND role != 'system' AND position > ?
        AND position < COALESCE((

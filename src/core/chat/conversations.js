@@ -9,6 +9,7 @@ import { resolveConfig, startSSE } from "./helpers.js";
 import { getEffectiveAffection } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
 import { getGeneration, attachSubscriber, detachSubscriber, cancelGeneration } from "./generationManager.js";
+import { configureAutoMessages } from "./autoMessages.js";
 
 const router = Router();
 
@@ -71,6 +72,25 @@ router.get("/conversations/:id", (req, res) => {
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
         const character = getCharacter(conv.character_id);
         res.json({ ok: true, conversation: conv, affection: getEffectiveAffection(character) });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
+router.put("/conversations/:id/auto-messages", (req, res) => {
+    try {
+        const conv = getConversation(req.params.id);
+        if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
+        if (typeof req.body?.enabled !== "boolean") {
+            return res.status(400).json({ ok: false, message: "enabled deve ser true ou false." });
+        }
+
+        const nextAt = configureAutoMessages(req.params.id, req.body.enabled);
+        res.json({
+            ok: true,
+            enabled: req.body.enabled,
+            next_message_at: nextAt,
+        });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }

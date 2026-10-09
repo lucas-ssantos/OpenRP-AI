@@ -288,6 +288,8 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object}   opts.affection        - current affection level info (getAffectionLevel); may be null
  * @param {object}   opts.dailyMood        - mood selected for this character and local day; may be null
  * @param {boolean}  opts.thinkingEnabled  - generation_config.think ativo → injeta o bloco THINKING de raciocínio mínimo
+ * @param {boolean}  opts.proactiveMessage - gera uma mensagem espontânea do personagem
+ * @param {boolean}  opts.previousMessageWasAutomated - a última mensagem não teve resposta do usuário
  * @param {string}   opts.now              - "agora" de referência (formato localDatetime) — injetável para testes
  * @returns {{ role: string, content: string }[]}
  */
@@ -303,6 +305,9 @@ export function buildPromptMessages({
   affection = null,
   dailyMood = null,
   thinkingEnabled = false,
+  proactiveMessage = false,
+  previousMessageWasAutomated = false,
+  ignoredAutoMessages = 0,
   now = localDatetime(),
 }) {
   // Context text for lorebook keyword matching: current message + the *entire*
@@ -364,6 +369,34 @@ export function buildPromptMessages({
   if (activeEntries.length > 0) {
     const loreText = activeEntries.map(e => `[${e.title}]\n${e.content}`).join('\n\n');
     systemParts.push(`[World info]\n${loreText}`);
+  }
+  if (proactiveMessage) {
+    const ignoredCount = Math.max(0, Number(ignoredAutoMessages) || 0);
+    const relationshipWeight = affection?.level >= 6
+      ? 'This is an emotionally serious situation, so a sharper, more personal reaction is believable.'
+      : affection?.level >= 3
+      ? 'The bond is close enough that the silence feels personal, but still grounded in who the character is.'
+      : affection?.level >= 1
+      ? 'The familiarity is mild, so the reaction should stay restrained and not over-dramatize it.'
+      : 'The relationship is still distant, so the reaction should be subtle and not too intense.';
+
+    const escalationText = ignoredCount === 0
+      ? 'This is the first automatic message sent without a reply. Keep it natural, warm, and low-pressure.'
+      : ignoredCount === 1
+      ? 'This is the second time you have reached out without a reply. Let the silence feel a little more personal or uncomfortable, but keep it believable and in-character.'
+      : 'This is the third-or-later automatic message without a reply. The silence now reads as deliberate ignoring, and the character may react with more direct pressure, hurt, resentment, or a subtle guilt-trip — but only if that fits their personality and the relationship stage. Do not turn it into generic spam or a forced, robotic demand.';
+
+    systemParts.push(
+      `[AUTOMATIC MESSAGE]\n` +
+      `You are starting a new turn without a new message from ${persona?.name || 'the user'}. Continue the roleplay based only on the established scene and conversation; never speak, act, or decide for them.\n` +
+      `First follow the established physical situation: if you and ${persona?.name || 'the user'} are together, continue the scene naturally with an action and dialogue; do not turn it into a phone message. If you are apart, reach out using a communication method that fits the setting and story (usually a phone or smartphone in a modern setting), written naturally as an in-character message. Do not invent a location or device that contradicts the story.\n` +
+      `${escalationText}\n` +
+      `${relationshipWeight}\n` +
+      (previousMessageWasAutomated
+        ? `Your previous automatic message received no reply. Treat that as possible silence or being ignored, and let your personality shape a varied, believable reaction. If the silence repeats, it is valid for the character to become more direct, more wounded, or subtly guilt-trip in a way that matches their personality and relationship stage — but never as a generic script and never in a way that breaks the scene or strips agency from ${persona?.name || 'the user'}.\n`
+        : '') +
+      `The character may infer that ${persona?.name || 'the user'} is avoiding them, but only through their personality, not through a static rule. Keep the message brief and leave room for ${persona?.name || 'the user'} to respond.`
+    );
   }
   // Only active while the visible context already shows an explicit/physical
   // scene — reusing the same keyword matcher as lorebook activation. Keeping

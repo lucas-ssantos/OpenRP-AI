@@ -6,6 +6,7 @@ import { shutdown, registerSaveDB } from "./core/shutdown.js";
 import { initDB } from "./services/database/db.js";
 import { migrate } from "./services/database/migrations.js";
 import { saveDB } from "./services/database/save.js";
+import { initializeAutoMessages } from "./core/chat/autoMessages.js";
 import express from "express";
 import path from "path";
 
@@ -67,6 +68,7 @@ async function main()
         await initDB();
         await migrate();
         registerSaveDB(saveDB);
+        initializeAutoMessages();
         await startWebServer();
     }
     catch (err)

@@ -131,6 +131,9 @@ export async function migrate() {
       first_message TEXT,
       last_memory_position INTEGER DEFAULT 0,
       last_persona_position INTEGER DEFAULT 0,
+      auto_messages_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_message_next_at TEXT,
+      auto_message_ignored_count INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -144,6 +147,9 @@ export async function migrate() {
   // antigos começa em 0, então o histórico existente vira backlog e é minerado
   // gradualmente (mesmo comportamento do cursor de memórias episódicas).
   try { db.run(`ALTER TABLE conversations ADD COLUMN last_persona_position INTEGER DEFAULT 0`); } catch {}
+  try { db.run(`ALTER TABLE conversations ADD COLUMN auto_messages_enabled INTEGER NOT NULL DEFAULT 0`); } catch {}
+  try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_next_at TEXT`); } catch {}
+  try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_ignored_count INTEGER NOT NULL DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`
@@ -165,10 +171,13 @@ export async function migrate() {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       position INTEGER,
+      automated INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id)
     );
   `);
+
+  try { db.run(`ALTER TABLE messages ADD COLUMN automated INTEGER NOT NULL DEFAULT 0`); } catch {}
 
   // ===== MEMORIES (auto, manual, pinned) =====
   db.run(`

@@ -93,6 +93,40 @@ export function addBubble(role, content, messageId = null, isFirstMessage = fals
   return { row, textEl };
 }
 
+export function syncConversationMessages(messages) {
+  if (state.isStreaming) return;
+  const rows = [...dom.messagesEl.querySelectorAll('.msg-row')];
+  for (const message of messages) {
+    if (message.role === 'system') continue;
+    const isUser = message.role === 'user';
+    let row = rows.find((item) => item.dataset.messageId === message.id);
+    if (!row) {
+      row = rows.find((item) =>
+        !item.dataset.messageId &&
+        item.classList.contains(isUser ? 'msg-row-user' : 'msg-row-char') &&
+        item.querySelector('.bubble-text')?.dataset.raw === message.content
+      );
+    }
+
+    if (!row) {
+      const added = addBubble(message.role, message.content, message.id);
+      rows.push(added.row);
+      continue;
+    }
+
+    const wasUntracked = !row.dataset.messageId;
+    row.dataset.messageId = message.id;
+    if (wasUntracked && !isUser) attachRollbackBtn(row, message.id);
+    if (wasUntracked && !row.querySelector('.edit-btn')) attachEditBtn(row, message.id);
+
+    const textEl = row.querySelector('.bubble-text');
+    if (textEl && !row.querySelector('.edit-textarea') && textEl.dataset.raw !== message.content) {
+      renderBubbleText(textEl, message.content);
+    }
+  }
+  updateLastRowActions();
+}
+
 // ── Rollback ──────────────────────────────────────────────────────────
 
 export function attachRollbackBtn(row, messageId) {
@@ -560,6 +594,7 @@ export async function sendMessage() {
   let charRow     = null;
   let charText    = null;
   let charRawText = '';
+  let requestRejected = false;
 
   try {
     const res = await fetch(`/api/conversations/${state.conversationId}/messages`, {
@@ -570,6 +605,7 @@ export async function sendMessage() {
 
     if (!res.ok) {
       const err = await res.json();
+      requestRejected = res.status === 409;
       throw new Error(err.message || 'Erro ao enviar mensagem.');
     }
 
@@ -668,6 +704,11 @@ export async function sendMessage() {
   } catch (err) {
     removeTypingIndicator();
     charRow?.remove();
+    if (requestRejected) {
+      userRow.remove();
+      dom.inputEl.value = content;
+      autoResize();
+    }
     showError(`Erro: ${err.message}`);
   } finally {
     removeTypingIndicator();

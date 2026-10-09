@@ -1,9 +1,10 @@
 import { conversationId, state, dom } from './state.js';
 import { showError, setInputEnabled, scrollToBottom, updateLastRowActions, updateAffectionBadge, renderScenarioBubble } from './ui.js';
-import { addBubble, initInputListeners, resumeActiveGeneration } from './events.js';
+import { addBubble, initInputListeners, resumeActiveGeneration, syncConversationMessages } from './events.js';
 
 let backgroundGallery = [];
 let currentBackgroundUrl = null;
+let messagePollTimer = null;
 
 // Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
 function expandPlaceholders(text, charName, userName) {
@@ -28,6 +29,27 @@ export async function init() {
     const conversation = convData.conversation;
     state.conversationId = conversation.id;
     state.characterId    = conversation.character_id;
+    const autoMessagesToggle = document.getElementById('auto-messages-toggle');
+    autoMessagesToggle.checked = conversation.auto_messages_enabled;
+    autoMessagesToggle.addEventListener('change', async () => {
+      autoMessagesToggle.disabled = true;
+      try {
+        const response = await fetch(`/api/conversations/${state.conversationId}/auto-messages`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: autoMessagesToggle.checked }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível alterar a configuração.');
+        startMessagePolling(result.enabled);
+      } catch (err) {
+        autoMessagesToggle.checked = !autoMessagesToggle.checked;
+        showError(`Erro ao configurar mensagens automáticas: ${err.message}`);
+      } finally {
+        autoMessagesToggle.disabled = false;
+      }
+    });
+    startMessagePolling(conversation.auto_messages_enabled);
     if (convData.affection) updateAffectionBadge(convData.affection);
 
     // 2) Dados do personagem + persona (para expandir {{char}}/{{user}} na exibição).
@@ -103,6 +125,24 @@ export async function init() {
     dom.charNameEl.textContent = 'Erro';
     showError(`Falha ao carregar: ${err.message}`);
   }
+}
+
+function startMessagePolling(enabled) {
+  if (messagePollTimer) clearInterval(messagePollTimer);
+  messagePollTimer = null;
+  if (!enabled) return;
+  messagePollTimer = setInterval(async () => {
+    if (state.isStreaming || !state.conversationId) return;
+    try {
+      await resumeActiveGeneration();
+      const response = await fetch(`/api/conversations/${state.conversationId}/messages`);
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Falha ao atualizar mensagens.');
+      syncConversationMessages(result.messages);
+    } catch (err) {
+      console.error(`Falha ao sincronizar mensagens automáticas: ${err.message}`);
+    }
+  }, 10_000);
 }
 
 export function initImmersiveMode() {

@@ -196,7 +196,7 @@ const PERSIST_THROTTLE_MS = 300;
 // eventos SSE próprios sem atrasar a percepção de conclusão do cliente.
 // opts.insertPosition replica a posição de uma mensagem substituída (regenerate).
 export async function streamOllama(conversationId, gen, messages, config, onDone, opts = {}) {
-    const { afterDone = null, insertPosition = null } = opts;
+    const { afterDone = null, insertPosition = null, automated = false } = opts;
     const controller = new AbortController();
     gen.controller = controller; // cancelGeneration() usa isto para abortar de fora
     let stallTimer   = null;
@@ -224,7 +224,7 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
         if (!force && now - lastPersistAt < PERSIST_THROTTLE_MS) return;
         lastPersistAt = now;
         if (!gen.assistantMessageId) {
-            gen.assistantMessageId = addMessage(conversationId, "assistant", fullContent, insertPosition);
+            gen.assistantMessageId = addMessage(conversationId, "assistant", fullContent, insertPosition, automated);
         } else {
             updateMessage(gen.assistantMessageId, fullContent);
         }
@@ -232,6 +232,7 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
 
     const finish = async (errorMsg = null) => {
         cleanup();
+        if (errorMsg) gen.error = errorMsg;
         persist(true);
         let extra = {};
         // No caminho de sucesso, onDone sempre roda (mesmo com fullContent vazio —
@@ -278,7 +279,8 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
 
         if (!ollamaRes.ok) {
             cleanup();
-            closeGeneration(conversationId, { delta: "", done: true, error: `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}` });
+            gen.error = `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}`;
+            closeGeneration(conversationId, { delta: "", done: true, error: gen.error });
             return;
         }
 
@@ -367,6 +369,7 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
             return;
         }
         console.error("streamOllama error:", err);
+        gen.error = err.message;
         closeGeneration(conversationId, { delta: "", done: true, error: err.message });
     }
 }
