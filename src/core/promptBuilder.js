@@ -70,6 +70,26 @@ function buildInstructionPrompt(character, persona) {
   );
 }
 
+function elapsedHoursBetween(fromDatetime, toDatetime) {
+  const toTimestamp = (value) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(value ?? '');
+    if (!match) return null;
+    return Date.UTC(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4]),
+      Number(match[5]),
+      Number(match[6] ?? 0),
+    );
+  };
+
+  const from = toTimestamp(fromDatetime);
+  const to = toTimestamp(toDatetime);
+  if (from === null || to === null) return null;
+  return Math.max(0, (to - from) / 3_600_000);
+}
+
 // Keywords used to detect an already-active explicit intimate scene in the
 // visible context window — same matcher as lorebook activation. Kept broad
 // on purpose (body/action words, not just explicit terms) so the block turns
@@ -372,6 +392,15 @@ export function buildPromptMessages({
   }
   if (proactiveMessage) {
     const ignoredCount = Math.max(0, Number(ignoredAutoMessages) || 0);
+    const latestMessage = historyMessages.at(-1);
+    const elapsedHours = elapsedHoursBetween(latestMessage?.created_at, now);
+    const elapsedHoursRounded = elapsedHours === null ? null : Math.round(elapsedHours * 10) / 10;
+    const elapsedDuration = elapsedHoursRounded === null
+      ? null
+      : `${elapsedHoursRounded} ${elapsedHoursRounded === 1 ? 'hour' : 'hours'}`;
+    const timeGapText = elapsedDuration && latestMessage?.created_at
+      ? `Current in-story time is ${now}. The most recent message was sent at ${latestMessage.created_at}; ${elapsedDuration} ${elapsedHoursRounded === 1 ? 'has' : 'have'} passed since then. Treat this as a real time jump, not the same uninterrupted moment.\n`
+      : `A scheduled time gap has passed since the previous turn. Treat this as a real time jump, not the same uninterrupted moment.\n`;
     const relationshipWeight = affection?.level >= 6
       ? 'This is an emotionally serious situation, so a sharper, more personal reaction is believable.'
       : affection?.level >= 3
@@ -389,6 +418,8 @@ export function buildPromptMessages({
     systemParts.push(
       `[AUTOMATIC MESSAGE]\n` +
       `You are starting a new turn without a new message from ${persona?.name || 'the user'}. Continue the roleplay based only on the established scene and conversation; never speak, act, or decide for them.\n` +
+      `${timeGapText}` +
+      `Do not simply resume the exact action, gesture, or line that was happening in the previous turn. Let the elapsed time matter: establish what ${character.name} is doing now and allow the scene to have naturally moved forward. Preserve established facts, and do not invent actions or decisions for ${persona?.name || 'the user'} during the gap.\n` +
       `First follow the established physical situation: if you and ${persona?.name || 'the user'} are together, continue the scene naturally with an action and dialogue; do not turn it into a phone message. If you are apart, reach out using a communication method that fits the setting and story (usually a phone or smartphone in a modern setting), written naturally as an in-character message. Do not invent a location or device that contradicts the story.\n` +
       `${escalationText}\n` +
       `${relationshipWeight}\n` +
