@@ -402,8 +402,8 @@ export function buildPromptMessages({
       ? null
       : `${elapsedHoursRounded} ${elapsedHoursRounded === 1 ? 'hour' : 'hours'}`;
     const timeGapText = elapsedDuration && latestMessage?.created_at
-      ? `Current in-story time is ${now}. The most recent message was sent at ${latestMessage.created_at}; ${elapsedDuration} ${elapsedHoursRounded === 1 ? 'has' : 'have'} passed since then. Treat this as a real time jump, not the same uninterrupted moment.\n`
-      : `A scheduled time gap has passed since the previous turn. Treat this as a real time jump, not the same uninterrupted moment.\n`;
+      ? `Current in-story local time: ${now}. The conversation transcript ended at ${latestMessage.created_at}; about ${elapsedDuration} ${elapsedHoursRounded === 1 ? 'has' : 'have'} passed since that message.\n`
+      : `A scheduled time gap has passed since the conversation transcript ended. The current in-story moment is later; do not treat the previous line as happening now.\n`;
     const relationshipWeight = affection?.level >= 6
       ? 'This is an emotionally serious situation, so a sharper, more personal reaction is believable.'
       : affection?.level >= 3
@@ -419,10 +419,11 @@ export function buildPromptMessages({
       : 'This is the third-or-later automatic message without a reply. The silence now reads as deliberate ignoring, and the character may react with more direct pressure, hurt, resentment, or a subtle guilt-trip — but only if that fits their personality and the relationship stage. Do not turn it into generic spam or a forced, robotic demand.';
 
     systemParts.push(
-      `[AUTOMATIC MESSAGE]\n` +
-      `You are starting a new turn without a new message from ${persona?.name || 'the user'}. Continue the roleplay based only on the established scene and conversation; never speak, act, or decide for them.\n` +
+      `[AUTOMATIC MESSAGE — TIME SKIP]\n` +
+      `You are starting a new turn without a new message from ${persona?.name || 'the user'}. The transcript below is history, not a live exchange.\n` +
       `${timeGapText}` +
-      `Do not simply resume the exact action, gesture, or line that was happening in the previous turn. Let the elapsed time matter: establish what ${character.name} is doing now and allow the scene to have naturally moved forward. Preserve established facts, and do not invent actions or decisions for ${persona?.name || 'the user'} during the gap.\n` +
+      `The previous line is old: do not answer it as if it was just said, and do not continue the same gesture, action, dialogue beat, or uninterrupted moment. Start from what ${character.name} is doing now, hours later. Where natural, make the passage of time apparent with a brief cue such as "later that evening" or by referring to something that happened during the gap. Keep established facts, but do not invent what ${persona?.name || 'the user'} did, said, or decided while absent.\n` +
+      `Continue the roleplay based on the established scene and conversation, without speaking, acting, or deciding for ${persona?.name || 'the user'}.\n` +
       `First follow the established physical situation: if you and ${persona?.name || 'the user'} are together, continue the scene naturally with an action and dialogue; do not turn it into a phone message. If you are apart, reach out using a communication method that fits the setting and story (usually a phone or smartphone in a modern setting), written naturally as an in-character message. Do not invent a location or device that contradicts the story.\n` +
       `${escalationText}\n` +
       `${relationshipWeight}\n` +
