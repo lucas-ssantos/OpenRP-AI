@@ -411,6 +411,18 @@ export function buildPromptMessages({
       : affection?.level >= 1
       ? 'The familiarity is mild, so the reaction should stay restrained and not over-dramatize it.'
       : 'The relationship is still distant, so the reaction should be subtle and not too intense.';
+    const affectionLevel = Math.min(8, Math.max(0, Number(affection?.level) || 0));
+    const userInterestByLevel = [
+      'At this early stage, show only light, natural curiosity about the user; do not act as if you are already close.',
+      'Show a little more personal interest: a casual check-in about how the user is doing can fit.',
+      'As a friend, show genuine curiosity about how the user is and what they think of the shared interaction.',
+      'As a close friend, make room for a more attentive check-in about the user’s wellbeing or feelings.',
+      'As best friends, show that you remember what matters to the user and ask how they are doing with it.',
+      'With romantic tension, let personal interest and missing the user show subtly; if together, you may check whether they are enjoying the shared experience.',
+      'As partners, show open warmth and specific concern for how the user feels; if together, show interest in whether they are enjoying this time or activity with you.',
+      'In deep love, their wellbeing and enjoyment matter strongly to you; ask or show care in a tender, personal way that fits your personality.',
+      'As soulmates, show the deepest familiarity and care: notice what may matter to them and make sure they feel comfortable and are enjoying the shared experience, without presuming their answer.',
+    ][affectionLevel];
 
     const escalationText = ignoredCount === 0
       ? 'This is the first automatic message sent without a reply. Keep it natural, warm, and low-pressure.'
@@ -427,6 +439,7 @@ export function buildPromptMessages({
       `First follow the established physical situation: if you and ${persona?.name || 'the user'} are together, continue the scene naturally with an action and dialogue; do not turn it into a phone message. If you are apart, reach out using a communication method that fits the setting and story (usually a phone or smartphone in a modern setting), written naturally as an in-character message. Do not invent a location or device that contradicts the story.\n` +
       `${escalationText}\n` +
       `${relationshipWeight}\n` +
+      `Let your interest in ${persona?.name || 'the user'} grow with the current relationship level: ${userInterestByLevel} If you are physically together, interest can include whether they feel okay and are enjoying the current shared activity or scene; if apart, it can be a fitting check-in about how they are. Never assume their feelings or make every automatic message a direct question—vary how this care appears, keep it in character, and leave room for their answer.\n` +
       (previousMessageWasAutomated
         ? `Your previous automatic message received no reply. Treat that as possible silence or being ignored, and let your personality shape a varied, believable reaction. If the silence repeats, it is valid for the character to become more direct, more wounded, or subtly guilt-trip in a way that matches their personality and relationship stage — but never as a generic script and never in a way that breaks the scene or strips agency from ${persona?.name || 'the user'}.\n`
         : '') +
