@@ -129,6 +129,7 @@ async function generateAutomaticMessage(conversationId) {
                 generationMs: Date.now() - startedAt,
                 allMemories: getMemories(conversationId),
                 allLorebooks: lorebooks,
+                isProactiveMessage: true,
             });
             return { message_id: messageId };
         },

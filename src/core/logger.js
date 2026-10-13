@@ -25,6 +25,7 @@ export function isDevMode() {
  * @param {number}   [opts.prepMs]         - tempo (ms) desde a requisição até o envio ao Ollama (montagem do prompt, retrieval de memórias/lorebook)
  * @param {number}   [opts.generationMs]   - tempo (ms) que o Ollama levou para gerar a resposta (streaming completo)
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
+ * @param {boolean}  [opts.isProactiveMessage=false] - true quando a IA está iniciando sem nova mensagem do usuário
  */
 export function logConversationTurn({
     conversationId,
@@ -40,6 +41,7 @@ export function logConversationTurn({
     allMemories  = [],
     allLorebooks = [],
     isRegen = false,
+    isProactiveMessage = false,
 }) {
     if (!isDevMode()) return;
 
@@ -61,6 +63,7 @@ export function logConversationTurn({
             prepMs, generationMs,
             allMemories, allLorebooks,
             isRegen,
+            isProactiveMessage,
         });
 
         fs.appendFileSync(filepath, entry, "utf8");
@@ -86,7 +89,7 @@ function formatDuration(ms) {
     return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(2)}s`;
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, prepMs, generationMs, allMemories, allLorebooks, isRegen }) {
+function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -209,6 +212,9 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
     if (currentUser) {
         lines.push(section("[5] MENSAGEM ATUAL DO USUÁRIO"));
         lines.push(currentUser.content);
+    } else if (isProactiveMessage) {
+        lines.push(section("[5] MENSAGEM ATUAL DO USUÁRIO"));
+        lines.push("(nenhuma — turno proativo/autônomo; o user não enviou uma nova mensagem e o modelo deve tratar o tempo como avançado)");
     }
 
     // ── Raciocínio nativo do Ollama (think:true na config) ─────────────────────
