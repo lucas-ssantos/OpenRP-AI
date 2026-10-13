@@ -14,8 +14,45 @@ import { beginGeneration, isGenerating } from "./generationManager.js";
 
 const timers = new Map();
 
-function chooseNextMessageTime() {
-    const delayMinutes = 60 + Math.random() * 120;
+const PROXIMITY_CUES = [
+    /\b(?:cuddling|cuddle|resting together|lying together|lie beside|beside you|next to you|in bed together|on the couch together|same room|same house|in the same house|at home together|curled up|in your arms|in my arms)\b/i,
+    /\b(?:abraçad\w*|deitad\w* junt\w*|descansando junt\w*|dormindo junt\w*|aninhad\w*|lado a lado|na mesma casa|no mesmo ambiente|no mesmo cômodo|no mesmo quarto|no sofá junt\w*|na cama junt\w*|encostad\w* em você)\b/i,
+];
+
+const SEPARATION_CUES = [
+    /\b(?:went to work|going to work|getting ready for work|leaving for work|at work|left for work|headed to work|left the house|went out|on my way to work|at the office|miles away|long-distance|i'?m going|i have to go|i should go|i'?m leaving|i need to leave|heading out|leaving now)\b/i,
+    /\b(?:fui trabalhar|vou trabalhar|vou pro trabalho|vou para o trabalho|indo pro trabalho|indo para o trabalho|indo trabalhar|cheguei no trabalho|estou no trabalho|saí de casa|saiu de casa|indo embora|estou indo|tô indo|tenho que ir|preciso ir|vou indo|estou saindo|tô saindo|preciso sair|estou longe|em outra cidade)\b/i,
+];
+
+function applyProximityCues(text, state) {
+    let latestCue = null;
+    for (const cue of [...PROXIMITY_CUES, ...SEPARATION_CUES]) {
+        const match = cue.exec(text);
+        if (match && (!latestCue || match.index > latestCue.index)) {
+            latestCue = {
+                index: match.index,
+                together: PROXIMITY_CUES.includes(cue),
+            };
+        }
+    }
+    return latestCue ? latestCue.together : state;
+}
+
+function areTogetherOrNearby(conversationId) {
+    const recentMessages = getLastNMessages(conversationId, 8);
+    let state = applyProximityCues(getConversation(conversationId)?.scenario ?? "", false);
+
+    for (const message of recentMessages) {
+        state = applyProximityCues(message.content, state);
+    }
+    return state;
+}
+
+function chooseNextMessageTime(conversationId) {
+    const nearby = areTogetherOrNearby(conversationId);
+    const delayMinutes = nearby
+        ? 30 + Math.random() * 30
+        : 60 + Math.random() * 120;
     return new Date(Date.now() + delayMinutes * 60_000).toISOString();
 }
 
@@ -40,7 +77,7 @@ function persistAndSchedule(conversationId, enabled, nextAt = null, ignoredCount
 }
 
 export function configureAutoMessages(conversationId, enabled) {
-    const nextAt = enabled ? chooseNextMessageTime() : null;
+    const nextAt = enabled ? chooseNextMessageTime(conversationId) : null;
     persistAndSchedule(conversationId, enabled, nextAt, enabled ? 0 : 0);
     return nextAt;
 }
@@ -48,14 +85,14 @@ export function configureAutoMessages(conversationId, enabled) {
 export function resetAutoMessageTimer(conversationId) {
     const conversation = getConversation(conversationId);
     if (!conversation?.auto_messages_enabled) return;
-    persistAndSchedule(conversationId, true, chooseNextMessageTime(), 0);
+    persistAndSchedule(conversationId, true, chooseNextMessageTime(conversationId), 0);
 }
 
 export function initializeAutoMessages() {
     for (const conversation of getEnabledAutoMessageConversations()) {
         const nextAt = conversation.next_at && Number.isFinite(Date.parse(conversation.next_at))
             ? conversation.next_at
-            : chooseNextMessageTime();
+            : chooseNextMessageTime(conversation.id);
         persistAndSchedule(conversation.id, true, nextAt, Number(conversation.ignored_count ?? 0));
     }
 }
@@ -151,7 +188,7 @@ async function runScheduledMessage(conversationId, scheduledAt) {
     if (!conversation?.auto_messages_enabled || conversation.auto_message_next_at !== scheduledAt) return;
 
     const nextIgnoredCount = (conversation.auto_message_ignored_count ?? 0) + 1;
-    const nextAt = chooseNextMessageTime();
+    const nextAt = chooseNextMessageTime(conversationId);
     setAutoMessages(conversationId, true, nextAt, nextIgnoredCount);
 
     try {
@@ -165,7 +202,9 @@ async function runScheduledMessage(conversationId, scheduledAt) {
     } finally {
         const latest = getConversation(conversationId);
         if (latest?.auto_messages_enabled && latest.auto_message_next_at === nextAt) {
-            armTimer(conversationId, nextAt);
+            const refreshedNextAt = chooseNextMessageTime(conversationId);
+            setAutoMessages(conversationId, true, refreshedNextAt, latest.auto_message_ignored_count);
+            armTimer(conversationId, refreshedNextAt);
         }
     }
 }

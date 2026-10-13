@@ -217,6 +217,12 @@ A resposta do Ollama **não depende da conexão HTTP que a disparou**. `src/core
 - `regenerate` usa o mesmo mecanismo — `insertPosition` (opts do `streamOllama`) replica a posição da mensagem substituída.
 - O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
 
+### Mensagens automáticas por conversa
+
+- O estado de ativação, próximo disparo e contador de mensagens automáticas sem resposta é persistido em `conversations`; as mensagens geradas são salvas como mensagens reais com `automated = true`.
+- `autoMessages.js` agenda normalmente entre 1 e 3 horas. Se o cenário e as últimas 8 mensagens indicarem proximidade física (por exemplo, juntos em casa ou descansando abraçados), agenda entre 30 e 60 minutos. Uma indicação mais recente de separação/saída prevalece; sem sinal claro de proximidade, mantém o intervalo normal.
+- O prompt automático trata a última fala do usuário como contexto histórico, informa o tempo transcorrido e exige progresso de cena. Em momentos tranquilos juntos, pode avançar com um gesto pequeno, um assunto cotidiano ou uma memória relevante; separados, mantém a situação e o meio de comunicação estabelecidos.
+
 ### Thinking (raciocínio do modelo)
 
 - `generation_config.think_mode` (`'off' | 'scoped' | 'always'`, padrão `'off'`) controla o parâmetro nativo `think` da API do Ollama — configurável em `/settings` (select no card "Modelo em uso"). Só tem efeito em modelos com suporte a reasoning (qwen3, qwen3.5, deepseek-r1, gpt-oss, etc.); em outros modelos o Ollama ignora o parâmetro. A coluna booleana legada `think` é mantida em sincronia (1 = qualquer modo ativo); DBs antigos com `think=1` migram para `'always'` no boot (backfill roda uma vez, só em linhas com `think_mode` NULL).

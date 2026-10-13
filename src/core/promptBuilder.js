@@ -414,13 +414,19 @@ export function buildPromptMessages({
     const elapsedHoursRounded = elapsedHours === null ? null : Math.round(elapsedHours * 10) / 10;
     const elapsedDuration = elapsedHoursRounded === null
       ? null
+      : elapsedHoursRounded < 1
+      ? `${Math.max(1, Math.round(elapsedHoursRounded * 60))} ${Math.round(elapsedHoursRounded * 60) === 1 ? 'minute' : 'minutes'}`
       : `${elapsedHoursRounded} ${elapsedHoursRounded === 1 ? 'hour' : 'hours'}`;
+    const elapsedDurationIsSingular = elapsedDuration?.startsWith('1 ');
     const timeGapText = elapsedDuration && latestMessage?.created_at
-      ? `Current in-story local time: ${now}. The conversation transcript ended at ${latestMessage.created_at}; about ${elapsedDuration} ${elapsedHoursRounded === 1 ? 'has' : 'have'} passed since that message.\n`
-      : `A scheduled time gap has passed since the conversation transcript ended. The current in-story moment is later; do not treat the previous line as happening now.\n`;
+      ? `Current in-story local time: ${now}. The conversation transcript ended at ${latestMessage.created_at}; about ${elapsedDuration} ${elapsedDurationIsSingular ? 'has' : 'have'} passed since that message.\n`
+      : `A scheduled time gap of at least 30 minutes has passed since the conversation transcript ended. The current in-story moment is later; do not treat the previous line as happening now.\n`;
     const noLivePromptText = lastUserTurn
       ? `THERE IS NO NEW USER MESSAGE THIS TURN. The most recent user text in the transcript is stale history from earlier in the scene, not a fresh prompt. Treat it as an old turn from before the time skip, not as a live reply to this automatic check-in.\n`
       : `THERE IS NO NEW USER MESSAGE THIS TURN. This is a proactive character message, not a direct reply. The conversation is paused and the scene has advanced by time.\n`;
+    const historicalUserText = lastUserTurn
+      ? `The last historical user message, for story-state context only (not a live prompt): ${JSON.stringify(lastUserTurn.content)}\n`
+      : '';
     const relationshipWeight = affection?.level >= 6
       ? 'This is an emotionally serious situation, so a sharper, more personal reaction is believable.'
       : affection?.level >= 3
@@ -452,15 +458,18 @@ export function buildPromptMessages({
       `You are starting a new turn without a new message from ${persona?.name || 'the user'}. The transcript below is history, not a live exchange.\n` +
       `${timeGapText}` +
       `${noLivePromptText}` +
-      `TIME SKIP IS MANDATORY: the previous line happened hours ago, not seconds ago. Do not answer it as if it was just said or continue its immediate next beat. In particular, do not narrate ${character.name} watching ${persona?.name || 'the user'} leave, waiting for a door to close, reacting to their departure, or completing an action that was already underway. Start from the present moment after the stated time has passed; let the character's day and circumstances move forward. A brief natural time cue is welcome. Keep established facts, but never invent what ${persona?.name || 'the user'} did, said, or decided while absent.\n` +
+      `${historicalUserText}` +
+      `TIME SKIP IS MANDATORY: the stated time has passed; do not answer the old user message as if it was just said or continue its immediate next beat. Do not narrate ${character.name} watching ${persona?.name || 'the user'} leave, waiting for a door to close, reacting to their departure, or completing an action that was already underway. Start from the present moment after the stated time has passed; let the character's day and circumstances move forward. A brief natural time cue is welcome. Keep established facts, but never invent what ${persona?.name || 'the user'} did, said, or decided while absent.\n` +
       `Determine whether you are physically together NOW from the established story, including the user's last described movements. If ${persona?.name || 'the user'} left, went to work, or is otherwise elsewhere, you are apart: write this as a message ${character.name} sends now through a fitting communication method (usually a phone in a modern setting). Do not narrate an in-person action or reaction to the user's departure. If you are established to still be together, continue from the current later moment—not from the exact gesture or instant where the transcript stopped. Never speak, act, or decide for ${persona?.name || 'the user'} during the gap.\n` +
+      `ALWAYS PROGRESS THE SCENE: each automatic message must move the roleplay forward from its established state. Do not merely paraphrase the last exchange, repeat the same gesture, or react again to the same event. Add one small new beat, development, or conversational opening that fits the character and what is already established.\n` +
+      `If you are together and the scene is calm (for example resting, cuddling, or lying together), keep the moment gentle and natural rather than inventing drama. You can make a small affectionate gesture, ask a casual question, bring up a light everyday topic, or naturally mention a relevant established memory to start a fresh thread. Do not fabricate a shared memory or force a question every time.\n` +
       `${escalationText}\n` +
       `${relationshipWeight}\n` +
       `Let your interest in ${persona?.name || 'the user'} grow with the current relationship level: ${userInterestByLevel} If you are physically together, interest can include whether they feel okay and are enjoying the current shared activity or scene; if apart, it can be a fitting check-in about how they are. Never assume their feelings or make every automatic message a direct question—vary how this care appears, keep it in character, and leave room for their answer.\n` +
       (previousMessageWasAutomated
         ? `Your previous automatic message received no reply. Treat that as possible silence or being ignored, and let your personality shape a varied, believable reaction. If the silence repeats, it is valid for the character to become more direct, more wounded, or subtly guilt-trip in a way that matches their personality and relationship stage — but never as a generic script and never in a way that breaks the scene or strips agency from ${persona?.name || 'the user'}.\n`
         : '') +
-      `The character may infer that ${persona?.name || 'the user'} is avoiding them, but only through their personality, not through a static rule. Keep the message brief and leave room for ${persona?.name || 'the user'} to respond.`
+      `If you are apart, stay consistent with the established situation and communication method; do not suddenly move ${character.name} into the user's location or invent that they reunited. The character may infer that ${persona?.name || 'the user'} is avoiding them, but only through their personality, not through a static rule. Keep the message brief and leave room for ${persona?.name || 'the user'} to respond.`
     );
   }
   // Only active while the visible context already shows an explicit/physical
