@@ -6,6 +6,7 @@ const characterId = window.location.pathname.split('/')[2];
 
 let characterImages = [];          // galeria atual vinda do banco
 const removeImageIds = new Set();  // marcadas para remoção — aplicadas no salvar
+let originalAffectionOverride = null;
 
 function showError(text) {
   msgError.textContent = text;
@@ -39,6 +40,7 @@ async function loadCharacter() {
 
     if (!charRes.ok) throw new Error('Personagem não encontrado.');
     const { character } = await charRes.json();
+    originalAffectionOverride = character.affection_override ?? null;
 
     document.title = `Editar ${character.name} — OpenRP AI`;
     document.getElementById('subtitle').textContent = `Modificando dados de ${character.name}`;
@@ -192,9 +194,14 @@ async function handleSubmit(event) {
   }
 
   const overrideValue = document.getElementById('affection_override').value;
+  const affectionOverride = overrideValue === '' ? null : Number(overrideValue);
+  if (affectionOverride !== originalAffectionOverride && !window.confirm(
+    'O estágio de afeição foi alterado. Isso vai reiniciar a progressão a partir do estágio escolhido (ou do zero ao selecionar Auto). Deseja continuar?'
+  )) return;
+
   const body = {
     name, description, personality, physical_traits: physicalTraits, likes, dislikes,
-    affection_override: overrideValue === '' ? null : Number(overrideValue),
+    affection_override: affectionOverride,
   };
 
   if (avatarFiles.length) {

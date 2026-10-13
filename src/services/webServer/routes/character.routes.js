@@ -176,6 +176,10 @@ export default function characterRouter(uploadDir) {
                     return res.status(400).json({ ok: false, message: "Estágio de afeição inválido." });
                 }
             }
+            const affectionStageChanged = affection_override !== undefined &&
+                (affection_override === null
+                    ? existing.affection_override !== null
+                    : Number(affection_override) !== existing.affection_override);
 
             const uploads = collectUploads(req.body);
             const currentImages = getCharacterImages(id);
@@ -219,8 +223,10 @@ export default function characterRouter(uploadDir) {
                 dislikes:      dislikes      !== undefined ? dislikes              : undefined,
                 physical_traits: physical_traits !== undefined ? physical_traits   : undefined,
                 avatar_url:    avatarUrl,
-                affection_points: affection_override !== undefined && affection_override !== null
-                    ? Math.max(existing.affection_points ?? 0, AFFECTION_LEVELS[Number(affection_override)].threshold)
+                affection_points: affectionStageChanged
+                    ? affection_override === null
+                        ? 0
+                        : AFFECTION_LEVELS[Number(affection_override)].threshold
                     : undefined,
                 affection_override: affection_override !== undefined
                     ? (affection_override === null ? null : Number(affection_override))
