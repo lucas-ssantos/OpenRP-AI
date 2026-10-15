@@ -1,6 +1,7 @@
 import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
+import { deletePersonaFactsForCharacter } from "./personaFacts.js";
 
 const CHAR_COLUMNS = `id, name, description, personality, likes, dislikes, physical_traits, avatar_url, affection_points, affection_override, created_at, updated_at`;
 
@@ -92,8 +93,8 @@ export function deleteCharacter(characterId) {
     `DELETE FROM conversation_config WHERE conversation_id IN (SELECT id FROM conversations WHERE character_id = ?)`,
     [characterId]
   );
+  deletePersonaFactsForCharacter(characterId);
   db.run(`DELETE FROM conversations WHERE character_id = ?`, [characterId]);
-  db.run(`DELETE FROM persona_facts WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM character_moods WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM character_lorebooks WHERE character_id = ?`, [characterId]);
   db.run(`DELETE FROM character_images WHERE character_id = ?`, [characterId]);

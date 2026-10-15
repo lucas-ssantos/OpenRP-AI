@@ -107,3 +107,37 @@ export function deletePersonaFact(id) {
   if (changed) saveDB();
   return changed;
 }
+
+export function deletePersonaFactsForConversation(conversationId) {
+  const db = getDB();
+  db.run(
+    `UPDATE persona_facts SET superseded_by = NULL
+     WHERE superseded_by IN (
+       SELECT id FROM persona_facts WHERE source_conversation_id = ?
+     )`,
+    [conversationId]
+  );
+  const referencesChanged = db.getRowsModified() > 0;
+  db.run(`DELETE FROM persona_facts WHERE source_conversation_id = ?`, [conversationId]);
+  const changed = referencesChanged || db.getRowsModified() > 0;
+  if (changed) saveDB();
+  return changed;
+}
+
+export function deletePersonaFactsForCharacter(characterId) {
+  const db = getDB();
+  const relatedFacts = `character_id = ?
+    OR source_conversation_id IN (SELECT id FROM conversations WHERE character_id = ?)`;
+  db.run(
+    `UPDATE persona_facts SET superseded_by = NULL
+     WHERE superseded_by IN (
+       SELECT id FROM persona_facts WHERE ${relatedFacts}
+     )`,
+    [characterId, characterId]
+  );
+  const referencesChanged = db.getRowsModified() > 0;
+  db.run(`DELETE FROM persona_facts WHERE ${relatedFacts}`, [characterId, characterId]);
+  const changed = referencesChanged || db.getRowsModified() > 0;
+  if (changed) saveDB();
+  return changed;
+}

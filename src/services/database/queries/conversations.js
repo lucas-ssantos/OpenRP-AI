@@ -1,6 +1,7 @@
 import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
+import { deletePersonaFactsForConversation } from "./personaFacts.js";
 
 const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, auto_messages_enabled, auto_message_next_at, auto_message_ignored_count, created_at, updated_at`;
 
@@ -166,6 +167,7 @@ export function deleteConversation(conversationId) {
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM conversation_config WHERE conversation_id = ?`, [conversationId]);
+  deletePersonaFactsForConversation(conversationId);
   db.run(`DELETE FROM conversations WHERE id = ?`, [conversationId]);
   const changed = db.getRowsModified() > 0;
   saveDB();

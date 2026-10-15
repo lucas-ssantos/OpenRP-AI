@@ -1,6 +1,7 @@
 import { getDB, saveDB } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
+import { deletePersonaFactsForConversation } from "./personaFacts.js";
 
 const mapRow = (row) => ({
   id: row[0], conversation_id: row[1], role: row[2],
@@ -91,12 +92,12 @@ export function rollbackConversation(conversationId, messageId) {
   return true;
 }
 
-// Apaga todas as mensagens e memórias — usado pelo reset de conversa.
-// Persona facts NÃO são apagados: pertencem ao usuário, não à conversa.
+// Apaga mensagens, memórias e fatos de persona extraídos desta conversa.
 export function resetConversation(conversationId) {
   const db = getDB();
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
+  deletePersonaFactsForConversation(conversationId);
   db.run(`UPDATE conversations SET last_memory_position = 0, last_persona_position = 0 WHERE id = ?`, [conversationId]);
   saveDB();
 }
