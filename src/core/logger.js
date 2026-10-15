@@ -131,7 +131,7 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
         const part = systemParts[i];
         if (part.startsWith("[About ")) {
             personaFactsInjected = true;
-            lines.push(section("[1b] PERFIL DO USUÁRIO (persona facts — sempre injetado)"));
+            lines.push(section("[1b] PERFIL DO USUÁRIO (fatos pessoais + específicos do personagem)"));
             lines.push(part.replace(/^\[[^\]]*\]\n/, ""));
         } else if (part.startsWith("[Core memories") || part.startsWith("[Relevant memories")) {
             const label = part.startsWith("[Core memories")

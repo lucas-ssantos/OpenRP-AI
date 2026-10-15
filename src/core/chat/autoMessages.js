@@ -111,7 +111,7 @@ async function generateAutomaticMessage(conversationId) {
         userMessage: "",
         recentMessages: historyMessages,
     });
-    const personaFacts = getPersonaFactsForPrompt();
+    const personaFacts = getPersonaFactsForPrompt(conversation.character_id);
     const lorebooks = getAllLorebooks(conversation.character_id);
     const dailyMood = getDailyMoodForCharacter(conversation.character_id);
     const affection = getEffectiveAffection(character);

@@ -83,6 +83,31 @@ function renderFactItem(fact) {
   return item;
 }
 
+function renderFactGroups(container, facts) {
+  const groups = new Map();
+  for (const fact of facts) {
+    const key = fact.character_id || 'personal';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        title: fact.character_id ? (fact.character_name || 'Personagem removido') : 'Pessoal — compartilhado com todos os personagens',
+        facts: [],
+      });
+    }
+    groups.get(key).facts.push(fact);
+  }
+
+  for (const group of groups.values()) {
+    const section = document.createElement('section');
+    section.className = 'd-flex flex-column gap-2';
+    const heading = document.createElement('h3');
+    heading.className = 'h6 text-info mb-0 mt-2';
+    heading.textContent = group.title;
+    section.appendChild(heading);
+    group.facts.forEach(fact => section.appendChild(renderFactItem(fact)));
+    container.appendChild(section);
+  }
+}
+
 async function loadPersonaFacts() {
   const loadingFacts   = document.getElementById('facts-loading');
   const emptyEl        = document.getElementById('facts-empty');
@@ -103,10 +128,10 @@ async function loadPersonaFacts() {
     const superseded = facts.filter(f => f.status !== 'active');
 
     emptyEl.style.display = active.length ? 'none' : '';
-    active.forEach(f => listEl.appendChild(renderFactItem(f)));
+    renderFactGroups(listEl, active);
 
     supersededWrap.style.display = superseded.length ? '' : 'none';
-    superseded.forEach(f => supersededEl.appendChild(renderFactItem(f)));
+    renderFactGroups(supersededEl, superseded);
   } catch (err) {
     loadingFacts.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${escHtml(err.message)}</span>`;
     loadingFacts.style.display = '';

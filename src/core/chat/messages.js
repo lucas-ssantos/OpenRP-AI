@@ -75,7 +75,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
-        const personaFacts = getPersonaFactsForPrompt();
+        const personaFacts = getPersonaFactsForPrompt(conv.character_id);
         const lorebooks    = getAllLorebooks(conv.character_id);
         const dailyMood    = getDailyMoodForCharacter(conv.character_id);
 
@@ -204,7 +204,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
         const lastUser     = isContinue ? lastMsg : [...recentMsgs].reverse().find(m => m.role === "user");
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
-        const personaFacts = getPersonaFactsForPrompt();
+        const personaFacts = getPersonaFactsForPrompt(conv.character_id);
         const lorebooks    = getAllLorebooks(conv.character_id);
         const dailyMood    = getDailyMoodForCharacter(conv.character_id);
 

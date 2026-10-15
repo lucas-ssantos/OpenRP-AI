@@ -5,32 +5,34 @@ import { localDatetime } from "../../../utils/datetime.js";
 // Categorias válidas de um persona fact — qualquer outra vira 'fact' na criação.
 export const PERSONA_FACT_CATEGORIES = ["preference", "dislike", "trait", "fact", "relationship", "goal"];
 
-const FACT_COLUMNS = `id, category, content, keywords, confidence, times_confirmed, status, superseded_by, source_conversation_id, created_at, updated_at`;
+const FACT_COLUMNS = `persona_facts.id, persona_facts.category, persona_facts.character_id, persona_facts.content, persona_facts.keywords, persona_facts.confidence, persona_facts.times_confirmed, persona_facts.status, persona_facts.superseded_by, persona_facts.source_conversation_id, persona_facts.created_at, persona_facts.updated_at`;
 
 const mapFact = (row) => ({
   id: row[0],
   category: row[1],
-  content: row[2],
-  keywords: row[3],
-  confidence: row[4],
-  times_confirmed: row[5],
-  status: row[6],
-  superseded_by: row[7],
-  source_conversation_id: row[8],
-  created_at: row[9],
-  updated_at: row[10],
+  character_id: row[2],
+  content: row[3],
+  keywords: row[4],
+  confidence: row[5],
+  times_confirmed: row[6],
+  status: row[7],
+  superseded_by: row[8],
+  source_conversation_id: row[9],
+  created_at: row[10],
+  updated_at: row[11],
+  character_name: row[12] ?? null,
 });
 
-export function createPersonaFact({ category, content, keywords = null, confidence = 0.6, sourceConversationId = null } = {}) {
+export function createPersonaFact({ category, characterId = null, content, keywords = null, confidence = 0.6, sourceConversationId = null } = {}) {
   if (!content?.trim()) throw new Error("Persona fact requer conteúdo.");
   const cat = PERSONA_FACT_CATEGORIES.includes(category) ? category : "fact";
   const db = getDB();
   const id = uuidv4();
   const now = localDatetime();
   db.run(
-    `INSERT INTO persona_facts (id, category, content, keywords, confidence, times_confirmed, status, source_conversation_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, 'active', ?, ?, ?)`,
-    [id, cat, content.trim(), keywords, confidence, sourceConversationId, now, now]
+    `INSERT INTO persona_facts (id, category, character_id, content, keywords, confidence, times_confirmed, status, source_conversation_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, 'active', ?, ?, ?)`,
+    [id, cat, characterId, content.trim(), keywords, confidence, sourceConversationId, now, now]
   );
   saveDB();
   return id;
@@ -38,12 +40,18 @@ export function createPersonaFact({ category, content, keywords = null, confiden
 
 // Fatos ativos (os que entram no prompt), mais confiáveis primeiro.
 // `limit` opcional — o cap de injeção no prompt fica no caller.
-export function getActivePersonaFacts(limit = null) {
+export function getActivePersonaFacts(limit = null, characterId = null) {
   const db = getDB();
-  const sql = `SELECT ${FACT_COLUMNS} FROM persona_facts WHERE status = 'active'
+  const scopedFilter = characterId === null
+    ? ` AND character_id IS NULL`
+    : ` AND (character_id IS NULL OR character_id = ?)`;
+  const sql = `SELECT ${FACT_COLUMNS} FROM persona_facts WHERE status = 'active'${scopedFilter}
                ORDER BY confidence DESC, times_confirmed DESC, updated_at DESC` +
               (limit ? ` LIMIT ?` : ``);
-  const result = db.exec(sql, limit ? [limit] : []);
+  const params = [];
+  if (characterId !== null) params.push(characterId);
+  if (limit) params.push(limit);
+  const result = db.exec(sql, params);
   if (result.length === 0) return [];
   return result[0].values.map(mapFact);
 }
@@ -52,8 +60,10 @@ export function getActivePersonaFacts(limit = null) {
 export function getAllPersonaFacts() {
   const db = getDB();
   const result = db.exec(
-    `SELECT ${FACT_COLUMNS} FROM persona_facts
-     ORDER BY status = 'active' DESC, confidence DESC, times_confirmed DESC, updated_at DESC`
+    `SELECT ${FACT_COLUMNS}, characters.name FROM persona_facts
+     LEFT JOIN characters ON characters.id = persona_facts.character_id
+     ORDER BY persona_facts.status = 'active' DESC, persona_facts.confidence DESC,
+              persona_facts.times_confirmed DESC, persona_facts.updated_at DESC`
   );
   if (result.length === 0) return [];
   return result[0].values.map(mapFact);

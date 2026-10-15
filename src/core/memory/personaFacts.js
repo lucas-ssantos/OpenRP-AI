@@ -12,10 +12,10 @@ const OLLAMA_URL = appConfig.ollama.chatEndpoint;
 // cada) — 30 fatos ≈ 300 tokens, barato o bastante para estar sempre presente.
 const PROMPT_FACTS_CAP = 30;
 
-// Fatos que formam o bloco [About {{user}}] — sempre injetado, sem keyword
-// matching (o perfil do usuário é sempre relevante, como a ficha do personagem).
-export function getPersonaFactsForPrompt() {
-    return getActivePersonaFacts(PROMPT_FACTS_CAP);
+// Fatos que formam o bloco [About {{user}}] — fatos pessoais globais e fatos
+// do personagem atual, sem keyword matching.
+export function getPersonaFactsForPrompt(characterId) {
+    return getActivePersonaFacts(PROMPT_FACTS_CAP, characterId);
 }
 
 // JSON Schema para structured outputs do Ollama — garante JSON válido na resposta.
@@ -29,12 +29,13 @@ const RESPONSE_FORMAT = {
                 properties: {
                     content:   { type: "string" },
                     category:  { type: "string", enum: PERSONA_FACT_CATEGORIES },
+                    scope:     { type: "string", enum: ["personal", "character"] },
                     keywords:  { type: "string" },
                     action:    { type: "string", enum: ["new", "reinforce", "supersede"] },
                     target:    { type: ["integer", "null"] },
                     certainty: { type: "integer", minimum: 1, maximum: 5 },
                 },
-                required: ["content", "category", "keywords", "action", "certainty"],
+                required: ["content", "category", "scope", "keywords", "action", "certainty"],
             },
         },
     },
@@ -44,24 +45,31 @@ const RESPONSE_FORMAT = {
 function buildPersonaExtractionPrompt(personaName, characterName, persona, knownFacts) {
     const baseline  = persona?.description?.trim() || '(no baseline provided)';
     const factsList = knownFacts.length
-        ? knownFacts.map((f, i) => `#${i} [${f.category}] ${f.content}`).join('\n')
+        ? knownFacts.map((f, i) => `#${i} [${f.character_id ? 'character-specific' : 'personal'} / ${f.category}] ${f.content}`).join('\n')
         : '(none yet — the profile is empty)';
 
     return `You are the profile-learning system of a roleplay chat platform.
 ${personaName} is the human user; ${characterName} is the AI character they talk to.
 
 Your job: read the conversation excerpt and update the persistent profile of
-${personaName} — WHO they are, not what happened. Think of it as a character
-sheet for the USER ONLY, filled in gradually as they reveal themselves.
+${personaName}. Keep two scopes separate:
+- PERSONAL: timeless facts about ${personaName} that apply across characters
+  and conversations — preferences, biography, traits, goals, and relationships
+  outside this roleplay.
+- CHARACTER: facts specific to ${personaName}'s relationship, shared history,
+  or roleplay dynamic with ${characterName}. These must not be treated as facts
+  about their general life or shared with other characters.
 
 THE FRAMING TEST — the most important rule:
-Events belong to another system. You only record TIMELESS characteristics.
+Transient events belong to another system. Record only lasting knowledge:
+stable personal characteristics or lasting facts about this relationship.
 - "I'm hungry today" → NOT a fact (transient state)
 - complains about hunger every afternoon → trait (pattern)
 - "rough day at work today" → NOT a fact (event)
 - "I work the night shift as a nurse" → fact (biography)
-Ask: would this still be true about ${personaName} a month from now, in any
-scene? If not, skip it.
+Ask whether it will remain useful beyond the current scene. Then ask whether
+it applies across conversations or only to this particular relationship. If
+it is transient or scene-only, skip it.
 
 ---
 PERSONA BASELINE — what ${personaName}'s sheet already says:
@@ -82,13 +90,15 @@ FOR EACH FACT YOU FIND, choose ONE action:
               (changed job, changed taste, dropped habit). The new fact
               replaces the old one ("target": the outdated fact's #number)
 
-CATEGORIES:
+CATEGORIES (for either scope):
 - "preference":   likes, enjoys, is drawn to
 - "dislike":      avoids, dislikes, is bothered by
 - "trait":        behavior pattern you OBSERVE across messages — what they
                   demonstrate, not what they claim about themselves
 - "fact":         concrete biography — work, routine, family, home, skills
-- "relationship": how they relate to people or things outside this roleplay
+- "relationship": how they relate to people or things; for PERSONAL scope,
+  this means outside the roleplay, and for CHARACTER scope, this means
+  ${personaName}'s relationship with ${characterName}
 - "goal":         something they are pursuing or working toward
 
 FOR EVERY ITEM:
@@ -101,12 +111,18 @@ ${personaName} uses in the excerpt.
 1 = weak hint. When in doubt, use the lower number.
 
 RULES:
-- Facts are about ${personaName} ONLY — never about ${characterName}.
+- PERSONAL facts are about ${personaName} generally — never about ${characterName}.
+- Use CHARACTER scope only for facts about the user's relationship or shared
+  roleplay history with ${characterName}; never put generic preferences or
+  biography in this scope.
+- Reinforce/supersede only a known fact with the same scope. Never target a
+  personal fact with a character fact, or a fact belonging to another scope.
 - Only what the excerpt actually shows. Never invent or embellish.
-- In-character actions still reveal the persona; scene details do not.
+- In-character actions may reveal either a personal pattern or a
+  character-specific relationship fact; scene details alone do not.
 - Most excerpts contain 0-3 facts. An empty list is a common, correct answer.
 - Respond ONLY with valid JSON, no markdown, no preamble.
-- Format: {"facts": [{"content": "...", "category": "preference",
+- Format: {"facts": [{"content": "...", "category": "preference", "scope": "personal",
   "keywords": "kw1, kw2", "action": "new", "target": null, "certainty": 3}]}
 - Nothing timeless revealed: {"facts": []}`;
 }
@@ -134,9 +150,9 @@ function contentOverlap(a, b) {
 // Restrito à categoria de propósito: entre categorias diferentes, keywords
 // iguais costumam ser contradição ("gosta de queijo" × "não gosta de queijo"),
 // e contradição é decisão semântica do modelo (action: "supersede"), não nossa.
-function findDuplicate(activeFacts, { category, content, keywords }) {
+function findDuplicate(activeFacts, { category, characterId, content, keywords }) {
     return activeFacts.find(f =>
-        f.status === 'active' && f.category === category &&
+        f.status === 'active' && f.category === category && (f.character_id ?? null) === characterId &&
         (keywordOverlap(f.keywords, keywords) >= 0.6 || contentOverlap(f.content, content) >= 0.7)
     ) || null;
 }
@@ -170,7 +186,7 @@ async function callOllama(model, systemPrompt, excerpt, withFormat) {
  * existente (reinforce: times_confirmed/confidence sobem) ou substitui um
  * desatualizado (supersede: o antigo vira histórico, nunca é deletado).
  *
- * @param {string}   conversationId  - origem dos fatos (auditoria); os fatos em si são globais
+ * @param {string}   conversationId  - conversa de origem dos fatos
  * @param {object[]} recentMessages  - mensagens a analisar (role !== 'system')
  * @param {object}   opts
  * @param {object}   opts.character  - { name, ... }
@@ -186,9 +202,10 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
     const personaName   = persona?.name   || 'User';
     const model         = config?.model   || appConfig.defaults.model;
 
-    // Snapshot local dos fatos ativos: indexa o prompt (#N do target) e serve de
-    // base para o dedup; atualizado em memória conforme os itens são aplicados.
-    const activeFacts = getActivePersonaFacts();
+    const characterId = character?.id ?? null;
+    // O modelo só pode comparar e atualizar fatos pessoais globais e fatos
+    // vinculados ao personagem desta conversa.
+    const activeFacts = getActivePersonaFacts(null, characterId);
 
     const excerpt = recentMessages
         .filter(m => m.role !== 'system')
@@ -222,6 +239,9 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
             if (!content || content.length < 6) continue;
 
             const category = PERSONA_FACT_CATEGORIES.includes(item.category) ? item.category : 'fact';
+            const scope = item.scope === 'character' ? 'character' : 'personal';
+            const factCharacterId = scope === 'character' ? characterId : null;
+            if (scope === 'character' && !factCharacterId) continue;
             const keywords = item.keywords?.trim()
                 || extractKeywordsFromText(content).slice(0, 5).join(', ')
                 || null;
@@ -229,7 +249,7 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
             const confidence = 0.4 + 0.1 * certainty; // 0.5–0.9; cada reforço soma +0.1 (cap 1.0)
 
             const target      = Number.isInteger(item.target) ? activeFacts[item.target] : null;
-            const validTarget = target && target.status === 'active' ? target : null;
+            const validTarget = target && target.status === 'active' && (target.character_id ?? null) === factCharacterId ? target : null;
 
             if (item.action === 'reinforce' && validTarget) {
                 reinforcePersonaFact(validTarget.id);
@@ -246,10 +266,10 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
                     result.reinforced.push(validTarget.id);
                     continue;
                 }
-                const newId = createPersonaFact({ category, content, keywords, confidence, sourceConversationId: conversationId });
+                const newId = createPersonaFact({ category, characterId: factCharacterId, content, keywords, confidence, sourceConversationId: conversationId });
                 supersedePersonaFact(validTarget.id, newId);
                 validTarget.status = 'superseded';
-                activeFacts.push({ id: newId, category, content, keywords, status: 'active' });
+                activeFacts.push({ id: newId, category, character_id: factCharacterId, content, keywords, status: 'active' });
                 result.created.push(newId);
                 result.superseded.push(validTarget.id);
                 continue;
@@ -257,15 +277,15 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
 
             // "new" (ou reinforce/supersede com target inválido): dedup mecânico
             // por sobreposição antes de criar — reconfirmação vira reforço.
-            const dup = findDuplicate(activeFacts, { category, content, keywords });
+            const dup = findDuplicate(activeFacts, { category, characterId: factCharacterId, content, keywords });
             if (dup) {
                 reinforcePersonaFact(dup.id);
                 result.reinforced.push(dup.id);
                 continue;
             }
 
-            const id = createPersonaFact({ category, content, keywords, confidence, sourceConversationId: conversationId });
-            activeFacts.push({ id, category, content, keywords, status: 'active' });
+            const id = createPersonaFact({ category, characterId: factCharacterId, content, keywords, confidence, sourceConversationId: conversationId });
+            activeFacts.push({ id, category, character_id: factCharacterId, content, keywords, status: 'active' });
             result.created.push(id);
         }
 

@@ -207,6 +207,7 @@ export async function migrate() {
     CREATE TABLE IF NOT EXISTS persona_facts (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL DEFAULT 'fact',
+      character_id TEXT,
       content TEXT NOT NULL,
       keywords TEXT,
       confidence REAL DEFAULT 0.6,
@@ -218,6 +219,9 @@ export async function migrate() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  // Fatos pessoais têm character_id NULL; fatos de relação/dinâmica ficam
+  // vinculados ao personagem para não serem compartilhados entre roleplays.
+  try { db.run(`ALTER TABLE persona_facts ADD COLUMN character_id TEXT`); } catch {}
 
   // ===== LOREBOOKS (World Info, ativado por keywords) =====
   db.run(`
@@ -342,6 +346,7 @@ export async function migrate() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_type ON memories(type);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_mem_pinned ON memories(is_pinned);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_pfacts_status ON persona_facts(status);`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_pfacts_character ON persona_facts(character_id, status);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_scope ON lorebooks(scope);`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_lorebook_char ON lorebooks(character_id, scope);`);
 

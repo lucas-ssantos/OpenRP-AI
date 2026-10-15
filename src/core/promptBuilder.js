@@ -254,19 +254,33 @@ const PERSONA_FACT_LABELS = {
   goal:         'Goals',
 };
 
-function buildPersonaFactsBlock(personaFacts, persona) {
+function buildPersonaFactsBlock(personaFacts, persona, character) {
   if (!personaFacts?.length) return null;
   const userName = persona?.name || 'the user';
   const lines = [];
-  for (const [category, label] of Object.entries(PERSONA_FACT_LABELS)) {
-    const items = personaFacts.filter(f => f.category === category);
-    if (items.length) lines.push(`${label}: ${items.map(f => f.content).join('; ')}`);
+  const groups = [
+    {
+      title: `Personal profile — facts about ${userName} that apply across conversations`,
+      facts: personaFacts.filter(f => !f.character_id),
+    },
+    {
+      title: `Relationship with ${character?.name || 'this character'} — facts specific to this roleplay`,
+      facts: personaFacts.filter(f => f.character_id && f.character_id === character?.id),
+    },
+  ];
+  for (const group of groups) {
+    const groupLines = [];
+    for (const [category, label] of Object.entries(PERSONA_FACT_LABELS)) {
+      const items = group.facts.filter(f => f.category === category);
+      if (items.length) groupLines.push(`${label}: ${items.map(f => f.content).join('; ')}`);
+    }
+    if (groupLines.length) lines.push(`${group.title}\n${groupLines.join('\n')}`);
   }
   if (!lines.length) return null;
   return (
     `[About ${userName} — persistent profile learned from previous conversations]\n` +
-    `Treat these as established background knowledge about ${userName}. Let them shape how you interact naturally — never recite this list, never bring these facts up out of nowhere.\n` +
-    lines.join('\n')
+    `Treat these as established background knowledge about ${userName}. Personal facts apply in every conversation; relationship facts apply only to ${character?.name || 'this character'}. Let them shape your interaction naturally — never recite these lists or bring facts up out of nowhere.\n` +
+    lines.join('\n\n')
   );
 }
 
@@ -362,7 +376,7 @@ export function buildPromptMessages({
   // Compose final system content by joining the sections
   const systemParts = [basePrompt];
   // ── [1b] Persona facts — profile block, right after the character card ─────
-  const personaFactsBlock = buildPersonaFactsBlock(personaFacts, persona);
+  const personaFactsBlock = buildPersonaFactsBlock(personaFacts, persona, character);
   if (personaFactsBlock) systemParts.push(personaFactsBlock);
   const dailyMoodBlock = buildDailyMoodBlock(dailyMood, character);
   if (dailyMoodBlock) systemParts.push(dailyMoodBlock);
