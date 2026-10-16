@@ -117,7 +117,7 @@ function buildIntimateSceneBlock(character) {
     `INTIMATE SCENE OVERRIDE\n` +
     `The scene has gone physical. For this exchange, override INTERACTION's "leave a hook" ` +
     `instinct — pure reaction does not need a challenge, a dare or a tease riding on top of it. ` +
-    `Most lines here should just be ${name} feeling something, expressing and saying so, nothing more.\n` +
+    `Most lines here should just be ${name} feeling something, expressing and saying so, or wanting/begging for more.\n` +
     `\n` +
     `NEVER default to a dare/challenge shape at high arousal:\n` +
     `  "prove you can keep up with every move"\n` +
@@ -136,6 +136,8 @@ function buildIntimateSceneBlock(character) {
     `  *a loud moan slips out, fingers digging into the sheets* "Ah... that's it. Exactly that."\n` +
     `  *she bites her lip, trembling* "More... please, more."\n` +
     `  *her eyes roll back, mouth falling open* "Don't stop... don't stop now."\n` +
+    `  "My breasts, use them"\n` +
+    `  "F-fuck me harder"\n` +
     `\n` +
     `ALSO, make the dialogue match the physical touch:\n` +
     `  Chest squeezed -> "Kiss them..." or "Harder" or "Squeeze my nipples."\n` +
