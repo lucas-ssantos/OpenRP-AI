@@ -20,6 +20,11 @@ export function isRunning()
     return child !== null && !child.killed;
 }
 
+export function isServerProcessRunning()
+{
+    return isRunning() || findPidListeningOnPort(appConfig.port) !== null;
+}
+
 // Descobre o PID que está ouvindo a porta configurada, mesmo que não tenha
 // sido esta instância da bandeja que o iniciou (outra instância, `npm start`
 // manual, etc.) — usa `ss` (iproute2), presente por padrão em qualquer Linux.
@@ -67,15 +72,17 @@ export function stopServer()
         if (isRunning())
         {
             const proc = child;
-            proc.once("exit", () => resolve());
+            const forceKillTimer = setTimeout(() => {
+                if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
+            }, SHUTDOWN_TIMEOUT_MS);
+            proc.once("exit", () => {
+                clearTimeout(forceKillTimer);
+                resolve();
+            });
 
             // Aciona o graceful shutdown já implementado em src/index.js
             // (fecha o servidor web, salva o banco, para o Ollama).
             proc.kill("SIGTERM");
-
-            setTimeout(() => {
-                if (proc && !proc.killed) proc.kill("SIGKILL");
-            }, SHUTDOWN_TIMEOUT_MS);
             return;
         }
 

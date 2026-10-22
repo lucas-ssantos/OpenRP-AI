@@ -13,6 +13,7 @@
     "db:init": "node src/config/database.js",
     "db:reset": "node src/config/database.js --reset",
     "launcher": "node launcher/tray.js",
+    "launcher:cli": "node launcher/cli.js",
     "launcher:install": "node launcher/desktopEntry.js",
     "launcher:uninstall": "node launcher/desktopEntry.js --uninstall"
   },
