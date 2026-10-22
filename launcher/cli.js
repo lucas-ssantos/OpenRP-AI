@@ -20,7 +20,7 @@ Exemplos:
   npm run launcher:cli -- restart server
   npm run launcher:cli -- stop tailscale
 
-O comando "server" controla o OpenRP AI e o Ollama juntos.
+O comando "server" controla o OpenRP AI e o llama-server juntos.
 Parar o servidor também desconecta o Tailscale; reiniciá-lo mantém o Tailscale conectado.
 Iniciar o servidor mantém este terminal aberto para exibir os logs.`);
 }
@@ -47,14 +47,14 @@ async function isReachable(url, { authenticate = false } = {})
 
 async function showStatus()
 {
-    const [server, ollama] = await Promise.all([
+    const [server, llama] = await Promise.all([
         isReachable(`http://127.0.0.1:${appConfig.port}/api/status`, { authenticate: true }),
-        isReachable(appConfig.ollama.tagsEndpoint),
+        isReachable(appConfig.llama.healthEndpoint),
     ]);
     const tailscale = isTailscaleRunning();
 
     console.log(`Servidor OpenRP AI: ${server ? "rodando" : "parado"} (http://localhost:${appConfig.port})`);
-    console.log(`Ollama: ${ollama ? "rodando" : "parado"} (${appConfig.ollama.host})`);
+    console.log(`llama-server: ${llama ? "rodando" : "parado"} (${appConfig.llama.host})`);
     console.log(`Tailscale: ${tailscale ? "ativo" : "inativo"}`);
 }
 
@@ -73,7 +73,7 @@ function startServerProcess()
             else if (signal && signal !== "SIGTERM" && signal !== "SIGINT") process.exitCode = 1;
         },
     });
-    console.log(`Iniciando OpenRP AI e Ollama em http://localhost:${appConfig.port}...`);
+    console.log(`Iniciando OpenRP AI e llama-server em http://localhost:${appConfig.port}...`);
 }
 
 async function run()
@@ -114,14 +114,14 @@ async function run()
 
         if (action === "stop")
         {
-            console.log("Parando OpenRP AI e Ollama...");
+            console.log("Parando OpenRP AI e llama-server...");
             await stopServer();
             stopTailscaleConnection();
             console.log("Servidor parado; Tailscale desconectado.");
             return;
         }
 
-        console.log("Reiniciando OpenRP AI e Ollama...");
+        console.log("Reiniciando OpenRP AI e llama-server...");
         await stopServer();
         startServerProcess();
         return;

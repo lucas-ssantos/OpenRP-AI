@@ -1,11 +1,10 @@
 import { appConfig } from "../../config.js";
+import { llamaChatBody, llamaChatEndpoint, extractMessageContent } from "../../services/llama.client.js";
 import { getMemories, getPinnedMemories } from "../../services/database/queries.js";
 import { createAutoMemory, createPinnedMemory } from "./create.js";
 import { extractKeywordsFromText } from "./retrieval.js";
 
-const OLLAMA_URL = appConfig.ollama.chatEndpoint;
-
-// JSON Schema para structured outputs do Ollama — garante JSON válido na resposta.
+// JSON Schema para structured outputs do llama.cpp.
 const RESPONSE_FORMAT = {
     type: "object",
     properties: {
@@ -176,31 +175,30 @@ function importanceToWeight(importance, pinned) {
     return pinned ? 1.0 + 0.2 * level : 0.7 + 0.1 * level;
 }
 
-// Timeout da chamada de extração — sem isso uma travada do Ollama seguraria a
+// Timeout da chamada de extração — sem isso uma travada do llama-server seguraria a
 // promise (e o lock do trigger) indefinidamente.
 const EXTRACTION_TIMEOUT_MS = 120_000;
 
-async function callOllama(model, systemPrompt, excerpt, withFormat) {
-    return fetch(OLLAMA_URL, {
+async function callLlama(model, systemPrompt, excerpt, withFormat) {
+    return fetch(llamaChatEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(EXTRACTION_TIMEOUT_MS),
-        body: JSON.stringify({
+        body: JSON.stringify(llamaChatBody({
             model,
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user',   content: `Conversation excerpt:\n\n${excerpt}` },
             ],
             stream: false,
-            think:  false,
-            ...(withFormat ? { format: RESPONSE_FORMAT } : {}),
             options: { temperature: 0.15, num_predict: 1000, top_p: 0.9 },
-        }),
+            format: withFormat ? RESPONSE_FORMAT : null,
+        })),
     });
 }
 
 /**
- * Extrator unificado: uma única chamada Ollama que analisa o trecho e retorna
+ * Extrator unificado: uma única chamada llama.cpp que analisa o trecho e retorna
  * memórias contextuais (auto) e core (pinned) de uma vez.
  *
  * @param {string}   conversationId
@@ -228,14 +226,12 @@ export async function extractAndSaveMemories(conversationId, recentMessages, { c
     const systemPrompt = buildExtractionPrompt(character, personaName);
 
     try {
-        // Structured outputs garantem JSON; versões antigas do Ollama podem rejeitar
-        // o campo `format` — nesse caso tenta uma vez sem ele.
-        let res = await callOllama(model, systemPrompt, excerpt, true);
-        if (!res.ok) res = await callOllama(model, systemPrompt, excerpt, false);
+        let res = await callLlama(model, systemPrompt, excerpt, true);
+        if (!res.ok) res = await callLlama(model, systemPrompt, excerpt, false);
         if (!res.ok) return null;
 
         const data = await res.json();
-        const text = (data.message?.content || '').trim()
+        const text = extractMessageContent(data).trim()
             .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 
         const jsonStart = text.indexOf('{');

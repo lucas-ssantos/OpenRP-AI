@@ -10,6 +10,7 @@ import { getEffectiveAffection } from "../affection.js";
 import { extractAndSaveMemories } from "../memory/index.js";
 import { getGeneration, attachSubscriber, detachSubscriber, cancelGeneration } from "./generationManager.js";
 import { configureAutoMessages } from "./autoMessages.js";
+import { appConfig } from "../../config.js";
 
 const router = Router();
 
@@ -39,6 +40,9 @@ router.post("/conversations", (req, res) => {
     try {
         const { character_id, title, scenario, first_message, model } = req.body;
         if (!character_id) return res.status(400).json({ ok: false, message: "character_id é obrigatório." });
+        if (model?.trim() && model.trim() !== appConfig.llama.model) {
+            return res.status(400).json({ ok: false, message: "O llama.cpp mantém um único modelo carregado; use o modelo global ativo." });
+        }
 
         const character = getCharacter(character_id);
         if (!character) return res.status(404).json({ ok: false, message: "Personagem não encontrado." });
@@ -107,7 +111,7 @@ router.get("/conversations/:id/messages", (req, res) => {
 
 // ── GET /api/conversations/:id/generation ────────────────────────────────────
 // Regruda numa geração em andamento — usado quando o cliente volta a olhar a
-// conversa (reload, troca de página, tela apagou e voltou) enquanto o Ollama
+// conversa (reload, troca de página, tela apagou e voltou) enquanto o llama-server
 // ainda está respondendo. A geração roda no backend independente do cliente
 // (ver generationManager.js); isto só serve para voltar a "assistir" a ela.
 // 204 sem corpo = nenhuma geração ativa para esta conversa.
@@ -125,7 +129,7 @@ router.get("/conversations/:id/generation", (req, res) => {
 });
 
 // ── DELETE /api/conversations/:id/generation ─────────────────────────────────
-// Botão de pause do chat: aborta a chamada em andamento ao Ollama e descarta a
+// Botão de pause do chat: aborta a chamada em andamento ao llama-server e descarta a
 // mensagem do assistente que estava sendo gerada — do banco (se algum chunk já
 // tinha sido persistido) e do stream (o evento `cancelled` chega pela mesma
 // conexão SSE que originou o envio/regenerate, então o frontend remove a bolha
@@ -188,7 +192,11 @@ router.post("/conversations/:id/model", (req, res) => {
     try {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
-        setConversationModel(req.params.id, req.body?.model || null);
+        const model = req.body?.model?.trim() || null;
+        if (model && model !== appConfig.llama.model) {
+            return res.status(400).json({ ok: false, message: "O llama.cpp mantém um único modelo carregado; modelos por conversa não podem ser alternados." });
+        }
+        setConversationModel(req.params.id, model);
         res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
@@ -247,7 +255,7 @@ router.post("/conversations/:id/memories/generate", async (req, res) => {
         const config    = resolveConfig(req.params.id);
 
         const result = await extractAndSaveMemories(req.params.id, messages, { character, persona, config });
-        if (result === null) return res.status(502).json({ ok: false, message: "Falha ao gerar memórias — verifique o Ollama." });
+        if (result === null) return res.status(502).json({ ok: false, message: "Falha ao gerar memórias — verifique o llama-server." });
         res.json({ ok: true, created: result.auto.length + result.pinned.length, pinned: result.pinned.length });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });

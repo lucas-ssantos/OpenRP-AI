@@ -2,11 +2,9 @@ import fs from "fs";
 import path from "path";
 import { getGenerationConfig, getConversationModel, addMessage, updateMessage, deleteMessage } from "../../services/database/queries.js";
 import { normalize } from "../memory/retrieval.js";
-import { getModelContextLength } from "../../services/ollama.models.js";
+import { llamaChatBody, llamaChatEndpoint } from "../../services/llama.client.js";
 import { appConfig } from "../../config.js";
 import { broadcast, closeGeneration } from "./generationManager.js";
-
-const OLLAMA_URL = appConfig.ollama.chatEndpoint;
 
 // Último recurso da cadeia de fallback — carregado uma vez no boot.
 let MEDIUM_SPEC = {};
@@ -17,7 +15,7 @@ try {
 } catch { /* sem o preset, a cadeia para nos defaults do .env */ }
 
 // Um valor só é aceito de uma fonte se passar no validador do campo — NULL vindo
-// do banco (campo deixado em branco no /settings) ou lixo nunca chega ao Ollama.
+// do banco (campo deixado em branco no /settings) ou lixo nunca chega ao llama.cpp.
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const isInt = (v) => Number.isInteger(v);
 const VALIDATORS = {
@@ -31,8 +29,7 @@ const VALIDATORS = {
     max_tokens:         (v) => isInt(v) && (v === -1 || v > 0),
     min_tokens:         (v) => isInt(v) && v >= 0,
     // null = "contexto automático" (checkbox do /settings) — deliberado, não inválido.
-    // Resolvido em streamOllama() para o context_length real do modelo (via
-    // getModelContextLength), não simplesmente omitido do request ao Ollama.
+    // Resolvido no start do llama-server para o contexto definido ao iniciar o processo.
     context_size:       (v) => v === null || (isInt(v) && v > 0),
     num_ctx_messages:   (v) => isInt(v) && v > 0,
     memory_interval:    (v) => isInt(v) && v > 0,
@@ -49,7 +46,7 @@ const VALIDATORS = {
 };
 
 // Hierarquia por campo: global (banco) → defaults (.env) → medium_spec.json.
-// Campo null/inválido numa fonte cai para a próxima — nunca vaza para o Ollama.
+// Campo null/inválido numa fonte cai para a próxima — nunca vaza para o llama.cpp.
 // Único override existente: modelo exclusivo da conversa (model-only).
 export function resolveConfig(conversationId = null) {
     const sources = [getGenerationConfig(), appConfig.defaults, MEDIUM_SPEC];
@@ -61,8 +58,9 @@ export function resolveConfig(conversationId = null) {
 
     if (conversationId) {
         const convModel = getConversationModel(conversationId);
-        if (VALIDATORS.model(convModel)) config.model = convModel;
+        if (VALIDATORS.model(convModel) && convModel === appConfig.llama.model) config.model = convModel;
     }
+    if (appConfig.llama.model) config.model = appConfig.llama.model;
     return config;
 }
 
@@ -114,7 +112,7 @@ export function withThinkingBudget(tokens, config) {
     return tokens + THINKING_TOKEN_BONUS;
 }
 
-// When max_tokens <= 0 (i.e. -1), passes -1 through to Ollama (natural stop).
+// When max_tokens <= 0 (i.e. -1), passes -1 through for natural stopping.
 // Dynamic capping only applies when the user sets a positive max_tokens ceiling.
 export function dynamicMaxTokens(userMessage, config) {
     if (!config.max_tokens || config.max_tokens <= 0) return -1;
@@ -174,7 +172,7 @@ export function handleSSEError(res, err, label) {
     }
 }
 
-// Sem nenhum chunk do Ollama por este tempo, o stream é abortado (modelo travado).
+// Sem nenhum chunk do llama-server por este tempo, o stream é abortado (modelo travado).
 // 5 min: cobre load a frio + prompt eval de contextos grandes em hardware lento
 // antes de declarar timeout.
 const STREAM_STALL_TIMEOUT_MS = 300_000;
@@ -184,7 +182,7 @@ const STREAM_STALL_TIMEOUT_MS = 300_000;
 // aberto para recebê-la. Throttled para não bater no banco a cada token.
 const PERSIST_THROTTLE_MS = 300;
 
-// Gera a resposta do Ollama para `conversationId`, transmitindo cada delta para
+// Gera a resposta do llama.cpp para `conversationId`, transmitindo cada delta para
 // todo subscriber atualmente registrado em `gen` (ver generationManager.js) e
 // persistindo o conteúdo progressivamente — a geração roda até o fim
 // independentemente de haver alguém conectado ouvindo. onDone(filteredContent,
@@ -195,7 +193,7 @@ const PERSIST_THROTTLE_MS = 300;
 // — trabalho em background (ex.: extração de memória) que ainda pode emitir
 // eventos SSE próprios sem atrasar a percepção de conclusão do cliente.
 // opts.insertPosition replica a posição de uma mensagem substituída (regenerate).
-export async function streamOllama(conversationId, gen, messages, config, onDone, opts = {}) {
+export async function streamLlama(conversationId, gen, messages, config, onDone, opts = {}) {
     const { afterDone = null, insertPosition = null, automated = false } = opts;
     const controller = new AbortController();
     gen.controller = controller; // cancelGeneration() usa isto para abortar de fora
@@ -236,11 +234,11 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
         persist(true);
         let extra = {};
         // No caminho de sucesso, onDone sempre roda (mesmo com fullContent vazio —
-        // é o que loga/trata uma resposta vazia do Ollama). No caminho de stall,
+        // é o que loga/trata uma resposta vazia do llama.cpp). No caminho de stall,
         // só roda se algo chegou a ser gerado, preservando esse parcial.
         if (!errorMsg || fullContent) {
             try { extra = (await onDone(fullContent, rawContent, rawThinking, gen.assistantMessageId)) ?? {}; }
-            catch (e) { console.error("streamOllama onDone error:", e); }
+            catch (e) { console.error("streamLlama onDone error:", e); }
         }
         broadcast(conversationId, { delta: "", done: true, ...extra, ...(errorMsg ? { error: errorMsg } : {}) });
         if (!errorMsg && afterDone) { try { await afterDone(); } catch { /* trabalho pós-done não pode derrubar o stream */ } }
@@ -249,45 +247,86 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
 
     try {
         resetStallTimer();
-        // context_size NULL ("contexto automático") resolve para o context_length real
-        // do modelo em vez de omitir num_ctx — sem isso o Ollama cai no default hardcoded
-        // de 4096 tokens para qualquer modelo sem PARAMETER num_ctx no próprio Modelfile.
-        const numCtx = config.context_size || await getModelContextLength(config.model) || undefined;
-        const ollamaRes = await fetch(OLLAMA_URL, {
+        const llamaRes = await fetch(llamaChatEndpoint(), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
-            body: JSON.stringify({
+            body: JSON.stringify(llamaChatBody({
                 model: config.model,
                 messages,
                 stream: true,
                 think: config.think === true,
                 options: {
-                    temperature:   config.temperature,
-                    top_p:         config.top_p,
-                    top_k:         config.top_k,
-                    min_p:         config.min_p,
+                    temperature: config.temperature,
+                    top_p: config.top_p,
+                    top_k: config.top_k,
+                    min_p: config.min_p,
                     repeat_penalty: config.repeat_penalty,
                     repeat_last_n: config.repeat_last_n,
-                    num_ctx:       numCtx,
-                    num_predict:   config.max_tokens,
-                    seed:          (config.seed !== -1 && config.seed != null) ? config.seed : undefined,
-                    stop:          config.stop?.length ? config.stop : undefined,
+                    num_predict: config.max_tokens,
+                    seed: config.seed !== -1 && config.seed != null ? config.seed : undefined,
+                    stop: config.stop?.length ? config.stop : undefined,
                 },
-            }),
+            })),
         });
 
-        if (!ollamaRes.ok) {
+        if (!llamaRes.ok) {
             cleanup();
-            gen.error = `Ollama: ${ollamaRes.status} — ${await ollamaRes.text()}`;
+            gen.error = `llama.cpp: ${llamaRes.status} — ${await llamaRes.text()}`;
             closeGeneration(conversationId, { delta: "", done: true, error: gen.error });
             return;
         }
 
         let inThink   = false;
-        const reader  = ollamaRes.body.getReader();
+        const reader  = llamaRes.body.getReader();
         const decoder = new TextDecoder();
         let buffer    = "";
+        let receivedDone = false;
+
+        const handleEvent = async (eventData) => {
+            if (!eventData || eventData === "[DONE]") {
+                if (eventData === "[DONE]") receivedDone = true;
+                return;
+            }
+            let parsed;
+            try { parsed = JSON.parse(eventData); }
+            catch { return; }
+            if (parsed.error) throw new Error(parsed.error.message || JSON.stringify(parsed.error));
+
+            const choice = parsed.choices?.[0];
+            const reasoning = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+            if (reasoning) rawThinking += reasoning;
+            const raw = choice?.delta?.content;
+            if (typeof raw !== "string" || !raw) return;
+            rawContent += raw;
+
+            let delta = raw;
+            if (inThink) {
+                const endIdx = delta.indexOf("</think>");
+                if (endIdx !== -1) { inThink = false; delta = delta.slice(endIdx + 8); }
+                else return;
+            }
+
+            while (delta.includes("<think>")) {
+                const startIdx = delta.indexOf("<think>");
+                const before = delta.slice(0, startIdx);
+                if (before) {
+                    fullContent += before;
+                    gen.content = fullContent;
+                    broadcast(conversationId, { delta: before, done: false });
+                }
+                const endIdx = delta.indexOf("</think>", startIdx);
+                if (endIdx !== -1) delta = delta.slice(endIdx + 8);
+                else { inThink = true; delta = ""; }
+            }
+
+            if (delta) {
+                fullContent += delta;
+                gen.content = fullContent;
+                broadcast(conversationId, { delta, done: false });
+            }
+            persist();
+        };
 
         while (true) {
             const { done, value } = await reader.read();
@@ -299,54 +338,17 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
             buffer = lines.pop() || "";
 
             for (const line of lines) {
-                if (!line.trim()) continue;
-                let parsed;
-                try { parsed = JSON.parse(line); } catch { continue; }
-
-                if (parsed.message?.thinking) rawThinking += parsed.message.thinking;
-
-                if (parsed.message?.content) {
-                    const raw  = parsed.message.content;
-                    rawContent += raw;
-
-                    let delta = raw;
-
-                    if (inThink) {
-                        const endIdx = delta.indexOf("</think>");
-                        if (endIdx !== -1) { inThink = false; delta = delta.slice(endIdx + 8); }
-                        else continue;
-                    }
-
-                    while (delta.includes("<think>")) {
-                        const startIdx = delta.indexOf("<think>");
-                        const before   = delta.slice(0, startIdx);
-                        if (before) {
-                            fullContent += before;
-                            gen.content = fullContent;
-                            broadcast(conversationId, { delta: before, done: false });
-                        }
-                        const endIdx = delta.indexOf("</think>", startIdx);
-                        if (endIdx !== -1) { delta = delta.slice(endIdx + 8); }
-                        else { inThink = true; delta = ""; }
-                    }
-
-                    if (delta) {
-                        fullContent += delta;
-                        gen.content = fullContent;
-                        broadcast(conversationId, { delta, done: false });
-                    }
-
-                    persist();
-                }
-
-                if (parsed.done) {
-                    await finish();
-                    return;
-                }
+                if (!line.startsWith("data:")) continue;
+                await handleEvent(line.slice(5).trimStart());
             }
+            if (receivedDone) { await finish(); return; }
         }
 
-        // Fallback if stream ended without a parsed.done event
+        if (buffer.startsWith("data:")) {
+            await handleEvent(buffer.slice(5).trim());
+        }
+        if (receivedDone) { await finish(); return; }
+        // Some builds close the stream without the OpenAI-compatible [DONE] marker.
         if (fullContent) { await finish(); return; }
         cleanup();
         closeGeneration(conversationId);
@@ -362,13 +364,13 @@ export async function streamOllama(conversationId, gen, messages, config, onDone
                 closeGeneration(conversationId, { delta: "", done: true, cancelled: true });
                 return;
             }
-            // Stall (Ollama parou de responder): persiste o parcial e encerra.
+            // Stall (llama-server parou de responder): persiste o parcial e encerra.
             // Não depende mais de o cliente estar conectado — a única causa de
-            // abort agora é o próprio Ollama travar.
-            await finish("Geração interrompida — o Ollama parou de responder.");
+            // abort agora é o próprio llama-server travar.
+            await finish("Geração interrompida — o llama-server parou de responder.");
             return;
         }
-        console.error("streamOllama error:", err);
+        console.error("streamLlama error:", err);
         gen.error = err.message;
         closeGeneration(conversationId, { delta: "", done: true, error: err.message });
     }

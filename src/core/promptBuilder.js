@@ -12,7 +12,7 @@ function matchesKeywords(keywords, normalizedContext) {
 }
 
 // Builds the fixed behavioral instruction block — returned as its own dedicated
-// `system` message so the Ollama API interprets it as a standalone instruction,
+// `system` message so the chat-completions API interprets it as a standalone instruction,
 // separate from the character identity/persona content.
 // Style target: immersive companion chat (TalkieAI/LinkyAI) — short in-character
 // replies, inline *actions*, never controlling the user, always a hook to continue.
@@ -304,7 +304,7 @@ function filterLorebooks(lorebooks, contextText) {
 }
 
 /**
- * Builds the Ollama messages array using the following structure:
+ * Builds the chat-completions messages array using the following structure:
  *
  *  [1] SYSTEM PROMPT   — character identity + persona
  *  [1b] PERSONA FACTS  — fixed [About {{user}}] profile block (always injected)

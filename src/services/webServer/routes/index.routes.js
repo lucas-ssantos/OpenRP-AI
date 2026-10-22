@@ -8,7 +8,7 @@ const router = Router();
 
 router.get("/", async (_req, res) => {
     const status = await getHealthStatus();
-    if (!status.ollama.ok || !status.database.ok) return res.redirect("/check");
+    if (!status.llama.ok || !status.database.ok) return res.redirect("/check");
     if (!getPersona()) return res.redirect("/persona");
     res.sendFile(path.join(publicPath, "index.html"));
 });

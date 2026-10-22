@@ -8,7 +8,7 @@ import {
 
 // ── Pause (cancela a geração em andamento) ───────────────────────────────
 
-// Pede ao backend para abortar a chamada ao Ollama e descartar a mensagem
+// Pede ao backend para abortar a chamada ao llama-server e descartar a mensagem
 // parcial. O próprio loop de leitura do SSE (em sendMessage/regenerate/resume)
 // recebe o evento `cancelled` pela mesma conexão e remove a bolha — este
 // request só dispara o cancelamento, não espera confirmação de conteúdo.

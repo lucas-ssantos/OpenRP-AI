@@ -12,7 +12,7 @@ const processing = new Set();
  * processadas pela extração de memórias e roda o extrator unificado sobre ele.
  *
  * Usa conversations.last_memory_position como cursor — nunca pula janelas
- * (mesmo após edit/rollback) e falha de Ollama vira retry natural no próximo
+ * (mesmo após edit/rollback) e falha do llama-server vira retry natural no próximo
  * turno, porque o cursor só avança quando a extração conclui com sucesso.
  *
  * @param {string}   conversationId
@@ -29,7 +29,7 @@ export async function processMemoryBacklogIfDue(conversationId, { character, per
     const numCtx      = config?.num_ctx_messages || 20;
     const memInterval = Math.max(1, config?.memory_interval ?? 5);
 
-    // Mensagens fora da janela de contexto (o que o Ollama não vai mais ver) e
+    // Mensagens fora da janela de contexto (o que o llama-server não vai mais ver) e
     // após o cursor — direto no SQL, sem carregar a conversa inteira.
     // Cap contra backlogs longos (ex.: usuário reduziu num_ctx_messages):
     // processa os mais antigos primeiro; o resto entra nos próximos turnos.

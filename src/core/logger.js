@@ -16,14 +16,14 @@ export function isDevMode() {
  * @param {object} opts
  * @param {string}   opts.conversationId
  * @param {object}   opts.character        - { name, ... }
- * @param {string}   opts.model            - nome do modelo Ollama usado
- * @param {object[]} opts.messages         - array completo enviado ao Ollama (system + histórico + user)
+ * @param {string}   opts.model            - nome do modelo llama.cpp usado
+ * @param {object[]} opts.messages         - array completo enviado ao llama-server (system + histórico + user)
  * @param {string}   opts.rawResponse      - resposta bruta do modelo (com <think> se houver)
  * @param {string}   opts.filteredResponse - resposta após remover tokens de raciocínio
- * @param {string}   [opts.thinking]       - raciocínio nativo do Ollama (message.thinking, quando think:true na config)
+ * @param {string}   [opts.thinking]       - raciocínio retornado pelo modelo no campo reasoning_content
  * @param {string}   [opts.thinkingTrigger] - motivo da ativação do thinking neste turno ('always' | 'forced' | 'level_up' | 'emotional' | 'memory_load'), null se desativado
- * @param {number}   [opts.prepMs]         - tempo (ms) desde a requisição até o envio ao Ollama (montagem do prompt, retrieval de memórias/lorebook)
- * @param {number}   [opts.generationMs]   - tempo (ms) que o Ollama levou para gerar a resposta (streaming completo)
+ * @param {number}   [opts.prepMs]         - tempo (ms) desde a requisição até o envio ao llama-server
+ * @param {number}   [opts.generationMs]   - tempo (ms) que o llama-server levou para gerar a resposta
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
  * @param {boolean}  [opts.isProactiveMessage=false] - true quando a IA está iniciando sem nova mensagem do usuário
  */
@@ -217,7 +217,7 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
         lines.push("(nenhuma — turno proativo/autônomo; o user não enviou uma nova mensagem e o modelo deve tratar o tempo como avançado)");
     }
 
-    // ── Raciocínio nativo do Ollama (think:true na config) ─────────────────────
+    // ── Raciocínio do modelo ───────────────────────────────────────────────
     if (thinking) {
         lines.push(section("RACIOCÍNIO DO MODELO (thinking — não enviado ao chat)"));
         lines.push(thinking);

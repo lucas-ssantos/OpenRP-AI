@@ -1,13 +1,13 @@
 # OpenRP AI — Contexto para Claude
 
-Plataforma local de roleplay/chat com IA usando Ollama. Inspirado em TalkieAI, LinkyAI, SillyTavern. Tudo roda localmente, sem login, sem nuvem.
+Plataforma local de roleplay/chat com IA usando llama.cpp. Inspirado em TalkieAI, LinkyAI, SillyTavern. Tudo roda localmente, sem login, sem nuvem.
 
 ## Stack
 
 - **Runtime**: Node.js 20+ (ESM — `"type": "module"` no package.json)
 - **Backend**: Express 4 — rotas em `src/services/webServer/routes/`
 - **Banco**: SQLite via `sql.js` (banco em memória, persistido manualmente em disco via `saveDB()`)
-- **IA**: Ollama local em `http://127.0.0.1:11434` (padrão: modelo `gemma4:12b`, contexto automático)
+- **IA**: `llama-server` local em `http://127.0.0.1:8080`, iniciado e encerrado pelo app. Carrega um GGUF do cache local Ollama (padrão: `gemma4:12b`).
 - **Frontend**: HTML/CSS/JS puro em `public/` — sem framework, sem bundler
 - **IDs**: UUIDs v4 via `uuid`
 - **Config centralizada**: `src/config.js` lê o `.env` via `dotenv` e exporta `appConfig`
@@ -20,24 +20,25 @@ src/
   config.js                         ← configuração centralizada (lê .env + defaults)
   core/
     shutdown.js                     ← graceful shutdown + registro de processos
-    promptBuilder.js                ← monta array de mensagens para o Ollama
+    promptBuilder.js                ← monta array de mensagens para a API Chat Completions
     affection.js                    ← sistema de afeto: escala de níveis, ganho de pontos, bloco [Relationship] do prompt
     chat.js                         ← entry point do router de chat (monta sub-routers)
     chat/
-      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamOllama (persiste progressivamente no banco, com afterDone pós-`done`)
+      helpers.js                    ← resolveConfig, dynamicMaxTokens, startSSE, handleSSEError, streamLlama (persiste progressivamente no banco, com afterDone pós-`done`)
       generationManager.js          ← registro em memória de gerações em andamento por conversa (beginGeneration/isGenerating/attachSubscriber/broadcast/closeGeneration) — desacopla a geração da conexão HTTP que a disparou
       conversations.js              ← GET /characters/:id/conversation, POST/GET /conversations, GET messages, GET /conversations/:id/generation (resume), POST memories/generate
       messages.js                   ← POST enviar, POST regenerar, PATCH editar, DELETE rollback
     memory/
       index.js                      ← barrel do módulo de memória
       create.js                     ← createAutoMemory, createManualMemory, createPinnedMemory (validações)
-      extraction.js                 ← extractAndSaveMemories(): UMA chamada Ollama → memórias auto + pinned classificadas
+      extraction.js                 ← extractAndSaveMemories(): UMA chamada llama.cpp → memórias auto + pinned classificadas
       trigger.js                    ← processMemoryBacklogIfDue(): gatilho por cursor (last_memory_position)
       retrieval.js                  ← getRelevantMemories/getMemoriesForPrompt: score por keyword (word-boundary, sem acentos)
       personaFacts.js               ← memória de persona (perfil do usuário): extração new/reinforce/supersede, gatilho por cursor próprio, getPersonaFactsForPrompt()
   services/
-    ollama.init.js                  ← inicia daemon Ollama (systemd ou fallback)
-    ollama.models.js                ← garante existência do modelo customizado gemma4:e4b-64k (preset "Máquina Forte") via Modelfile API
+    llama.init.js                   ← inicia llama-server com o modelo configurado e o encerra no shutdown
+    llama.models.js                 ← resolve e lista blobs GGUF já existentes no cache local
+    llama.client.js                 ← monta requisições Chat Completions e valida o modelo carregado
     database/
       db.js                         ← getDB() / saveDB() (debounced) / flushDB()
       migrations.js                 ← CREATE TABLE IF NOT EXISTS + seed de config inicial
@@ -73,7 +74,7 @@ public/
   persona.html                      ← configuração da persona do usuário
   settings.html                     ← configurações de geração do modelo
   sidebar.html                      ← sidebar reutilizável (carregada via fetch)
-  check.html                        ← checagem de saúde (Ollama + DB)
+  check.html                        ← checagem de saúde (llama-server + DB)
   viewdb.html                       ← visualização do banco de dados
   lorebooks.html                    ← listagem e gestão de lorebooks (world info)
   assets/
@@ -101,7 +102,7 @@ data/
   roleplay.db                       ← banco SQLite persistido (binário)
 
 config_recomendadas/
-  README.MD                         ← referência completa dos parâmetros de geração do Ollama
+  README.MD                         ← referência dos parâmetros de geração
   low_spec.json                     ← preset para máquina fraca (i5 7ª gen / GTX 1060)
   medium_spec.json                  ← preset para máquina média (Ryzen 5 / RX 9060 XT)
   high_spec.json                    ← preset para máquina forte (Ryzen 9 / RTX 5080)
@@ -125,7 +126,7 @@ contexto/
 | `persona_facts` | id, category (preference/dislike/trait/fact/relationship/goal), content, keywords, confidence, times_confirmed, status (active/superseded), superseded_by, source_conversation_id — perfil GLOBAL do usuário (não pertence a conversa); fato contradito nunca é deletado, vira superseded |
 | `lorebooks` | id, scope='global', title, content, keywords, insertion_order |
 | `character_lorebooks` | character_id, lorebook_id — many-to-many; se vazio para o personagem, usa todos os lorebooks |
-| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval, persona_interval (extração de persona facts a cada N mensagens do usuário; 0 = desligado), think (coluna booleana legada, mantida em sincronia), think_mode ('off' \| 'scoped' \| 'always' — raciocínio nativo do Ollama, 'off' por padrão) |
+| `generation_config` | id='global', model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n, max_tokens, min_tokens, context_size, stream, seed, stop (CSV), num_ctx_messages, memory_interval, persona_interval (extração de persona facts a cada N mensagens do usuário; 0 = desligado), think (coluna booleana legada, mantida em sincronia), think_mode ('off' \| 'scoped' \| 'always' — thinking via template Jinja, 'off' por padrão) |
 | `conversation_config` | override por conversa — **apenas `model`** (get/setConversationModel); único override existente |
 
 **Importante:** `sql.js` não persiste automaticamente — sempre chamar `saveDB()` após escrita. `saveDB()` é **debounced** (~500ms); a gravação imediata é `flushDB()`, chamada no shutdown. A coluna `stop` é CSV (o parseStop ainda lê o formato JSON legado de bancos antigos).
@@ -169,7 +170,7 @@ DELETE /api/conversations/:id/rollback      → remove mensagens após messageId
 
 ### Config / outros
 ```
-GET  /api/status            → health check (Ollama + DB)
+GET  /api/status            → health check (llama-server + DB)
 GET  /api/persona           → retorna persona atual
 POST /api/persona           → salva persona
 GET  /api/persona/facts     → todos os persona facts (ativos + superseded; front separa por status)
@@ -178,8 +179,8 @@ GET  /api/config            → config global de geração
 POST /api/config            → salva config global
 GET  /api/presets           → presets de hardware (low/medium/high)
 GET  /api/affection/levels  → escala de níveis de afeição (select de override na edição de personagem)
-GET  /api/models            → lista modelos instalados no Ollama (nome, tamanho, família, parâmetros)
-POST /api/models/pull       → baixa um modelo do Ollama → streaming SSE de progresso
+GET  /api/models            → lista GGUFs no cache local e identifica o carregado
+POST /api/models/pull       → indisponível (llama.cpp não baixa modelos)
 GET  /api/viewdb/tables     → lista tabelas com contagem
 GET  /api/viewdb/records    → últimas 25 linhas de uma tabela (?table=X)
 GET    /api/lorebooks               → lista todos os lorebooks
@@ -195,26 +196,26 @@ PUT    /api/characters/:id/lorebooks → define associações (body: {lorebook_i
 
 `POST /api/conversations/:id/messages` funciona assim:
 1. Valida e busca conversa + personagem + persona; 409 se já houver uma geração em andamento para a conversa (`isGenerating()`)
-2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. Exceção: `context_size = NULL` é "contexto automático" (deliberado) — resolvido em `streamOllama()` para o `context_length` real do modelo via `getModelContextLength()` (`/api/show`, cacheado em memória por nome de modelo), não simplesmente omitido do request. Único override: modelo da conversa (`conversation_config`)
+2. Resolve config por campo com validação (`resolveConfig`): `generation_config` (banco) → `.env defaults` → `medium_spec.json`; campo `NULL`/inválido cai para a próxima fonte. O llama-server carrega um modelo e um contexto ao iniciar; trocar qualquer um exige reiniciar o OpenRP AI. Overrides antigos de modelo por conversa não são usados.
 3. Monta mensagens via `buildPromptMessages()` (ver `src/core/promptBuilder.js` e `contexto/prompt_builder`)
 4. Busca últimas N mensagens (`getLastNMessages`) para contexto
 5. Salva mensagem do usuário no banco (`addMessage`) e registra a geração em `generationManager.beginGeneration()`
 6. Calcula `dynamicMaxTokens` — proporcional ao tamanho da mensagem do usuário
-7. Chama `http://127.0.0.1:11434/api/chat` com `stream: true` e `think` decidido por turno (`resolveThinkingTrigger` a partir de `think_mode`) via `streamOllama()`
+7. Chama `/v1/chat/completions` com `stream: true`, `chat_template_kwargs.enable_thinking` decidido por turno (`resolveThinkingTrigger`) via `streamLlama()`
 8. Responde com **SSE** (`Content-Type: text/event-stream`)
 9. Cada chunk: `data: {"delta":"texto","done":false}`
 10. Final: `data: {"delta":"","done":true,"message_id":"...","user_message_id":"..."}`
 11. Filtra `<think>...</think>` (fallback para modelos que inlinam raciocínio no `content` mesmo com `think:false`) durante o stream
 12. Salva resposta completa no banco ao final
 
-### Geração desacoplada do frontend (`generationManager.js` + `streamOllama`)
+### Geração desacoplada do frontend (`generationManager.js` + `streamLlama`)
 
-A resposta do Ollama **não depende da conexão HTTP que a disparou**. `src/core/chat/generationManager.js` mantém um registro em memória por `conversationId` (`assistantMessageId`, `content` acumulado, `subscribers`: o `Set` de conexões SSE atualmente escutando). `streamOllama()` nunca mais escreve direto num único `res` — ele transmite cada delta via `broadcast(conversationId, ...)` para todo subscriber conectado *no momento*, e persiste o conteúdo no banco progressivamente (`addMessage` no primeiro chunk, depois `updateMessage` throttled a cada 300ms, forçado no fim) — não só ao final.
+A resposta do llama-server **não depende da conexão HTTP que a disparou**. `src/core/chat/generationManager.js` mantém um registro em memória por `conversationId` (`assistantMessageId`, `content` acumulado, `subscribers`: o `Set` de conexões SSE atualmente escutando). `streamLlama()` traduz SSE Chat Completions para os eventos internos, transmite cada delta via `broadcast(conversationId, ...)` e persiste o conteúdo progressivamente no banco.
 
-- **Cliente desconecta no meio (troca de página, aba fechada, tela apagou):** a rota apenas remove aquele `res` dos subscribers (`res.on("close", () => detachSubscriber(...))`) — a geração **continua rodando** e sendo salva no banco. A única causa de abort do fetch ao Ollama agora é o próprio modelo travar (timeout de inatividade de 120s → `AbortController`).
+- **Cliente desconecta no meio (troca de página, aba fechada, tela apagou):** a rota apenas remove aquele `res` dos subscribers — a geração continua e é salva no banco. O timeout de inatividade interrompe modelos travados.
 - **Reconectar a uma geração em andamento:** `GET /api/conversations/:id/generation` — se `getGeneration(conversationId)` existir, abre SSE, manda um evento `{delta, done:false, sync:true, message_id}` com o snapshot do que já foi gerado (`gen.content`, atualizado em tempo real a cada broadcast — não fica atrás do throttle de persistência no banco) e vira subscriber dos deltas seguintes; sem geração ativa, retorna `204` sem corpo. O frontend chama isso automaticamente no load da página (`resumeActiveGeneration()` em `chat/events.js`, disparado por `loader.js`) — é assim que a resposta "continua aparecendo" mesmo depois de sair e voltar para o chat.
 - **Uma geração por conversa por vez:** `beginGeneration()` recusa (retorna `null`) se já houver uma ativa; as rotas de envio/regenerar respondem `409` nesse caso.
-- `regenerate` usa o mesmo mecanismo — `insertPosition` (opts do `streamOllama`) replica a posição da mensagem substituída.
+- `regenerate` usa o mesmo mecanismo — `insertPosition` replica a posição da mensagem substituída.
 - O regenerate só apaga a última resposta se ela for de fato a última mensagem da conversa — se a última for do usuário (geração anterior falhou), a nova resposta é apensada ao fim sem reordenar. `addMessage` sem `position` calcula `MAX(position)+1` no SQL (sem corrida). O PATCH de mensagem valida que ela pertence à conversa (404 caso contrário).
 
 ### Mensagens automáticas por conversa
@@ -225,13 +226,13 @@ A resposta do Ollama **não depende da conexão HTTP que a disparou**. `src/core
 
 ### Thinking (raciocínio do modelo)
 
-- `generation_config.think_mode` (`'off' | 'scoped' | 'always'`, padrão `'off'`) controla o parâmetro nativo `think` da API do Ollama — configurável em `/settings` (select no card "Modelo em uso"). Só tem efeito em modelos com suporte a reasoning (qwen3, qwen3.5, deepseek-r1, gpt-oss, etc.); em outros modelos o Ollama ignora o parâmetro. A coluna booleana legada `think` é mantida em sincronia (1 = qualquer modo ativo); DBs antigos com `think=1` migram para `'always'` no boot (backfill roda uma vez, só em linhas com `think_mode` NULL).
+- `generation_config.think_mode` (`'off' | 'scoped' | 'always'`, padrão `'off'`) controla `chat_template_kwargs.enable_thinking` na API Chat Completions — configurável em `/settings`. O suporte depende do template Jinja do modelo. A coluna booleana legada `think` é mantida em sincronia (1 = qualquer modo ativo); DBs antigos com `think=1` migram para `'always'` no boot.
 - **Decisão por turno** (`resolveThinkingTrigger()` em `chat/helpers.js`): `always` liga em todo turno; `scoped` liga só quando a cena pede — gatilhos: `level_up` (a relação de afeto acabou de mudar de estágio), `emotional` (a mensagem do usuário contém palavra emocionalmente pesada — lista `EMOTIONAL_KEYWORDS`, match com fronteira de palavra e sem acentos via `normalize()`) ou `memory_load` (3+ memórias injetadas no prompt). `force_thinking: true` no body do POST de mensagem/regenerate força pontualmente (`forced`) — exceto com modo `off`, que é interruptor mestre. O boolean resolvido vira `config.think` do turno (`genConfig`) — nunca vem direto do banco. O motivo da ativação (`thinkingTrigger`) é gravado no cabeçalho do log do turno (`Thinking: <gatilho>`), para calibrar os gatilhos depois; no regenerate não há gatilho `level_up` (regenerar não pontua afeto) e o check emocional usa a última mensagem do usuário.
 - **Thinking controlado (escopo mínimo)**: com `think` ativo, o `promptBuilder` (`thinkingEnabled: true`) injeta o bloco `THINKING` no system prompt (logo antes do HARD LIMIT): raciocínio mínimo de 1-2 linhas checando apenas (1) consistência com a personalidade/fatos estabelecidos/estágio da relação e (2) tom emocional da cena — verificação, nunca composição da resposta. Sem essa trava o raciocínio completo competiria com a resposta de 250-500 chars pelo mesmo `num_predict`.
 - **Bônus de tokens**: `withThinkingBudget()` em `chat/helpers.js` soma `THINKING_TOKEN_BONUS` (400) ao `max_tokens` resolvido (`dynamicMaxTokens` e fallback do regenerate) quando `think` está ativo e o orçamento é positivo — os tokens de raciocínio saem do mesmo `num_predict` da resposta; `-1` (parada natural) não recebe bônus.
-- Quando ativo, o Ollama retorna o raciocínio no campo separado `message.thinking` (distinto de `message.content`) a cada chunk do stream. `streamOllama()` acumula isso em `rawThinking` — **nunca** é enviado por SSE, salvo como mensagem ou passado ao extrator de memórias; existe só para diagnóstico.
+- Quando ativo, o llama-server pode retornar o raciocínio em `reasoning_content`, separado de `content`. `streamLlama()` acumula isso em `rawThinking` — nunca é enviado por SSE nem salvo como mensagem; existe para diagnóstico.
 - Em modo dev, `logConversationTurn()` grava esse raciocínio numa seção própria (`RACIOCÍNIO DO MODELO`) em `data/logs/`, antes da seção de resposta bruta — é por isso que ele não aparecia nos logs antes desta mudança (o parâmetro vinha hardcoded como `false`).
-- `memory/extraction.js` e `chat/ideas.js` fazem chamadas Ollama próprias com `think: false` fixo (JSON estruturado não se beneficia de raciocínio) — não seguem essa config.
+- `memory/extraction.js` e `chat/ideas.js` fazem chamadas próprias com thinking desligado (JSON estruturado não se beneficia de raciocínio).
 
 ## Eventos do chat (frontend)
 
@@ -284,7 +285,7 @@ Implementado em `initResetModal()` — fecha o offcanvas via `hidden.bs.offcanva
 - Balão personagem: esquerda, glassmorphism escuro, `border-radius: 0 1.25rem 1.25rem 1.25rem`
 - Balão usuário: direita, azul `rgba(56,189,248,0.88)`, `border-radius: 1.25rem 1.25rem 0 1.25rem`
 - Bolha de cenário: bolha central (`renderScenarioBubble` em `ui.js`) no topo do histórico com o cenário da conversa (`conversation.scenario || title`), sempre acima de todas as mensagens; re-renderizada após reset (`state.scenarioText`); rollback não a afeta (não é `.msg-row`)
-- Indicador de digitação: 3 pontos animados enquanto aguarda Ollama
+- Indicador de digitação: 3 pontos animados enquanto aguarda llama-server
 - Streaming token-a-token: `reader.getReader()` + SSE parsing
 - Header contém: botão de menu (offcanvas nav), avatar, nome/cenário, botão editar personagem, botão voltar
 
@@ -318,13 +319,13 @@ Referência completa em `config_recomendadas/README.MD`. Parâmetros principais:
 | `max_tokens` | Comprimento máximo de cada resposta | Alto (linear) |
 | `min_tokens` | Mínimo de tokens na resposta (evita respostas curtíssimas) | Alto (linear) |
 | `context_size` | Janela de contexto total (KV Cache) — maior = mais memória do personagem | **Alto (quadrático)** |
-| `num_ctx_messages` | Quantas mensagens do histórico enviar ao Ollama (total, user+assistant) | Indireto |
+| `num_ctx_messages` | Quantas mensagens do histórico enviar ao llama-server (total, user+assistant) | Indireto |
 | `seed` | Semente do RNG (`-1` = aleatório) | Nenhum |
 | `stop` | Tokens de parada que encerram a geração | Nenhum |
 | `stream` | Envia tokens um a um em tempo real | Nenhum |
-| `think_mode` | Raciocínio nativo (`message.thinking`): `off` nunca, `scoped` só em momentos-chave (carga emocional, level-up de afeto, 3+ memórias), `always` todo turno. Só em modelos com suporte a reasoning (qwen3, deepseek-r1, gpt-oss...); nunca aparece no chat, só nos logs dev | **Alto** quando ativo (soma tokens de raciocínio à resposta) |
+| `think_mode` | Thinking via `chat_template_kwargs.enable_thinking`, `off` nunca, `scoped` em momentos-chave, `always` todo turno. Suporte depende do modelo/template; reasoning não aparece no chat, só nos logs dev | **Alto** quando ativo (soma tokens de raciocínio à resposta) |
 
-A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json` (último recurso). Um campo `NULL` ou inválido numa fonte cai para a próxima — nunca chega ao Ollama. Exceção: `context_size = NULL` significa "contexto automático" — em vez de omitir `num_ctx` do request (o que faria o Ollama cair no default hardcoded de 4096 tokens para modelos sem `PARAMETER num_ctx` no Modelfile), `streamOllama()` resolve para o `context_length` real do modelo via `getModelContextLength()` em `src/services/ollama.models.js` (`POST /api/show`, cacheado em memória por nome de modelo). **`NULL` (automático) é o padrão de fábrica** (`medium_spec.json` e `appConfig.defaults`) — um valor fixo só existe se o usuário desmarcar "Contexto automático" em `/settings`. O único override é o modelo por conversa (`conversation_config`); como o `context_size` continua global, trocar o modelo de uma conversa com contexto fixo (não automático) não adapta o `num_ctx` ao novo modelo — o modal "Modelo desta conversa" avisa quando o valor fixo não bate com o `context_length` do modelo selecionado.
+A config é resolvida por campo em `resolveConfig()` com validação: `generation_config` (banco) → `appConfig.defaults` (.env) → `config_recomendadas/medium_spec.json`. O modelo e o contexto são definidos quando o `llama-server` inicia; alteração em `/settings` exige reiniciar o OpenRP AI. O modelo da conversa não pode divergir do modelo global carregado. O modo automático de contexto usa `LLAMA_CTX_SIZE` (padrão 32768).
 
 ## Estrutura de memória e prompt (ver `contexto/`)
 
@@ -345,9 +346,9 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 
 ### Geração automática de memórias (extrator unificado)
 
-- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez. Backlog vem de `getMemoryBacklog()` (SQL, sem carregar a conversa inteira); um lock por conversa (Set em memória) impede extração dupla em turnos rápidos; a chamada Ollama da extração tem timeout de 120s.
-- **Cursor**: `last_memory_position` só avança se a extração concluir com sucesso — falha de Ollama vira retry natural; rollback clampeia o cursor, reset zera. Nunca pula janelas.
-- Extração (`memory/extraction.js`): **UMA chamada Ollama** com CHARACTER BASELINE (nunca reafirma a ficha), structured outputs (`format` JSON Schema) + parsing defensivo. Cada item vem com `pinned` (bool) e `importance` (1-5) → `relevance_weight` graduado: pinned 1.2–2.0, auto 0.8–1.2. Dedup por overlap de palavras (>0.55); auto também deduplica contra pinned. Keywords ausentes são derivadas do content (`extractKeywordsFromText`).
+- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez. Backlog vem de `getMemoryBacklog()` (SQL, sem carregar a conversa inteira); um lock por conversa impede extração dupla; a chamada llama-server tem timeout de 120s.
+- **Cursor**: `last_memory_position` só avança se a extração concluir com sucesso — falha do llama-server vira retry natural; rollback clampeia o cursor, reset zera. Nunca pula janelas.
+- Extração (`memory/extraction.js`): uma chamada llama.cpp com CHARACTER BASELINE, structured outputs (JSON Schema) e parsing defensivo. Cada item vem com `pinned` (bool) e `importance` (1-5), graduando `relevance_weight`.
 - Eventos SSE após o `done`: `{type:"memory_processing"}` → `{type:"memories_created", auto, pinned}` — o frontend mostra status e toast de pinned.
 
 ### Memórias Pinned — critério e garantias
@@ -389,8 +390,8 @@ Sistema irmão da memória episódica, com comportamento de **perfil que se atua
 
 - **Escopo global**: a tabela `persona_facts` não tem `conversation_id` — o perfil é do usuário (como a própria persona), compartilhado por todos os personagens e conversas. `source_conversation_id` registra só a origem, para auditoria. Reset/delete de conversa **não** apaga fatos.
 - **Categorias**: `preference` (gosta), `dislike` (evita), `trait` (padrão de comportamento observado, não o que ele diz que é), `fact` (biografia concreta), `relationship` (relações fora do roleplay), `goal` (o que busca).
-- **Gatilho** (`processPersonaBacklogIfDue`): cursor próprio `conversations.last_persona_position`; dispara no mesmo `afterDone` da extração episódica (sequencial a ela — Ollama local processa uma chamada por vez), a cada `persona_interval` mensagens **do usuário** (0 = desligado; configurável em `/settings`). Não espera mensagens saírem da janela de contexto — fato de perfil não duplica histórico. Mesmas garantias do cursor episódico: só avança com extração bem-sucedida, rollback clampeia, reset zera, lock por conversa, timeout 120s.
-- **Extração** (`extractAndSavePersonaFacts`): UMA chamada Ollama (structured outputs + parsing defensivo) que recebe o PERSONA BASELINE (description da persona — nunca re-extrai o que já está lá) e os fatos já conhecidos indexados (`#N`), e decide por item: `new` (cria; `certainty` 1-5 do modelo → `confidence` 0.5–0.9), `reinforce` (fato reconfirmado: `times_confirmed`+1, `confidence`+0.1 cap 1.0 — **nunca duplica**) ou `supersede` (contradição: o antigo vira `status='superseded'` + `superseded_by` — sai do prompt mas fica no banco como histórico; **nunca é deletado**). Teste de enquadramento no prompt: "hoje estou com fome" não é fato; "sempre reclama de fome à tarde" é.
+- **Gatilho** (`processPersonaBacklogIfDue`): cursor próprio `conversations.last_persona_position`; dispara no mesmo `afterDone` da extração episódica, a cada `persona_interval` mensagens **do usuário** (0 = desligado; configurável em `/settings`). Não espera mensagens saírem da janela de contexto; cursor só avança com sucesso e tem timeout de 120s.
+- **Extração** (`extractAndSavePersonaFacts`): uma chamada llama.cpp (structured outputs + parsing defensivo) que recebe o PERSONA BASELINE (description da persona — nunca re-extrai o que já está lá) e os fatos já conhecidos indexados (`#N`), e decide por item: `new` (cria; `certainty` 1-5 do modelo → `confidence` 0.5–0.9), `reinforce` (fato reconfirmado: `times_confirmed`+1, `confidence`+0.1 cap 1.0 — **nunca duplica**) ou `supersede` (contradição: o antigo vira `status='superseded'` + `superseded_by` — sai do prompt mas fica no banco como histórico; **nunca é deletado**). Teste de enquadramento no prompt: "hoje estou com fome" não é fato; "sempre reclama de fome à tarde" é.
 - **Rede mecânica sob o modelo**: item `new` passa por dedup de sobreposição (keywords ≥0.6 ou conteúdo ≥0.7, **na mesma categoria**) e vira reforço se bater. Entre categorias não há dedup automático — keywords iguais em categorias opostas ("gosta de queijo" × "não gosta de queijo") costumam ser contradição, decisão semântica que pertence ao modelo (`supersede`). Supersede com conteúdo idêntico ao alvo é rebaixado a reforço.
 - **Injeção**: `getPersonaFactsForPrompt()` (ativos, ordenados por confiança, cap 30) → bloco fixo `[About {{user}} — persistent profile…]` logo após o character card, agrupado por categoria — **sem keyword matching**, sempre presente (o perfil do usuário é sempre relevante, como a ficha do personagem). O bloco instrui a não recitar a lista nem puxar os fatos do nada.
 - **SSE**: após a extração episódica, `{type:"persona_processing"}` → `{type:"persona_facts", created, reinforced, superseded}` — o frontend mostra status e toast verde ("Aprendi algo novo sobre você") quando `created`/`superseded` > 0.
@@ -400,7 +401,7 @@ Sistema irmão da memória episódica, com comportamento de **perfil que se atua
 
 Pontos de afeto por personagem (`characters.affection_points`) definem o estágio da relação personagem↔usuário — compartilhados entre todas as conversas do personagem:
 
-- **Ganho**: cada mensagem do usuário rende 1 ponto; +1 se ≥240 chars; +1 se contém `*ações*` de roleplay (máx 3). O prompt já reflete o nível novo (pontos prospectivos), mas a persistência (`addAffectionPoints`) só ocorre no `onDone` se a geração produziu resposta — falha de Ollama não pontua, e o evento SSE de afeição só é emitido em turno salvo.
+- **Ganho**: cada mensagem do usuário rende 1 ponto; +1 se ≥240 chars; +1 se contém `*ações*` de roleplay (máx 3). O prompt já reflete o nível novo, mas a persistência (`addAffectionPoints`) só ocorre no `onDone` se a geração produziu resposta.
 - **Escala** (thresholds cumulativos, gaps crescentes): Estranhos 0 → Conhecidos 100 → Amigos 190 → Amigos próximos 500 → Melhores amigos 1500 → Paquera 5000 → Namorados 7000 → Apaixonados 10000 → Almas gêmeas 15000.
 - **Prompt**: `buildPromptMessages({ affection })` injeta o bloco `[Relationship — how X currently feels about Y]` logo após o character card, com orientação de comportamento por nível e instrução explícita de não forçar o estágio em toda resposta nem mencionar níveis/pontos.
 - **SSE**: após o `done`, o backend emite `{type:"affection", points, level, name, next_threshold, progress, leveled_up}` — o frontend atualiza o badge no header (`#header-affection`, coração + nome do nível + barra de progresso) e mostra toast em level-up.
@@ -411,7 +412,7 @@ Pontos de afeto por personagem (`characters.affection_points`) definem o estági
 
 Todas as variáveis de ambiente são lidas aqui via `dotenv`. Demais arquivos importam `appConfig`:
 - `appConfig.port` / `appConfig.nodeEnv`
-- `appConfig.ollama.host` / `.chatEndpoint` / `.tagsEndpoint`
+- `appConfig.llama.host` / `.chatEndpoint` / `.healthEndpoint`
 - `appConfig.dbPath`
 - `appConfig.auth` — basic auth opcional: definir `AUTH_PASSWORD` no .env ativa o middleware (usuário padrão `openrp`, muda com `AUTH_USER`); sem ela, acesso livre. Importante quando exposto via Tailscale.
 - `appConfig.defaults` — valores padrão de todos os parâmetros de geração
@@ -431,9 +432,9 @@ Scripts de teste criados em `tests/` (ou em qualquer lugar) apenas para verifica
 ## Observações importantes
 
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
-- **Ollama é obrigatório** — redireciona para `/check` se não responder
-- Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; único override é o modelo por conversa
-- O modelo padrão é `gemma4:12b` com `context_size = NULL` (contexto automático, ver seção de parâmetros abaixo) — pode ser alterado em `/settings`. Os presets `low_spec`/`high_spec` (não o padrão de fábrica) ainda usam `gemma4:e4b`/`gemma4:e4b-64k` com `context_size` fixo; na inicialização, `ollama.models.js` tenta criar automaticamente `gemma4:e4b-64k` (64k ctx) via Modelfile API se ainda não existir, para suportar o preset "Máquina Forte"
+- **llama-server é obrigatório** — o app o inicia e redireciona para `/check` se não responder
+- Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; modelo/contexto são carregados no boot e exigem reinicialização para trocar
+- O modelo padrão é `gemma4:12b`; os presets continuam sugerindo nomes disponíveis no cache local. Os blobs GGUF são lidos do cache Ollama existente, sem iniciar o daemon.
 - Avatar upload: enviado como base64 no body JSON (`avatar_uploads` array; múltiplos por request), validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx. 15 GB cada — a extensão salva vem do tipo detectado, nunca do nome enviado; o lote inteiro é validado antes de gravar qualquer arquivo) e salvo em `public/assets/uploads/` como `timestamp-i-rand-nome.ext`. As rotas de criação/edição aceitam até 60 GB no corpo total da requisição para compensar o aumento do Base64; demais rotas JSON mantêm o limite de 10 MB
 - Galeria de imagens: `character_images` guarda todas as imagens do personagem; `chat/loader.js` sorteia uma para o background a cada carregamento do chat (header/nav continuam com `avatar_url`, a imagem principal)
 - Todos os IDs são UUIDs v4

@@ -6,7 +6,7 @@ import {
     getAllLorebooks, getMemories, addAffectionPoints, getDailyMoodForCharacter,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
-import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamOllama, trimToLastSentence } from "./helpers.js";
+import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamLlama, trimToLastSentence } from "./helpers.js";
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue, getPersonaFactsForPrompt, processPersonaBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
@@ -38,7 +38,7 @@ function buildAfterDoneHook(conversationId, { character, persona, config, affect
         }
 
         // Perfil do usuário (persona facts) — sequencial à extração de
-        // memórias de propósito: o Ollama local processa uma chamada por
+        // memórias de propósito: o servidor local processa uma chamada por
         // vez, então rodar em paralelo só criaria fila e timeout.
         const factCounts = await processPersonaBacklogIfDue(conversationId, {
             character, persona, config,
@@ -81,7 +81,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         // Afeto: cada mensagem do usuário rende pontos ao personagem (compartilhados
         // entre todas as conversas dele). O prompt já reflete o nível novo, mas os
-        // pontos só são persistidos se a geração produzir resposta — falha de Ollama
+        // pontos só são persistidos se a geração produzir resposta — falha do llama.cpp
         // não pontua. Com affection_override ativo o estágio é fixo, mas os pontos
         // seguem acumulando para quando voltar ao modo automático.
         const gained        = computeAffectionGain(content);
@@ -101,7 +101,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         });
         const genConfig = { ...config, think: thinkingTrigger !== null };
 
-        const ollamaMessages = buildPromptMessages({
+        const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
@@ -122,13 +122,13 @@ router.post("/conversations/:id/messages", async (req, res) => {
 
         let turnSaved = false;
         // Preparo = da chegada da requisição até aqui (montagem do prompt, retrieval
-        // de memórias/lorebook, cálculo de afeto/thinking) — antes de chamar o Ollama.
+        // de memórias/lorebook, cálculo de afeto/thinking) — antes de chamar o llama-server.
         const prepMs = Date.now() - requestStartTime;
         const genStartTime = Date.now();
         // A geração roda independente desta conexão: se o cliente desconectar
         // (troca de página, tela apagou), ela continua e persiste no banco —
         // ver generationManager.js e GET /conversations/:id/generation.
-        await streamOllama(conversationId, gen, ollamaMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+        await streamLlama(conversationId, gen, promptMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
             const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
@@ -142,7 +142,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 conversationId,
                 character,
                 model: sendConfig.model,
-                messages: ollamaMessages,
+                messages: promptMessages,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,
@@ -228,7 +228,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         });
         const genConfig = { ...config, think: thinkingTrigger !== null };
 
-        const ollamaMessages = buildPromptMessages({
+        const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
@@ -247,7 +247,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         let turnSaved = false;
         const prepMs = Date.now() - requestStartTime;
         const genStartTime = Date.now();
-        await streamOllama(conversationId, gen, ollamaMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+        await streamLlama(conversationId, gen, promptMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
             const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
@@ -261,7 +261,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 conversationId,
                 character,
                 model: regenConfig.model,
-                messages: ollamaMessages,
+                messages: promptMessages,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,

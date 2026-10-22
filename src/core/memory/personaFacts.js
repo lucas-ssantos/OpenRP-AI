@@ -5,8 +5,7 @@ import {
     PERSONA_FACT_CATEGORIES,
 } from "../../services/database/queries.js";
 import { parseKeywords, extractKeywordsFromText, normalize } from "./retrieval.js";
-
-const OLLAMA_URL = appConfig.ollama.chatEndpoint;
+import { llamaChatBody, llamaChatEndpoint, extractMessageContent } from "../../services/llama.client.js";
 
 // Cap de fatos injetados no prompt. Fatos são frases de uma linha (~10 tokens
 // cada) — 30 fatos ≈ 300 tokens, barato o bastante para estar sempre presente.
@@ -18,7 +17,7 @@ export function getPersonaFactsForPrompt(characterId) {
     return getActivePersonaFacts(PROMPT_FACTS_CAP, characterId);
 }
 
-// JSON Schema para structured outputs do Ollama — garante JSON válido na resposta.
+// JSON Schema para structured outputs do llama.cpp.
 const RESPONSE_FORMAT = {
     type: "object",
     properties: {
@@ -157,31 +156,30 @@ function findDuplicate(activeFacts, { category, characterId, content, keywords }
     ) || null;
 }
 
-// Timeout da chamada de extração — sem isso uma travada do Ollama seguraria a
+// Timeout da chamada de extração — sem isso uma travada do llama-server seguraria a
 // promise (e o lock do trigger) indefinidamente.
 const EXTRACTION_TIMEOUT_MS = 120_000;
 
-async function callOllama(model, systemPrompt, excerpt, withFormat) {
-    return fetch(OLLAMA_URL, {
+async function callLlama(model, systemPrompt, excerpt, withFormat) {
+    return fetch(llamaChatEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(EXTRACTION_TIMEOUT_MS),
-        body: JSON.stringify({
+        body: JSON.stringify(llamaChatBody({
             model,
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user',   content: `Conversation excerpt:\n\n${excerpt}` },
             ],
             stream: false,
-            think:  false,
-            ...(withFormat ? { format: RESPONSE_FORMAT } : {}),
             options: { temperature: 0.15, num_predict: 800, top_p: 0.9 },
-        }),
+            format: withFormat ? RESPONSE_FORMAT : null,
+        })),
     });
 }
 
 /**
- * Extrator de persona facts: UMA chamada Ollama que lê o trecho junto com os
+ * Extrator de persona facts: UMA chamada llama.cpp que lê o trecho junto com os
  * fatos já conhecidos e decide, item a item, se cria (new), reforça um
  * existente (reinforce: times_confirmed/confidence sobem) ou substitui um
  * desatualizado (supersede: o antigo vira histórico, nunca é deletado).
@@ -215,14 +213,12 @@ export async function extractAndSavePersonaFacts(conversationId, recentMessages,
     const systemPrompt = buildPersonaExtractionPrompt(personaName, characterName, persona, activeFacts);
 
     try {
-        // Structured outputs garantem JSON; versões antigas do Ollama podem rejeitar
-        // o campo `format` — nesse caso tenta uma vez sem ele.
-        let res = await callOllama(model, systemPrompt, excerpt, true);
-        if (!res.ok) res = await callOllama(model, systemPrompt, excerpt, false);
+        let res = await callLlama(model, systemPrompt, excerpt, true);
+        if (!res.ok) res = await callLlama(model, systemPrompt, excerpt, false);
         if (!res.ok) return null;
 
         const data = await res.json();
-        const text = (data.message?.content || '').trim()
+        const text = extractMessageContent(data).trim()
             .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 
         const jsonStart = text.indexOf('{');
@@ -306,7 +302,7 @@ const processing = new Set();
  * (0 = desligado). Não espera as mensagens saírem da janela de contexto —
  * fatos de perfil não duplicam o histórico, então quanto antes, melhor.
  *
- * O cursor só avança se a extração concluir com sucesso — falha de Ollama
+ * O cursor só avança se a extração concluir com sucesso — falha do llama-server
  * vira retry natural no próximo turno; rollback clampeia, reset zera.
  *
  * @returns {Promise<{created: number, reinforced: number, superseded: number} | null>}

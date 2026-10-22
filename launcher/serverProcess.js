@@ -1,5 +1,5 @@
 // Sobe/derruba `src/index.js` como processo filho. O próprio index.js já
-// cuida de iniciar/parar o Ollama (services/ollama.init.js, core/shutdown.js),
+// cuida de iniciar/parar o llama-server (services/llama.init.js, core/shutdown.js),
 // então controlar este processo é suficiente para controlar a stack inteira.
 import { spawn, spawnSync } from "child_process";
 import path from "path";
@@ -81,7 +81,7 @@ export function stopServer()
             });
 
             // Aciona o graceful shutdown já implementado em src/index.js
-            // (fecha o servidor web, salva o banco, para o Ollama).
+            // (fecha o servidor web, salva o banco, para o llama-server).
             proc.kill("SIGTERM");
             return;
         }

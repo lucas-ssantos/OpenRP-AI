@@ -2,7 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { getGenerationConfig, setGenerationConfig } from "../../database/queries.js";
-import { getModelContextLength } from "../../ollama.models.js";
+import { listLocalModels, getLlamaContextSize } from "../../llama.models.js";
 import { appConfig } from "../../../config.js";
 
 const publicPath = path.resolve(process.cwd(), "public");
@@ -40,73 +40,22 @@ router.get("/api/presets", (_req, res) => {
 
 router.get("/api/models", async (_req, res) => {
     try {
-        const ollamaRes = await fetch(appConfig.ollama.tagsEndpoint);
-        if (!ollamaRes.ok) throw new Error(`Ollama: ${ollamaRes.status}`);
-        const data = await ollamaRes.json();
-        // context_length é cacheado em memória por nome de modelo (getModelContextLength) —
-        // consultar aqui para todos os modelos instalados é barato após o primeiro load.
-        const models = await Promise.all((data.models || []).map(async (m) => ({
-            name:            m.name,
-            size:            m.size,
-            family:          m.details?.family || null,
-            parameter_size:  m.details?.parameter_size || null,
-            context_length:  await getModelContextLength(m.name),
-        })));
-        res.json({ ok: true, models });
+        const models = listLocalModels().map((model) => ({
+            ...model,
+            loaded: model.name === appConfig.llama.model,
+            context_length: model.name === appConfig.llama.model ? getLlamaContextSize() : null,
+        }));
+        res.json({ ok: true, models, loaded_model: appConfig.llama.model });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
 });
 
-router.post("/api/models/pull", async (req, res) => {
-    const { model } = req.body;
-    if (!model?.trim()) return res.status(400).json({ ok: false, message: "Nome do modelo obrigatório." });
-
-    res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" });
-    res.flushHeaders();
-
-    try {
-        const pullRes = await fetch(`${appConfig.ollama.host}/api/pull`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: model.trim(), stream: true }),
-        });
-
-        if (!pullRes.ok) {
-            const text = await pullRes.text();
-            res.write(`data: ${JSON.stringify({ error: text })}\n\n`);
-            res.end();
-            return;
-        }
-
-        const reader  = pullRes.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer    = "";
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const parsed = JSON.parse(line);
-                    res.write(`data: ${JSON.stringify(parsed)}\n\n`);
-                } catch { /* skip malformed chunk */ }
-            }
-        }
-
-        res.end();
-    } catch (err) {
-        try {
-            res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-            res.end();
-        } catch { /* client disconnected */ }
-    }
+router.post("/api/models/pull", (_req, res) => {
+    res.status(410).json({
+        ok: false,
+        message: "O llama.cpp não baixa modelos. Baixe o modelo para adicioná-lo ao cache local e reinicie o OpenRP AI.",
+    });
 });
 
 router.get("/api/config", (_req, res) => {
@@ -122,8 +71,20 @@ router.post("/api/config", (req, res) => {
     try {
         const config = req.body;
         if (!config.model) return res.status(400).json({ ok: false, message: "Modelo é obrigatório." });
+        if (!listLocalModels().some((model) => model.name === config.model)) {
+            return res.status(400).json({ ok: false, message: `O modelo "${config.model}" não está no cache GGUF local.` });
+        }
+        const previous = getGenerationConfig();
         setGenerationConfig(config);
-        res.json({ ok: true, message: "Configuração salva com sucesso." });
+        const restartRequired = config.model !== appConfig.llama.model
+            || (config.context_size ?? null) !== (previous?.context_size ?? null);
+        res.json({
+            ok: true,
+            restart_required: restartRequired,
+            message: restartRequired
+                ? "Configuração salva. Reinicie o OpenRP AI para carregar o novo modelo/contexto."
+                : "Configuração salva com sucesso.",
+        });
     } catch (err) {
         res.status(500).json({ ok: false, message: `Erro ao salvar: ${err.message}` });
     }

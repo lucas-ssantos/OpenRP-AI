@@ -1,5 +1,5 @@
 // Benchmark manual: roda uma mesma cena (cartão de personagem real do banco +
-// cenário + persona) contra todos os modelos instalados no Ollama, em 4 níveis
+// cenário + persona) contra o modelo carregado pelo llama-server, em 4 níveis
 // crescentes de intimidade — 4 ações por nível, 16 gerações por modelo no total —
 // e grava tudo num único .txt para comparação lado a lado. Não faz parte da
 // suíte de testes automatizados (node --test) — é uma ferramenta manual,
@@ -10,20 +10,19 @@
 //   node scripts/model-bench.js [--character="Vigna"] [--models=a,b,c] [--timeout=180] [--think=true] [--max-predict=true]
 //
 // --character   nome do personagem já cadastrado no banco (default: "Vigna")
-// --models      lista de modelos a testar, separados por vírgula (default: todos os instalados)
+// --models      modelo a testar; llama-server mantém apenas um modelo carregado
 // --timeout     timeout por geração, em segundos (default: 180)
-// --think       liga o raciocínio nativo do Ollama (default: false — precisa passar
+// --think       liga reasoning pelo template Jinja (default: false — precisa passar
 //               --think=true ou --think explicitamente pra ativar)
-// --max-predict usa o context_length real de CADA modelo (consultado via /api/show)
-//               como num_predict, em vez do valor fixo (700/3000) — dá ao modelo o
-//               maior orçamento de tokens que ele suporta. O número usado aparece
+// --max-predict usa o contexto configurado no llama-server como max_tokens, em vez
+//               do valor fixo (700/3000). O número usado aparece
 //               no header de cada modelo no log: "MODELO: <nome> | contexto: <N>".
 //
 // Por padrão (--think ausente ou false) roda uma única chamada por ação, sem
 // raciocínio, independente da config global do app (generation_config.think).
 //
 // Com --think=true, o objetivo passa a ser inspecionar o raciocínio
-// (message.thinking) de cada modelo em cada nível. Modelos sem suporte a
+// (reasoning_content) do modelo em cada nível. Modelos sem suporte a
 // reasoning simplesmente não retornam esse campo (thinking fica vazio). O
 // raciocínio é gravado no .txt logo antes da resposta de cada ação.
 //
@@ -60,9 +59,6 @@ const ONLY_MODELS    = args.models ? String(args.models).split(",").map((s) => s
 // Default false — só liga com --think=true (ou --think sem valor, tratado como true).
 const THINK_ENABLED      = args.think === true || args.think === "true";
 const MAX_PREDICT_ENABLED = args["max-predict"] === true || args["max-predict"] === "true";
-
-const OLLAMA_CHAT_URL = appConfig.ollama.chatEndpoint;
-const OLLAMA_TAGS_URL = appConfig.ollama.tagsEndpoint;
 
 // ── Cena de teste — 4 níveis crescentes de intimidade, 4 ações por nível ────
 // Cada ação continua a partir da resposta anterior do próprio modelo (mesma
@@ -109,32 +105,31 @@ const LEVELS = [
     },
 ];
 
-// ── Ollama ───────────────────────────────────────────────────────────────────
+// ── llama.cpp ────────────────────────────────────────────────────────────────
 async function getInstalledModels() {
-    const res = await fetch(OLLAMA_TAGS_URL);
-    if (!res.ok) throw new Error(`Ollama /api/tags: HTTP ${res.status}`);
-    const data = await res.json();
-    return (data.models || []).map((m) => m.name);
+    const headers = appConfig.auth.password
+        ? { Authorization: `Basic ${Buffer.from(`${appConfig.auth.user}:${appConfig.auth.password}`).toString("base64")}` }
+        : undefined;
+    const response = await fetch(`http://127.0.0.1:${appConfig.port}/api/models`, {
+        headers,
+        signal: AbortSignal.timeout(2_000),
+    });
+    if (!response.ok) throw new Error(`Não foi possível consultar o modelo carregado: HTTP ${response.status}`);
+    const data = await response.json();
+    return (data.models || []).filter((model) => model.loaded).map((model) => model.name);
 }
 
-// Contexto máximo suportado pelo modelo (usado com --max-predict). A chave vem
-// namespaced pela arquitetura ("qwen35.context_length", "llama.context_length",
-// "gemma4.context_length"...), então procura qualquer chave que termine em
-// ".context_length" em vez de assumir um nome fixo.
+// Contexto configurado no servidor local (usado com --max-predict).
 async function getModelContextLength(model) {
     try {
-        const res = await fetch(`${appConfig.ollama.host}/api/show`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model }),
+        const res = await fetch(`${appConfig.llama.host}/props`, {
+            signal: AbortSignal.timeout(2_000),
         });
-        if (!res.ok) return null;
+        if (!res.ok) return appConfig.llama.contextSize;
         const data = await res.json();
-        const info = data.model_info || {};
-        const key = Object.keys(info).find((k) => k.endsWith(".context_length"));
-        return key ? info[key] : null;
+        return data.default_generation_settings?.n_ctx || appConfig.llama.contextSize;
     } catch {
-        return null;
+        return appConfig.llama.contextSize;
     }
 }
 
@@ -143,27 +138,37 @@ async function callModel(model, messages, options, think) {
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const start = Date.now();
     try {
-        const res = await fetch(OLLAMA_CHAT_URL, {
+        const res = await fetch(appConfig.llama.chatEndpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
             body: JSON.stringify({
-                model, messages, stream: false, think, options,
+                model,
+                messages,
+                stream: false,
+                max_tokens: options.num_predict,
+                temperature: options.temperature,
+                top_p: options.top_p,
+                top_k: options.top_k,
+                min_p: options.min_p,
+                repeat_penalty: options.repeat_penalty,
+                chat_template_kwargs: { enable_thinking: think },
             }),
         });
         const elapsedMs = Date.now() - start;
         if (!res.ok) return { error: `HTTP ${res.status} — ${await res.text()}`, elapsedMs };
         const data = await res.json();
-        const rawContent = data.message?.content?.trim() || "";
+        const message = data.choices?.[0]?.message;
+        const rawContent = message?.content?.trim() || "";
         // Com think:true, o raciocínio consome do mesmo orçamento de tokens (num_predict)
         // da resposta final — em modelos que "pensam" demais, o orçamento acaba antes de
         // chegar na resposta (done_reason:"length") e content vem vazio.
-        const truncated = think && !rawContent && data.done_reason === "length";
+        const truncated = think && !rawContent && data.choices?.[0]?.finish_reason === "length";
         return {
             content: rawContent || (truncated
                 ? "(sem resposta — esgotou o orçamento de tokens pensando, done_reason=length)"
                 : "(resposta vazia)"),
-            thinking: data.message?.thinking?.trim() || "",
+            thinking: (message?.reasoning_content || "").trim(),
             truncated,
             elapsedMs,
         };
@@ -273,8 +278,13 @@ async function main() {
 
     let models = ONLY_MODELS || await getInstalledModels();
     if (!models.length) {
-        console.error("Nenhum modelo instalado encontrado no Ollama.");
+        console.error("Nenhum modelo configurado para o llama-server.");
         process.exit(1);
+    }
+    const loadedModels = ONLY_MODELS ? await getInstalledModels() : models;
+    const unavailableModels = models.filter((model) => !loadedModels.includes(model));
+    if (unavailableModels.length) {
+        throw new Error(`llama-server mantém apenas um modelo carregado. Indisponível: ${unavailableModels.join(", ")}. Ativo: ${loadedModels.join(", ") || "nenhum"}.`);
     }
 
     fs.mkdirSync(path.resolve(process.cwd(), "data/model-bench"), { recursive: true });
@@ -331,7 +341,7 @@ async function main() {
                 console.log(`  ${step}`);
                 console.log(`    mensagem: "${truncate(actionText)}"`);
 
-                const ollamaMessages = buildPromptMessages({
+                const promptMessages = buildPromptMessages({
                     character, persona, conversation,
                     historyMessages: history,
                     userMessage: actionText,
@@ -340,7 +350,7 @@ async function main() {
                 });
 
                 process.stdout.write(`    gerando... `);
-                const { content, thinking, error, elapsedMs, attempts, usedFallback } = await generateTurn(model, ollamaMessages, options);
+                const { content, thinking, error, elapsedMs, attempts, usedFallback } = await generateTurn(model, promptMessages, options);
                 modelTotalMs += elapsedMs;
 
                 const note = [

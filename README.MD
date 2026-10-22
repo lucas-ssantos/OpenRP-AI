@@ -1,6 +1,6 @@
 # OpenRP AI — Plataforma Local de Roleplay (Web + Chat)
 
-OpenRP AI é uma aplicação local para chat e roleplay com IA utilizando modelos do Ollama, inspirada por TalkieAI, LinkyAI, SillyTavern e TavernAI. O foco é oferecer uma plataforma que rode no navegador, mantendo todos os dados e modelos localmente: sem login centralizado, sem funcionalidades de compartilhamento online e essas baboseiras de serem refens de empresas.
+OpenRP AI é uma aplicação local para chat e roleplay com IA utilizando llama.cpp e modelos GGUF, inspirada por TalkieAI, LinkyAI, SillyTavern e TavernAI. O foco é oferecer uma plataforma que rode no navegador, mantendo todos os dados e modelos localmente: sem login centralizado, sem funcionalidades de compartilhamento online.
 
 Principais características:
 
@@ -18,7 +18,7 @@ Principais características:
 
 - **Configurações de geração** — controle fino de parâmetros como temperature, top-p, top-k, min-p, repeat penalty, tamanho do contexto e número de mensagens de histórico enviadas ao modelo. Presets para máquinas fracas, médias e potentes, e troca de modelo por conversa.
 
-- **Integração com Ollama** — usa qualquer modelo disponível localmente via Ollama (com listagem e download de modelos direto pela página de configurações). Streaming token a token com suporte a reasoning tokens (filtro de `<think>`). Modelo padrão: `gemma4:e4b`. Ao iniciar, a aplicação cria automaticamente variantes com contexto expandido (`gemma4:e4b-32k` e `gemma4:e4b-64k`) para uso nos presets de máquina média e potente.
+- **Integração com llama.cpp** — inicia e encerra `llama-server` junto com o app, usa a API Chat Completions compatível com OpenAI e transmite tokens em streaming. O GGUF é localizado no cache local do Ollama, mas o daemon e a API do Ollama não são usados. Um único modelo fica carregado por processo; trocar o modelo ou o contexto requer reiniciar o OpenRP AI.
 
 - **100% offline e local** — nenhum dado sai da sua máquina. Sem login, sem nuvem, sem assinatura. Opcionalmente, acesse de outros dispositivos via Tailscale com autenticação básica.
 
@@ -26,7 +26,7 @@ Principais características:
 
 ## Privacidade e design local
 
-Este projeto foi pensado para ser totalmente local: nenhum dado é enviado por padrão para serviços remotos ou compartilhado entre usuários. Os modelos são executados localmente via Ollama, e os arquivos permanecem na máquina do usuário.
+Este projeto foi pensado para ser totalmente local: nenhum dado é enviado por padrão para serviços remotos ou compartilhado entre usuários. Os modelos são executados localmente via llama.cpp, e os arquivos permanecem na máquina do usuário.
 
 ## Futuro
 
@@ -38,34 +38,21 @@ O projeto pretende manter foco em chat/roleplay local, com planos para:
 ## Requisitos
 
 - Node.js 20 ou superior
-- Ollama (daemon local com API)
+- `llama-server` (build do llama.cpp com suporte ao formato GGUF)
+- Um modelo já baixado no cache de modelos do Ollama (o app usa o blob GGUF sem iniciar o daemon)
 - Linux (recomendado Debian/Ubuntu com systemd)
 
 ## Instalação rápida
 
-1) Instale o Ollama:
+1) Instale ou compile o llama.cpp com o executável `llama-server` disponível no `PATH`. Builds com aceleração de GPU devem corresponder aos drivers/backend instalados (CUDA, ROCm, Vulkan etc.).
 
-O jeito recomendado é usar o script oficial de instalação, que funciona no Debian e derivados (Ubuntu, Mint, etc.) e detecta automaticamente sua GPU (NVIDIA/AMD):
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-O script já configura e inicia o serviço systemd. Para confirmar:
+2) Baixe o modelo desejado uma vez pelo Ollama para que o blob GGUF esteja no cache local. O OpenRP AI não inicia nem chama o serviço Ollama:
 
 ```bash
-sudo systemctl status ollama
+ollama pull gemma4:12b
 ```
 
-Se o serviço não estiver ativo:
-
-```bash
-sudo systemctl enable --now ollama
-```
-
-**ATENÇÃO**: Para aceleração por GPU, instale antes os drivers da sua placa de vídeo (NVIDIA: driver proprietário + CUDA; AMD: ROCm). Sem eles o Ollama roda apenas na CPU, o que é muito mais lento. Leia a documentação oficial em https://ollama.com para instruções atualizadas.
-
-2) Instale o Node.js (recomendado usar `nvm`):
+3) Instale o Node.js (recomendado usar `nvm`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
@@ -75,19 +62,32 @@ nvm install 20
 nvm use 20
 ```
 
-3) Instale dependências do projeto:
+4) Instale dependências do projeto:
 
 ```bash
 npm install
 ```
 
-4) Verifique se a API do Ollama está respondendo:
+5) Inicie o app:
 
 ```bash
-curl -sS http://127.0.0.1:11434/api/tags
+npm start
 ```
 
-Se receber uma resposta HTTP 200, a API está pronta.
+O `llama-server` é iniciado automaticamente. O modelo deve existir no cache e o comando deve ser executável.
+Se usar um build local do llama.cpp em `bin/` e `lib/`, configure o caminho absoluto do executável em `LLAMA_SERVER_BIN`; o app inclui automaticamente a pasta `lib/` do build na busca de bibliotecas compartilhadas.
+
+Configurações opcionais no `.env`:
+
+```env
+LLAMA_SERVER_BIN=llama-server
+LLAMA_HOST=http://127.0.0.1:8080
+LLAMA_GPU_LAYERS=999
+LLAMA_CTX_SIZE=32768
+LLAMA_DEFAULT_MODEL=gemma4:12b
+# Diretório raiz do cache se não estiver em ~/.ollama/models:
+OLLAMA_MODELS=/caminho/para/.ollama/models
+```
 
 ## Como iniciar a aplicação localmente
 
@@ -141,7 +141,7 @@ npm run launcher
 
 A bandeja abre e já inicia o servidor automaticamente. O menu oferece:
 
-- **Servidor** — iniciar/parar o Node + Ollama. O indicador (🟢/⚪) mostra o estado real, checado a cada poucos segundos — reflete a situação de verdade mesmo que o servidor tenha sido iniciado por fora (ex: `npm start` manual em outro terminal), e "Parar" também funciona nesse caso.
+- **Servidor** — iniciar/parar o Node + llama-server. O indicador (🟢/⚪) mostra o estado real, checado a cada poucos segundos — reflete a situação de verdade mesmo que o servidor tenha sido iniciado por fora (ex: `npm start` manual em outro terminal), e "Parar" também funciona nesse caso.
 - **Tailscale** — conectar/desconectar da tailnet (`tailscale up`/`down`).
 - **Abrir no navegador** e **Sair** (encerra servidor e Tailscale).
 
@@ -149,7 +149,7 @@ No `ps`/`htop`, o processo da bandeja aparece como `OpenRP AI` em vez de `node`.
 
 ### Notificações
 
-O launcher envia notificações desktop via D-Bus (compatível com qualquer daemon de notificação — swaync, dunst, etc., sem depender de `notify-send`), avisando quando cada serviço (servidor, Ollama, Tailscale) está iniciando e quando inicia com sucesso.
+O launcher envia notificações desktop via D-Bus (compatível com qualquer daemon de notificação — swaync, dunst, etc., sem depender de `notify-send`), avisando quando cada serviço (servidor, llama-server, Tailscale) está iniciando e quando inicia com sucesso.
 
 ### Tailscale: liberando o botão "Parar" sem pedir senha
 
@@ -160,10 +160,6 @@ sudo tailscale set --operator=$USER
 ```
 
 Isso autoriza seu usuário a conectar/desconectar (`up`/`down`) sem precisar de senha. Não afeta o serviço `tailscaled` em si — ele continua rodando em segundo plano, gerenciado pelo systemd, independente disso; só muda quem pode controlar a conexão.
-
-### Ollama: funciona mesmo com o serviço systemd desabilitado
-
-Diferente do Tailscale, o Ollama não precisa de privilégios de root pra rodar (não cria interface de rede). Se o serviço `ollama` do systemd estiver desabilitado ou inativo, a aplicação automaticamente sobe o `ollama serve` como processo comum do seu usuário — sem sudo, sem configuração extra.
 
 ## Uso e desenvolvimento
 
@@ -183,15 +179,13 @@ npm run dev
 
 ## Ajuda / Troubleshooting
 
-- A própria aplicação tem uma página de checagem de saúde (Ollama + banco) em `http://localhost:3000/check`.
+- A própria aplicação tem uma página de checagem de saúde (llama-server + banco) em `http://localhost:3000/check`.
 
-- Se a verificação do Ollama falhar, veja os logs do systemd:
+- Se a inicialização do llama-server falhar, confira `logs/llama-server.log` e verifique se:
 
-```bash
-sudo journalctl -u ollama -f
-```
-
-- Confirme que a porta `11434` está acessível localmente.
+- `llama-server` está no `PATH` ou `LLAMA_SERVER_BIN` aponta para o executável;
+- o modelo está no cache do Ollama (ou `OLLAMA_MODELS` aponta para a raiz correta);
+- a porta configurada em `LLAMA_HOST` está livre.
 
 ---
 

@@ -7,20 +7,20 @@ const publicPath = path.resolve(process.cwd(), "public");
 
 export async function getHealthStatus() {
     const status = {
-        ollama: { ok: false, message: "Ollama não disponível" },
+        llama: { ok: false, message: "llama-server não disponível" },
         database: { ok: false, message: "Banco de dados não inicializado" },
     };
 
     try {
-        const response = await fetch(appConfig.ollama.tagsEndpoint);
+        const response = await fetch(appConfig.llama.healthEndpoint);
         if (response.ok) {
-            status.ollama.ok = true;
-            status.ollama.message = "Ollama está ativo";
+            status.llama.ok = true;
+            status.llama.message = "llama-server está ativo";
         } else {
-            status.ollama.message = `Ollama respondeu com status ${response.status}`;
+            status.llama.message = `llama-server respondeu com status ${response.status}`;
         }
     } catch {
-        status.ollama.message = "Ollama não está acessível";
+        status.llama.message = "llama-server não está acessível";
     }
 
     try {

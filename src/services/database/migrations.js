@@ -273,7 +273,7 @@ export async function migrate() {
   // usuário; 0 = desligado).
   try { db.run(`ALTER TABLE generation_config ADD COLUMN persona_interval INTEGER DEFAULT 10`); } catch {}
 
-  // Migration: raciocínio nativo do Ollama (thinking) — desligado por padrão,
+  // Migration: raciocínio nativo do modelo (thinking) — desligado por padrão,
   // preserva o comportamento anterior (hardcoded think:false) em DBs existentes.
   try { db.run(`ALTER TABLE generation_config ADD COLUMN think INTEGER DEFAULT 0`); } catch {}
 
@@ -294,7 +294,7 @@ export async function migrate() {
   } catch { /* sem o arquivo de preset, mantém os defaults do .env */ }
   const d = seed;
   // stop é armazenado como CSV (mesmo formato que setGenerationConfig grava e
-  // parseStop lê) — nunca como JSON, senão os tokens chegam corrompidos ao Ollama.
+  // parseStop lê) — nunca como JSON, senão os tokens chegam corrompidos ao llama.cpp.
   const stopCsv = Array.isArray(d.stop) ? d.stop.join(", ") : (d.stop || "");
   db.run(`
     INSERT OR IGNORE INTO generation_config

@@ -8,7 +8,7 @@ import { getEffectiveAffection } from "../affection.js";
 import { getMemoriesForPrompt, getPersonaFactsForPrompt } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 import {
-    dynamicMaxTokens, resolveConfig, resolveThinkingTrigger, streamOllama, trimToLastSentence,
+    dynamicMaxTokens, resolveConfig, resolveThinkingTrigger, streamLlama, trimToLastSentence,
 } from "./helpers.js";
 import { beginGeneration, isGenerating } from "./generationManager.js";
 
@@ -141,7 +141,7 @@ async function generateAutomaticMessage(conversationId) {
 
     let turnSaved = false;
     const startedAt = Date.now();
-    await streamOllama(
+    await streamLlama(
         conversationId,
         gen,
         messages,

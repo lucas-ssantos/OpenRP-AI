@@ -4,15 +4,15 @@ import {
 } from "../../services/database/queries.js";
 import { resolveConfig } from "./helpers.js";
 import { appConfig } from "../../config.js";
+import { llamaChatBody, llamaChatEndpoint, extractMessageContent } from "../../services/llama.client.js";
 
 const router = Router();
 
-const OLLAMA_URL      = appConfig.ollama.chatEndpoint;
 const IDEAS_PER_PAGE  = 4;
 const MAX_EXCLUDE     = IDEAS_PER_PAGE * 4; // até 4 páginas anteriores no bloco de exclusão
 const IDEAS_TIMEOUT_MS = 60_000;
 
-// JSON Schema para structured outputs do Ollama — garante JSON válido na resposta.
+// JSON Schema para structured outputs do llama.cpp.
 const RESPONSE_FORMAT = {
     type: "object",
     properties: {
@@ -54,22 +54,21 @@ Rules for each suggestion:
 {"ideas": ["...", "...", "...", "..."]}`;
 }
 
-async function callOllama(model, systemPrompt, excerpt, withFormat) {
-    return fetch(OLLAMA_URL, {
+async function callLlama(model, systemPrompt, excerpt, withFormat) {
+    return fetch(llamaChatEndpoint(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(IDEAS_TIMEOUT_MS),
-        body: JSON.stringify({
+        body: JSON.stringify(llamaChatBody({
             model,
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user",   content: `Conversation excerpt:\n\n${excerpt}` },
             ],
             stream: false,
-            think:  false,
-            ...(withFormat ? { format: RESPONSE_FORMAT } : {}),
             options: { temperature: 0.9, top_p: 0.95, num_predict: 600 },
-        }),
+            format: withFormat ? RESPONSE_FORMAT : null,
+        })),
     });
 }
 
@@ -101,13 +100,12 @@ router.post("/conversations/:id/ideas", async (req, res) => {
 
         const systemPrompt = buildIdeasPrompt(character, persona, conv, exclude);
 
-        // Versões antigas do Ollama podem rejeitar o campo `format` — tenta uma vez sem ele.
-        let r = await callOllama(config.model, systemPrompt, excerpt, true);
-        if (!r.ok) r = await callOllama(config.model, systemPrompt, excerpt, false);
-        if (!r.ok) return res.status(502).json({ ok: false, message: "Falha ao gerar ideias — verifique o Ollama." });
+        let r = await callLlama(config.model, systemPrompt, excerpt, true);
+        if (!r.ok) r = await callLlama(config.model, systemPrompt, excerpt, false);
+        if (!r.ok) return res.status(502).json({ ok: false, message: "Falha ao gerar ideias — verifique o llama-server." });
 
         const data = await r.json();
-        const text = (data.message?.content || "")
+        const text = extractMessageContent(data)
             .replace(/<think>[\s\S]*?<\/think>/g, "")
             .trim()
             .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");

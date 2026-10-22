@@ -1,5 +1,4 @@
-import { initOllama } from "./services/ollama.init.js";
-import { ensureCustomModels } from "./services/ollama.models.js";
+import { initLlamaServer } from "./services/llama.init.js";
 import { initTailscale } from "./services/tailscale.init.js";
 import { startWebServer } from "./services/webServer/webServer.init.js";
 import { shutdown, registerSaveDB } from "./core/shutdown.js";
@@ -63,10 +62,9 @@ async function main()
     {
         console.log("\n=== Starting OpenRP AI ===\n");
         await initTailscale();
-        await initOllama();
-        await ensureCustomModels();
         await initDB();
         await migrate();
+        await initLlamaServer();
         registerSaveDB(saveDB);
         initializeAutoMessages();
         await startWebServer();
@@ -75,6 +73,8 @@ async function main()
     {
         // Sem exit aqui o processo ficaria vivo sem servidor nem banco funcionando
         console.error("Error during initialization:", err);
+        try { await shutdown(1); }
+        catch (shutdownError) { console.error("Error during initialization shutdown:", shutdownError); }
         process.exit(1);
     }
 

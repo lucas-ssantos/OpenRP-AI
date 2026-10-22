@@ -19,9 +19,7 @@ export function initConvModelModal() {
   let inheritedModel = null;
   let contextSize    = null; // context_size global resolvido (null = automático)
 
-  // Avisa quando o context_size fixo em /settings não bate com o contexto real
-  // do modelo selecionado — trocar de modelo não muda o num_ctx enviado ao
-  // Ollama quando context_size é um valor fixo (só "automático" adapta por modelo).
+  // llama-server carrega um único modelo, definido na inicialização do processo.
   function updateContextWarning() {
     if (contextSize == null) { warnEl.style.display = 'none'; return; }
 
@@ -72,12 +70,12 @@ export function initConvModelModal() {
       models         = modelsData.ok ? (modelsData.models || []) : [];
 
       const opts = [`<option value="" ${!current ? 'selected' : ''}>Padrão (${esc(inheritedModel) || 'global / personagem'})</option>`]
-        .concat(models.map(m => `<option value="${esc(m.name)}" ${m.name === current ? 'selected' : ''}>${esc(m.name)}</option>`));
+        .concat(models.filter(m => m.loaded).map(m => `<option value="${esc(m.name)}" ${m.name === current ? 'selected' : ''}>${esc(m.name)} (carregado)</option>`));
       select.innerHTML = opts.join('');
       updateContextWarning();
     } catch {
       select.innerHTML = '<option value="">Padrão (global / personagem)</option>';
-      errEl.textContent = 'Não foi possível listar os modelos do Ollama.';
+      errEl.textContent = 'Não foi possível listar os modelos disponíveis.';
       errEl.style.display = 'block';
     }
   }

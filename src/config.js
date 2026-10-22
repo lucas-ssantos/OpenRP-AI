@@ -1,17 +1,28 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const host = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+const llamaUrl = new URL(process.env.LLAMA_HOST || "http://127.0.0.1:8080");
+const llamaHost = llamaUrl.origin;
+const parseInteger = (value, fallback) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) ? parsed : fallback;
+};
 
 export const appConfig = {
     port: parseInt(process.env.PORT) || 3000,
     nodeEnv: process.env.NODE_ENV || "development",
     timezone: process.env.TZ || "America/Sao_Paulo",
 
-    ollama: {
-        host,
-        chatEndpoint: `${host}/api/chat`,
-        tagsEndpoint: `${host}/api/tags`,
+    llama: {
+        host: llamaHost,
+        bindHost: llamaUrl.hostname,
+        port: parseInteger(llamaUrl.port, 8080),
+        chatEndpoint: `${llamaHost}/v1/chat/completions`,
+        healthEndpoint: `${llamaHost}/health`,
+        binary: process.env.LLAMA_SERVER_BIN || "llama-server",
+        gpuLayers: parseInteger(process.env.LLAMA_GPU_LAYERS ?? "999", 999),
+        contextSize: parseInteger(process.env.LLAMA_CTX_SIZE || process.env.DEFAULT_CONTEXT_SIZE || "32768", 32768),
+        model: null,
     },
 
     dbPath: process.env.DB_PATH || "./data/roleplay.db",
@@ -24,7 +35,7 @@ export const appConfig = {
     },
 
     defaults: {
-        model:            process.env.OLLAMA_DEFAULT_MODEL                       || "gemma4:12b",
+        model:            process.env.LLAMA_DEFAULT_MODEL || process.env.OLLAMA_DEFAULT_MODEL || "gemma4:12b",
         temperature:      parseFloat(process.env.DEFAULT_TEMPERATURE)            || 0.92,
         top_p:            parseFloat(process.env.DEFAULT_TOP_P)                  || 0.90,
         top_k:            parseInt(process.env.DEFAULT_TOP_K)                    || 60,
@@ -33,9 +44,7 @@ export const appConfig = {
         repeat_last_n:    parseInt(process.env.DEFAULT_REPEAT_LAST_N)            || 192,
         max_tokens:       parseInt(process.env.DEFAULT_MAX_TOKENS ?? "-1")       || -1,
         min_tokens:       parseInt(process.env.DEFAULT_MIN_TOKENS)               || 60,
-        // null = "contexto automático" (usa o context_length real do modelo escolhido,
-        // ver getModelContextLength) — padrão de fábrica. Só fixo se DEFAULT_CONTEXT_SIZE
-        // estiver definido no .env.
+        // null = contexto definido pela configuração do llama-server.
         context_size:     process.env.DEFAULT_CONTEXT_SIZE ? parseInt(process.env.DEFAULT_CONTEXT_SIZE) : null,
         num_ctx_messages: parseInt(process.env.DEFAULT_NUM_CTX_MESSAGES)         || 20,
         memory_interval:  parseInt(process.env.MEMORY_INTERVAL)                  || 5,

@@ -121,10 +121,11 @@ async function loadModels() {
     const res = await fetch('/api/models');
     const data = await res.json();
     if (!res.ok || !data.ok || !data.models?.length) return;
-    const opts = data.models.map(m => `<option value="${escHtml(m.name)}">${escHtml(m.name)}</option>`).join('');
+    const opts = data.models.filter(m => m.loaded)
+      .map(m => `<option value="${escHtml(m.name)}">${escHtml(m.name)}</option>`).join('');
     document.getElementById('conv-model').insertAdjacentHTML('beforeend', opts);
     document.getElementById('conv-edit-model').insertAdjacentHTML('beforeend', opts);
-  } catch { /* Ollama indisponível — fica só o padrão */ }
+  } catch { /* serviço de inferência indisponível — fica só o padrão */ }
 }
 
 function initNewConvForm() {

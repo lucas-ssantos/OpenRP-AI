@@ -25,7 +25,7 @@ function buildDesktopEntry()
         "Type=Application",
         "Version=1.0",
         "Name=OpenRP AI",
-        "Comment=Plataforma local de roleplay com IA (Ollama)",
+        "Comment=Plataforma local de roleplay com IA (llama.cpp)",
         `Exec=${process.execPath} "${trayScript}"`,
         `Path=${projectRoot}`,
         `Icon=${iconPath}`,

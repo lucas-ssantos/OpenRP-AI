@@ -42,13 +42,13 @@ async function isServerReachable()
     }
 }
 
-// Checa o Ollama diretamente (não via /api/status) — assim seu status é
+// Checa o llama-server diretamente (não via /api/status) — assim seu status é
 // independente do servidor Node estar de pé ou não.
-async function isOllamaReachable()
+async function isLlamaReachable()
 {
     try
     {
-        const res = await fetch(appConfig.ollama.tagsEndpoint, {
+        const res = await fetch(appConfig.llama.healthEndpoint, {
             signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
         });
         return res.ok;
@@ -82,7 +82,7 @@ function buildMenu({ reachable, tailscaleActive })
             },
             {
                 title: "Parar servidor",
-                tooltip: "Encerra o OpenRP AI (Node + Ollama) e desconecta o Tailscale",
+                tooltip: "Encerra o OpenRP AI (Node + llama-server) e desconecta o Tailscale",
                 enabled: reachable,
                 checked: false,
                 click: handleStop,
@@ -196,9 +196,9 @@ function notifyTransitions(previous, current)
     {
         notify("OpenRP AI", `Servidor iniciado com sucesso — http://localhost:${appConfig.port}`, { icon: ICON_RUNNING });
     }
-    if (!previous.ollamaReachable && current.ollamaReachable)
+    if (!previous.llamaReachable && current.llamaReachable)
     {
-        notify("Ollama", "Ollama iniciado com sucesso.", { icon: ICON_RUNNING });
+        notify("llama.cpp", "llama-server iniciado com sucesso.", { icon: ICON_RUNNING });
     }
     if (!previous.tailscaleActive && current.tailscaleActive)
     {
@@ -217,7 +217,7 @@ async function refreshMenu()
     {
         const state = {
             reachable: await isServerReachable(),
-            ollamaReachable: await isOllamaReachable(),
+            llamaReachable: await isLlamaReachable(),
             tailscaleActive: isTailscaleRunning(),
         };
 
@@ -237,8 +237,8 @@ function handleStart()
     if (isRunning()) return;
     console.log("Iniciando OpenRP AI...");
     notify("OpenRP AI", `Iniciando servidor em http://localhost:${appConfig.port}...`);
-    // Iniciar o servidor também aciona o start do Ollama (ver src/index.js → initOllama()).
-    notify("Ollama", "Iniciando Ollama...");
+    // Iniciar o servidor também inicia o llama-server (ver src/index.js).
+    notify("llama.cpp", "Iniciando llama-server...");
     startServer({
         onExit: (code, signal) => {
             console.log(`OpenRP AI encerrado (code=${code}, signal=${signal})`);
@@ -314,12 +314,12 @@ async function handleExit()
     // Checa quem estava de fato ativo antes de derrubar tudo, para só notificar
     // o encerramento dos serviços que realmente estavam rodando.
     const wasServerRunning = await isServerReachable();
-    const wasOllamaRunning = await isOllamaReachable();
+    const wasLlamaRunning = await isLlamaReachable();
     const wasTailscaleActive = isTailscaleRunning();
 
     await stopServer();
     if (wasServerRunning) notify("OpenRP AI", "Servidor encerrado.", { icon: ICON_STOPPED });
-    if (wasOllamaRunning) notify("Ollama", "Ollama encerrado.", { icon: ICON_STOPPED });
+    if (wasLlamaRunning) notify("llama.cpp", "llama-server encerrado.", { icon: ICON_STOPPED });
 
     try
     {
@@ -342,7 +342,7 @@ async function main()
 {
     const initialState = {
         reachable: false,
-        ollamaReachable: false,
+        llamaReachable: false,
         tailscaleActive: isTailscaleRunning(),
     };
     systray = await createTray(initialState);
