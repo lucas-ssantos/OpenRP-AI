@@ -338,7 +338,7 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 5. Mensagem atual do usuário
 
 `contexto/estrutura_memoria` — tipos de memória:
-- **Auto**: gerada pelo extrator unificado (`memory/extraction.js`) quando mensagens saem da janela de contexto — o registro episódico da conversa; recuperada por keyword/score
+- **Auto**: gerada pelo extrator unificado (`memory/extraction.js`) ao analisar mensagens novas — o registro episódico da conversa; recuperada por keyword/score
 - **Manual**: criada/editada pelo usuário; aparece só quando keywords batem com o contexto (sem keywords informadas, são derivadas do content — memória sem keywords seria irrecuperável)
 - **Pinned**: sempre injetada no prompt (ver regras abaixo)
 - **Lorebook**: ativada por palavras-chave mencionadas no chat
@@ -346,7 +346,7 @@ A config é resolvida por campo em `resolveConfig()` com validação: `generatio
 
 ### Geração automática de memórias (extrator unificado)
 
-- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa o backlog de mensagens fora da janela (`num_ctx_messages`) com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`. Processa até `memory_interval * 3` por vez. Backlog vem de `getMemoryBacklog()` (SQL, sem carregar a conversa inteira); um lock por conversa impede extração dupla; a chamada llama-server tem timeout de 120s.
+- Gatilho (`memory/trigger.js`): após o evento SSE `done` (não trava o input), processa mensagens novas com `position > conversations.last_memory_position`, quando o backlog ≥ `memory_interval`, sem esperar saírem da janela de contexto. Processa até `memory_interval * 3` por vez. Backlog vem de `getMemoryBacklog()` (SQL, sem carregar a conversa inteira); um lock por conversa impede extração dupla; a chamada llama-server tem timeout de 120s.
 - **Cursor**: `last_memory_position` só avança se a extração concluir com sucesso — falha do llama-server vira retry natural; rollback clampeia o cursor, reset zera. Nunca pula janelas.
 - Extração (`memory/extraction.js`): uma chamada llama.cpp com CHARACTER BASELINE, structured outputs (JSON Schema) e parsing defensivo. Cada item vem com `pinned` (bool) e `importance` (1-5), graduando `relevance_weight`.
 - Eventos SSE após o `done`: `{type:"memory_processing"}` → `{type:"memories_created", auto, pinned}` — o frontend mostra status e toast de pinned.

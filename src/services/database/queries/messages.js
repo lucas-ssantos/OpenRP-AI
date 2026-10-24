@@ -128,10 +128,7 @@ export function getLastNMessages(conversationId, n = 20) {
   return result[0].values.map(mapRow).reverse();
 }
 
-// Backlog da extração de persona facts: mensagens após o cursor, mais antigas
-// primeiro. Diferente do backlog de memórias, NÃO espera sair da janela de
-// contexto — um fato sobre quem o usuário é não duplica o histórico, então
-// pode (e deve) ser aprendido o quanto antes.
+// Mensagens novas para extração: cursor exclusivo, mais antigas primeiro.
 export function getPersonaBacklog(conversationId, lastProcessed, limit) {
   const db = getDB();
   const result = db.exec(
@@ -145,24 +142,16 @@ export function getPersonaBacklog(conversationId, lastProcessed, limit) {
   return result[0].values.map(mapRow);
 }
 
-// Mensagens fora da janela de contexto (as numCtx mais recentes) e ainda não
-// processadas pela extração (position > lastProcessed), mais antigas primeiro.
-// Feito direto no SQL para não carregar a conversa inteira a cada turno.
-export function getMemoryBacklog(conversationId, numCtx, lastProcessed, limit) {
+// Backlog de memórias: analisa mensagens novas sem esperar saírem da janela de
+// contexto. Feito direto no SQL para não carregar a conversa inteira a cada turno.
+export function getMemoryBacklog(conversationId, lastProcessed, limit) {
   const db = getDB();
   const result = db.exec(
     `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages
      WHERE conversation_id = ? AND role != 'system' AND position > ?
-       AND position < COALESCE((
-         SELECT MIN(position) FROM (
-           SELECT position FROM messages
-           WHERE conversation_id = ? AND role != 'system'
-           ORDER BY position DESC LIMIT ?
-         )
-       ), 0)
      ORDER BY position ASC LIMIT ?`,
-    [conversationId, lastProcessed, conversationId, numCtx, limit]
+    [conversationId, lastProcessed, limit]
   );
   if (result.length === 0) return [];
   return result[0].values.map(mapRow);
