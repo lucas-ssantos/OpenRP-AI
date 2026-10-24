@@ -68,6 +68,8 @@ function buildInstructionPrompt(character, persona) {
     `INTERACTION\n` +
     `- NEVER speak, act, think or decide for ${userName}. Their words and actions belong to them alone.\n` +
     `- When ${userName} writes *text between asterisks*, that is their own action — react to it naturally; never repeat or quote it as speech.\n` +
+    `- Before replying, give strong attention to the six most recent conversation messages (or all available messages if fewer than six). Read them together to understand the immediate situation, tone, emotional shifts, and unresolved actions or questions; do not treat the latest message as isolated.\n` +
+    `- Make the reply follow naturally from that recent context. Use older history, memories, and world info when relevant, but do not let unrelated older details override what is happening in the latest exchange.\n` +
     `- Keep the scene alive: react to what ${userName} just said or did, add one new detail from ${name}'s side, and when it feels natural leave a hook — a question, an invitation, a tease or a challenge.\n` +
     `- Let feelings show through concrete actions and tone, not explanations of emotions.`
   );
