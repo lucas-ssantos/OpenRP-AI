@@ -106,7 +106,6 @@ function fillForm(config) {
   document.getElementById('context_size').disabled    = ctxAuto;
   document.getElementById('num_ctx_messages').value  = config.num_ctx_messages  ?? '';
   document.getElementById('min_tokens').value        = config.min_tokens        ?? '';
-  document.getElementById('memory_interval').value   = config.memory_interval   ?? 5;
   document.getElementById('persona_interval').value  = config.persona_interval  ?? 10;
   document.getElementById('max_tokens').value     = config.max_tokens     ?? '';
   document.getElementById('stream').value         = config.stream ? '1' : '0';
@@ -167,7 +166,6 @@ async function handleSubmit(e) {
     num_ctx_messages: parseInt(document.getElementById('num_ctx_messages').value) || null,
     min_tokens:       parseInt(document.getElementById('min_tokens').value)       || null,
     max_tokens:       parseInt(document.getElementById('max_tokens').value)       || null,
-    memory_interval:  parseInt(document.getElementById('memory_interval').value)  || 5,
     persona_interval: personaInterval,
     stream:           parseInt(document.getElementById('stream').value)           || null,
     seed:             parseInt(document.getElementById('seed').value)             || -1,

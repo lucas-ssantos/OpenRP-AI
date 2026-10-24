@@ -142,16 +142,23 @@ export function getPersonaBacklog(conversationId, lastProcessed, limit) {
   return result[0].values.map(mapRow);
 }
 
-// Backlog de memórias: analisa mensagens novas sem esperar saírem da janela de
-// contexto. Feito direto no SQL para não carregar a conversa inteira a cada turno.
-export function getMemoryBacklog(conversationId, lastProcessed, limit) {
+// Backlog de memórias: todas as mensagens ainda não processadas anteriores às
+// mais recentes. Feito direto no SQL para não carregar tudo a cada turno.
+export function getMemoryBacklog(conversationId, lastProcessed, recentCount) {
   const db = getDB();
   const result = db.exec(
     `SELECT id, conversation_id, role, content, position, automated, created_at
      FROM messages
      WHERE conversation_id = ? AND role != 'system' AND position > ?
-     ORDER BY position ASC LIMIT ?`,
-    [conversationId, lastProcessed, limit]
+       AND position < COALESCE((
+         SELECT MIN(position) FROM (
+           SELECT position FROM messages
+           WHERE conversation_id = ? AND role != 'system'
+           ORDER BY position DESC LIMIT ?
+         )
+       ), 0)
+     ORDER BY position ASC`,
+    [conversationId, lastProcessed, conversationId, recentCount]
   );
   if (result.length === 0) return [];
   return result[0].values.map(mapRow);

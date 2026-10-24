@@ -3,13 +3,16 @@ import {
 } from "../../services/database/queries.js";
 import { extractAndSaveMemories } from "./extraction.js";
 
+const MIN_MEMORY_BACKLOG = 10;
+const RECENT_MESSAGES_TO_KEEP = 10;
+
 // Conversas com extração em andamento — evita processar o mesmo backlog duas
 // vezes quando turnos chegam em sequência rápida.
 const processing = new Set();
 
 /**
- * Verifica se há mensagens novas ainda não processadas e roda o extrator
- * unificado sobre elas, sem esperar que saiam da janela de contexto.
+ * Extrai todas as mensagens pendentes que já ficaram para trás das 10 mais
+ * recentes, quando há pelo menos 10 mensagens elegíveis.
  *
  * Usa conversations.last_memory_position como cursor — nunca pula janelas
  * (mesmo após edit/rollback) e falha do llama-server vira retry natural no próximo
@@ -19,20 +22,21 @@ const processing = new Set();
  * @param {object}   opts
  * @param {object}   opts.character
  * @param {object}   opts.persona
- * @param {object}   opts.config   - config resolvida ({ model, memory_interval, ... })
+ * @param {object}   opts.config   - config resolvida ({ model, ... })
  * @param {function} [opts.onStart] - chamado imediatamente antes da extração (ex.: notificar via SSE)
  * @returns {Promise<{auto: number, pinned: number} | null>} null se nada era devido ou a extração falhou
  */
 export async function processMemoryBacklogIfDue(conversationId, { character, persona, config, onStart } = {}) {
     if (processing.has(conversationId)) return null;
 
-    const memInterval = Math.max(1, config?.memory_interval ?? 5);
-
-    // Processa mensagens após o cursor; backlogs longos entram nos próximos turnos.
     const lastProcessed = getLastMemoryPosition(conversationId);
-    const batch = getMemoryBacklog(conversationId, lastProcessed, memInterval * 3);
+    const batch = getMemoryBacklog(
+        conversationId,
+        lastProcessed,
+        RECENT_MESSAGES_TO_KEEP
+    );
 
-    if (batch.length < memInterval) return null;
+    if (batch.length < MIN_MEMORY_BACKLOG) return null;
 
     processing.add(conversationId);
     try {

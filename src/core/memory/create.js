@@ -3,7 +3,8 @@ import { extractKeywordsFromText } from "./retrieval.js";
 
 /**
  * Memória gerada automaticamente pelo extrator unificado (extraction.js) quando
- * mensagens novas são analisadas — o registro episódico da conversa.
+ * mensagens pendentes ficam antes das 10 mais recentes — o registro episódico
+ * da conversa.
  * Recuperada por keyword matching quando o assunto volta à tona.
  * Ex: "Na sessão anterior, o usuário revelou que trabalha à noite."
  *
