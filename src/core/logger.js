@@ -4,9 +4,70 @@ import { appConfig } from "../config.js";
 
 const LOG_DIR = path.resolve(process.cwd(), "data/logs");
 
+function getSafeCharacterName(name) {
+    return (name || "unknown")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 32);
+}
+
 export function isDevMode() {
     const env = (appConfig.nodeEnv || "development").toLowerCase();
     return !["production", "prod"].includes(env);
+}
+
+export function archiveConversationLog(conversationId, characterName) {
+    const safeId = conversationId.replace(/-/g, "").slice(0, 8);
+    if (!fs.existsSync(LOG_DIR)) return false;
+
+    const sourceFilename = fs.readdirSync(LOG_DIR)
+        .filter((filename) => filename.endsWith(`_${safeId}.log`))
+        .map((filename) => ({
+            filename,
+            mtime: fs.statSync(path.join(LOG_DIR, filename)).mtimeMs,
+        }))
+        .sort((a, b) => b.mtime - a.mtime)[0]?.filename;
+
+    if (!sourceFilename) return false;
+
+    const safeName = getSafeCharacterName(characterName);
+    const sourcePath = path.join(LOG_DIR, sourceFilename);
+    const archivePath = path.join(LOG_DIR, `${safeName}_old.log`);
+    let previousArchivePath = null;
+
+    if (fs.existsSync(archivePath)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        let suffix = 0;
+        do {
+            const numberedSuffix = suffix ? `_${suffix}` : "";
+            previousArchivePath = path.join(
+                LOG_DIR,
+                `${safeName}_old_${timestamp}${numberedSuffix}.log`
+            );
+            suffix++;
+        } while (fs.existsSync(previousArchivePath));
+
+        fs.renameSync(archivePath, previousArchivePath);
+    }
+
+    try {
+        fs.renameSync(sourcePath, archivePath);
+    } catch (err) {
+        if (previousArchivePath) {
+            try {
+                fs.renameSync(previousArchivePath, archivePath);
+            } catch (restoreError) {
+                throw new AggregateError(
+                    [err, restoreError],
+                    "Falha ao arquivar o log e restaurar o arquivo anterior."
+                );
+            }
+        }
+        throw err;
+    }
+
+    return true;
 }
 
 /**
@@ -48,11 +109,7 @@ export function logConversationTurn({
     try {
         fs.mkdirSync(LOG_DIR, { recursive: true });
 
-        const safeName = (character?.name || "unknown")
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "_")
-            .replace(/_+/g, "_")
-            .slice(0, 32);
+        const safeName = getSafeCharacterName(character?.name);
         const safeId   = conversationId.replace(/-/g, "").slice(0, 8);
         const filename = `${safeName}_${safeId}.log`;
         const filepath = path.join(LOG_DIR, filename);

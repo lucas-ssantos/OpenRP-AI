@@ -11,6 +11,7 @@ import { extractAndSaveMemories } from "../memory/index.js";
 import { getGeneration, attachSubscriber, detachSubscriber, cancelGeneration } from "./generationManager.js";
 import { configureAutoMessages } from "./autoMessages.js";
 import { appConfig } from "../../config.js";
+import { archiveConversationLog } from "../logger.js";
 
 const router = Router();
 
@@ -209,9 +210,10 @@ router.post("/conversations/:id/reset", (req, res) => {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
 
+        const character = getCharacter(conv.character_id);
+        archiveConversationLog(conv.id, character?.name);
         resetConversation(req.params.id);
 
-        const character = getCharacter(conv.character_id);
         let firstMsg = null;
         if (conv.first_message) {
             const persona = getPersona();
@@ -233,6 +235,8 @@ router.delete("/conversations/:id", (req, res) => {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
 
+        const character = getCharacter(conv.character_id);
+        archiveConversationLog(conv.id, character?.name);
         deleteConversation(req.params.id);
         res.json({ ok: true, character_id: conv.character_id });
     } catch (err) {
