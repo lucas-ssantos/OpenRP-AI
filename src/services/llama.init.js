@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { appConfig } from "../config.js";
@@ -10,6 +10,7 @@ const STARTUP_TIMEOUT_MS = 600_000;
 const HEALTH_CHECK_INTERVAL_MS = 500;
 const STOP_TIMEOUT_MS = 10_000;
 let serverProcess = null;
+let serverWasHealthy = false;
 
 function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,27 +75,100 @@ async function isHealthy() {
     }
 }
 
-async function stopLlamaServer() {
+async function stopLlamaServer({ includeExternal = false } = {}) {
     const child = serverProcess;
-    if (!child || child.exitCode !== null || child.signalCode !== null) return;
-
-    console.log("[llama] Encerrando llama-server...");
-    child.kill("SIGTERM");
-    const stopped = await waitForExit(child, STOP_TIMEOUT_MS);
-    if (!stopped) {
-        console.warn("[llama] llama-server não encerrou no prazo; enviando SIGKILL.");
-        child.kill("SIGKILL");
-        if (!await waitForExit(child, 2_000)) {
-            console.error("[llama] llama-server ainda não encerrou após SIGKILL.");
+    if (child && child.exitCode === null && child.signalCode === null) {
+        console.log("[llama] Encerrando llama-server...");
+        child.kill("SIGTERM");
+        const stopped = await waitForExit(child, STOP_TIMEOUT_MS);
+        if (!stopped) {
+            console.warn("[llama] llama-server não encerrou no prazo; enviando SIGKILL.");
+            child.kill("SIGKILL");
+            if (!await waitForExit(child, 2_000)) {
+                console.error("[llama] llama-server ainda não encerrou após SIGKILL.");
+            }
         }
+    }
+
+    // O app pode ter iniciado o llama-server, perdido o processo filho (por
+    // exemplo, quando o benchmark reiniciou o servidor) e ainda assim precisar
+    // encerrar quem estiver ocupando a porta no shutdown.
+    if (includeExternal && serverWasHealthy) {
+        await stopExternalLlamaServer();
     }
 }
 
-export async function initLlamaServer() {
+// Descobre o PID que está ouvindo a porta do llama-server, mesmo que ele não
+// tenha sido iniciado por este processo (ex.: app já em execução).
+function findPidListeningOnPort(port) {
+    const result = spawnSync("ss", ["-H", "-ltnp", `sport = :${port}`], { encoding: "utf8" });
+    if (result.status !== 0 || !result.stdout) return null;
+    const match = result.stdout.match(/pid=(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+function isPidAlive(pid) {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Encerra um llama-server externo (não gerenciado por este processo). Usado
+// pelo benchmark para trocar de modelo quando o servidor já estava ativo.
+async function stopExternalLlamaServer() {
+    const pid = findPidListeningOnPort(appConfig.llama.port);
+    if (!pid) return;
+
+    console.log(`[llama] Encerrando llama-server externo (pid ${pid})...`);
+    try {
+        process.kill(pid, "SIGTERM");
+    } catch {
+        return;
+    }
+
+    const deadline = Date.now() + STOP_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        if (!isPidAlive(pid)) return;
+        await wait(200);
+    }
+
+    console.warn("[llama] llama-server externo não encerrou no prazo; enviando SIGKILL.");
+    try {
+        process.kill(pid, "SIGKILL");
+    } catch {
+        // já não existe
+    }
+
+    const killDeadline = Date.now() + 2_000;
+    while (Date.now() < killDeadline && isPidAlive(pid)) await wait(100);
+}
+
+// Encerra tanto o servidor iniciado por este processo quanto um servidor
+// externo que esteja ocupando a mesma porta.
+export async function stopAnyLlamaServer() {
+    await stopLlamaServer();
+    await stopExternalLlamaServer();
+}
+
+// Deixa o llama-server em execução, mas remove o vínculo com o shutdown deste
+// processo. Usado quando o benchmark assume um servidor externo, restaura o
+// modelo original e precisa deixá-lo rodando para o app que já estava ativo.
+export function detachLlamaServer() {
+    if (serverProcess) serverProcess.unref();
+    serverProcess = null;
+    serverWasHealthy = false;
+    registerLlamaServerStop(null);
+}
+
+export async function initLlamaServer({ model: modelOverride = null, contextSize: contextOverride = null } = {}) {
+    serverWasHealthy = false;
     const config = getGenerationConfig();
-    const model = config?.model || appConfig.defaults.model;
+    const model = modelOverride || config?.model || appConfig.defaults.model;
     const modelPath = resolveModelFile(model);
-    const ctxSize = config?.context_size || appConfig.llama.contextSize;
+    const ctxSize = contextOverride || config?.context_size || appConfig.llama.contextSize;
     const logsDir = path.resolve(process.cwd(), "logs");
     fs.mkdirSync(logsDir, { recursive: true });
     const logFd = fs.openSync(path.join(logsDir, "llama-server.log"), "a");
@@ -124,7 +198,7 @@ export async function initLlamaServer() {
             console.error(`[llama] llama-server encerrou inesperadamente (code=${code}, signal=${signal}).`);
         }
     });
-    registerLlamaServerStop(stopLlamaServer);
+    registerLlamaServerStop(() => stopLlamaServer({ includeExternal: true }));
 
     const deadline = Date.now() + STARTUP_TIMEOUT_MS;
     while (Date.now() < deadline) {
@@ -133,6 +207,7 @@ export async function initLlamaServer() {
             throw new Error(`llama-server encerrou durante a inicialização. Consulte logs/llama-server.log.`);
         }
         if (await isHealthy()) {
+            serverWasHealthy = true;
             appConfig.llama.model = model;
             appConfig.llama.contextSize = ctxSize;
             console.log(`[llama] llama-server pronto em ${appConfig.llama.host} (contexto ${ctxSize}).`);
