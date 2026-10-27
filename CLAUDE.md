@@ -7,7 +7,7 @@ Plataforma local de roleplay/chat com IA usando llama.cpp. Inspirado em TalkieAI
 - **Runtime**: Node.js 20+ (ESM — `"type": "module"` no package.json)
 - **Backend**: Express 4 — rotas em `src/services/webServer/routes/`
 - **Banco**: SQLite via `sql.js` (banco em memória, persistido manualmente em disco via `saveDB()`)
-- **IA**: `llama-server` local em `http://127.0.0.1:8080`, iniciado e encerrado pelo app. Carrega um GGUF do cache local Ollama (padrão: `gemma4:12b`).
+- **IA**: `llama-server` local em `http://127.0.0.1:8080`, iniciado e encerrado pelo app. Carrega um GGUF de `~/.ai-models` (padrão: `gemma4:12b`).
 - **Frontend**: HTML/CSS/JS puro em `public/` — sem framework, sem bundler
 - **IDs**: UUIDs v4 via `uuid`
 - **Config centralizada**: `src/config.js` lê o `.env` via `dotenv` e exporta `appConfig`
@@ -37,7 +37,7 @@ src/
       personaFacts.js               ← memória de persona (perfil do usuário): extração new/reinforce/supersede, gatilho por cursor próprio, getPersonaFactsForPrompt()
   services/
     llama.init.js                   ← inicia llama-server com o modelo configurado e o encerra no shutdown
-    llama.models.js                 ← resolve e lista blobs GGUF já existentes no cache local
+    llama.models.js                   ← resolve e lista arquivos GGUF de ~/.ai-models
     llama.client.js                 ← monta requisições Chat Completions e valida o modelo carregado
     database/
       db.js                         ← getDB() / saveDB() (debounced) / flushDB()
@@ -179,7 +179,7 @@ GET  /api/config            → config global de geração
 POST /api/config            → salva config global
 GET  /api/presets           → presets de hardware (low/medium/high)
 GET  /api/affection/levels  → escala de níveis de afeição (select de override na edição de personagem)
-GET  /api/models            → lista GGUFs no cache local e identifica o carregado
+GET  /api/models            → lista GGUFs em ~/.ai-models e identifica o carregado
 POST /api/models/pull       → indisponível (llama.cpp não baixa modelos)
 GET  /api/viewdb/tables     → lista tabelas com contagem
 GET  /api/viewdb/records    → últimas 25 linhas de uma tabela (?table=X)
@@ -434,7 +434,7 @@ Scripts de teste criados em `tests/` (ou em qualquer lugar) apenas para verifica
 - **Persona é obrigatória** para acessar `/` — redireciona para `/persona` se não existir
 - **llama-server é obrigatório** — o app o inicia e redireciona para `/check` se não responder
 - Config de geração: `global` (banco) → `.env defaults` → `medium_spec.json`, por campo com validação; modelo/contexto são carregados no boot e exigem reinicialização para trocar
-- O modelo padrão é `gemma4:12b`; os presets continuam sugerindo nomes disponíveis no cache local. Os blobs GGUF são lidos do cache Ollama existente, sem iniciar o daemon.
+- O modelo padrão é `gemma4:12b`; os presets continuam sugerindo nomes disponíveis em `~/.ai-models`. A estrutura `gemma4/12b.gguf` mantém esse nome selecionável como `gemma4:12b`; arquivos GGUF na raiz usam o nome sem extensão. `AI_MODELS_DIR` pode substituir o diretório padrão.
 - Avatar upload: enviado como base64 no body JSON (`avatar_uploads` array; múltiplos por request), validado por **magic bytes** (PNG/JPEG/WebP/GIF, máx. 15 GB cada — a extensão salva vem do tipo detectado, nunca do nome enviado; o lote inteiro é validado antes de gravar qualquer arquivo) e salvo em `public/assets/uploads/` como `timestamp-i-rand-nome.ext`. As rotas de criação/edição aceitam até 60 GB no corpo total da requisição para compensar o aumento do Base64; demais rotas JSON mantêm o limite de 10 MB
 - Galeria de imagens: `character_images` guarda todas as imagens do personagem; `chat/loader.js` sorteia uma para o background a cada carregamento do chat (header/nav continuam com `avatar_url`, a imagem principal)
 - Todos os IDs são UUIDs v4

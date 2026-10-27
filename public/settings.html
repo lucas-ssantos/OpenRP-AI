@@ -66,8 +66,8 @@
 
               <!-- Modelos disponíveis -->
               <div class="glass-card card p-4">
-                <div class="field-section-title"><i class="bi bi-folder2-open"></i> Modelos no cache local</div>
-                <p class="text-secondary mb-0">O llama.cpp carrega diretamente os blobs GGUF presentes no cache local do Ollama. Para adicionar um modelo, baixe o modelo nesse cache antes de iniciar esta aplicação. O daemon Ollama não é iniciado nem chamado pelo OpenRP AI.</p>
+                <div class="field-section-title"><i class="bi bi-folder2-open"></i> Modelos locais</div>
+                <p class="text-secondary mb-0">Os arquivos GGUF são carregados de <code>~/.ai-models</code>. Para manter nomes como <code>gemma4:12b</code>, organize o arquivo como <code>gemma4/12b.gguf</code>; arquivos GGUF na raiz usam o nome do arquivo. Adicione modelos nessa pasta e reinicie o OpenRP AI para carregá-los.</p>
               </div>
 
               <!-- Sampling -->

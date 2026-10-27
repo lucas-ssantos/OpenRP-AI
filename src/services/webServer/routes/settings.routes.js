@@ -41,7 +41,10 @@ router.get("/api/presets", (_req, res) => {
 router.get("/api/models", async (_req, res) => {
     try {
         const models = listLocalModels().map((model) => ({
-            ...model,
+            name: model.name,
+            size: model.size,
+            family: model.family,
+            parameter_size: model.parameter_size,
             loaded: model.name === appConfig.llama.model,
             context_length: model.name === appConfig.llama.model ? getLlamaContextSize() : null,
         }));
@@ -54,7 +57,7 @@ router.get("/api/models", async (_req, res) => {
 router.post("/api/models/pull", (_req, res) => {
     res.status(410).json({
         ok: false,
-        message: "O llama.cpp não baixa modelos. Baixe o modelo para adicioná-lo ao cache local e reinicie o OpenRP AI.",
+        message: "O llama.cpp não baixa modelos. Adicione arquivos GGUF em ~/.ai-models e reinicie o OpenRP AI.",
     });
 });
 
@@ -72,7 +75,7 @@ router.post("/api/config", (req, res) => {
         const config = req.body;
         if (!config.model) return res.status(400).json({ ok: false, message: "Modelo é obrigatório." });
         if (!listLocalModels().some((model) => model.name === config.model)) {
-            return res.status(400).json({ ok: false, message: `O modelo "${config.model}" não está no cache GGUF local.` });
+            return res.status(400).json({ ok: false, message: `O modelo "${config.model}" não está em ~/.ai-models.` });
         }
         const previous = getGenerationConfig();
         setGenerationConfig(config);

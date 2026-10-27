@@ -18,7 +18,7 @@ Principais características:
 
 - **Configurações de geração** — controle fino de parâmetros como temperature, top-p, top-k, min-p, repeat penalty, tamanho do contexto e número de mensagens de histórico enviadas ao modelo. Presets para máquinas fracas, médias e potentes, e troca de modelo por conversa.
 
-- **Integração com llama.cpp** — inicia e encerra `llama-server` junto com o app, usa a API Chat Completions compatível com OpenAI e transmite tokens em streaming. O GGUF é localizado no cache local do Ollama, mas o daemon e a API do Ollama não são usados. Um único modelo fica carregado por processo; trocar o modelo ou o contexto requer reiniciar o OpenRP AI.
+- **Integração com llama.cpp** — inicia e encerra `llama-server` junto com o app, usa a API Chat Completions compatível com OpenAI e transmite tokens em streaming. Os arquivos GGUF são carregados diretamente de `~/.ai-models`, sem depender do Ollama. Um único modelo fica carregado por processo; trocar o modelo ou o contexto requer reiniciar o OpenRP AI.
 
 - **100% offline e local** — nenhum dado sai da sua máquina. Sem login, sem nuvem, sem assinatura. Opcionalmente, acesse de outros dispositivos via Tailscale com autenticação básica.
 
@@ -39,18 +39,21 @@ O projeto pretende manter foco em chat/roleplay local, com planos para:
 
 - Node.js 20 ou superior
 - `llama-server` (build do llama.cpp com suporte ao formato GGUF)
-- Um modelo já baixado no cache de modelos do Ollama (o app usa o blob GGUF sem iniciar o daemon)
+- Um modelo no formato GGUF em `~/.ai-models`
 - Linux (recomendado Debian/Ubuntu com systemd)
 
 ## Instalação rápida
 
 1) Instale ou compile o llama.cpp com o executável `llama-server` disponível no `PATH`. Builds com aceleração de GPU devem corresponder aos drivers/backend instalados (CUDA, ROCm, Vulkan etc.).
 
-2) Baixe o modelo desejado uma vez pelo Ollama para que o blob GGUF esteja no cache local. O OpenRP AI não inicia nem chama o serviço Ollama:
+2) Coloque os arquivos GGUF desejados em `~/.ai-models`. Para manter nomes de modelo no formato `familia:tag`, use uma subpasta para a família e o nome da tag como arquivo:
 
 ```bash
-ollama pull gemma4:12b
+mkdir -p ~/.ai-models/gemma4
+# coloque o arquivo GGUF como ~/.ai-models/gemma4/12b.gguf
 ```
+
+GGUFs diretamente na raiz também são detectados; nesse caso, o nome selecionável será o nome do arquivo sem `.gguf`.
 
 3) Instale o Node.js (recomendado usar `nvm`):
 
@@ -74,7 +77,7 @@ npm install
 npm start
 ```
 
-O `llama-server` é iniciado automaticamente. O modelo deve existir no cache e o comando deve ser executável.
+O `llama-server` é iniciado automaticamente. O modelo deve existir em `~/.ai-models` e o comando deve ser executável.
 Se usar um build local do llama.cpp em `bin/` e `lib/`, configure o caminho absoluto do executável em `LLAMA_SERVER_BIN`; o app inclui automaticamente a pasta `lib/` do build na busca de bibliotecas compartilhadas.
 
 Configurações opcionais no `.env`:
@@ -85,8 +88,8 @@ LLAMA_HOST=http://127.0.0.1:8080
 LLAMA_GPU_LAYERS=999
 LLAMA_CTX_SIZE=32768
 LLAMA_DEFAULT_MODEL=gemma4:12b
-# Diretório raiz do cache se não estiver em ~/.ollama/models:
-OLLAMA_MODELS=/caminho/para/.ollama/models
+# Opcional: use outra pasta de modelos GGUF.
+AI_MODELS_DIR=/caminho/para/modelos
 ```
 
 ## Como iniciar a aplicação localmente
