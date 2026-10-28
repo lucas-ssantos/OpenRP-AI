@@ -43,7 +43,7 @@ export const appConfig = {
         repeat_penalty:   parseFloat(process.env.DEFAULT_REPEAT_PENALTY)         || 1.05,
         repeat_last_n:    parseInt(process.env.DEFAULT_REPEAT_LAST_N)            || 192,
         max_tokens:       parseInt(process.env.DEFAULT_MAX_TOKENS ?? "-1")       || -1,
-        min_tokens:       parseInt(process.env.DEFAULT_MIN_TOKENS)               || 60,
+        min_tokens:       parseInt(process.env.DEFAULT_MIN_TOKENS)               || 0,
         // null = contexto definido pela configuração do llama-server.
         context_size:     process.env.DEFAULT_CONTEXT_SIZE ? parseInt(process.env.DEFAULT_CONTEXT_SIZE) : null,
         num_ctx_messages: parseInt(process.env.DEFAULT_NUM_CTX_MESSAGES)         || 20,

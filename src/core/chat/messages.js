@@ -237,7 +237,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             thinkingEnabled: genConfig.think,
         });
 
-        const regenConfig  = { ...genConfig, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, genConfig) : withThinkingBudget((config.min_tokens ?? 60) * 2, genConfig) };
+        const regenConfig  = { ...genConfig, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, genConfig) : withThinkingBudget((config.min_tokens ?? 0) * 2, genConfig) };
         const gen = beginGeneration(conversationId);
 
         startSSE(res);

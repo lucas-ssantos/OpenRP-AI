@@ -27,7 +27,7 @@ const VALIDATORS = {
     repeat_penalty:     (v) => isNum(v) && v > 0,
     repeat_last_n:      (v) => isInt(v) && v >= -1,
     max_tokens:         (v) => isInt(v) && (v === -1 || v > 0),
-    min_tokens:         (v) => isInt(v) && v >= 0,
+    min_tokens:         (v) => isInt(v) && v > -1,
     // null = "contexto automático" (checkbox do /settings) — deliberado, não inválido.
     // Resolvido no start do llama-server para o contexto definido ao iniciar o processo.
     context_size:       (v) => v === null || (isInt(v) && v > 0),
@@ -81,7 +81,15 @@ const EMOTIONAL_KEYWORDS = [
     "odeio", "odio", "raiva", "trair", "traiu", "ciume", "ciumes",
     "saudade", "sofrer", "sofrendo", "sozinho", "sozinha", "abandonar", "abandonou",
     "segredo", "confessar", "confesso", "prometo", "promessa",
-    "casar", "casamento", "terminar", "separar",
+    "casar", "casamento", "terminar", "separar", "sad", "sadness", "to cry", "crying", "I cried", "crying/tears",
+"fear", "scared", "panic",
+"I love", "love", "in love", "passion", "kiss", "to kiss",
+"forgiveness", "forgive", "to forgive", "apology/sorry", "hurt (someone)", "hurt (feeling)",
+"to die", "death", "died", "dying", "goodbye", "farewell",
+"I hate", "hatred", "anger", "to betray", "betrayed", "jealousy",
+"longing/missing someone", "to suffer", "suffering", "alone", "to abandon", "abandoned",
+"secret", "to confess", "I confess", "I promise", "promise",
+"to marry", "marriage/wedding", "to end (a relationship)", "to separate"
 ];
 const EMOTIONAL_RE = new RegExp(`\\b(?:${EMOTIONAL_KEYWORDS.join("|")})\\b`, "i");
 
@@ -116,7 +124,7 @@ export function withThinkingBudget(tokens, config) {
 // Dynamic capping only applies when the user sets a positive max_tokens ceiling.
 export function dynamicMaxTokens(userMessage, config) {
     if (!config.max_tokens || config.max_tokens <= 0) return -1;
-    const FLOOR   = config.min_tokens ?? 60;
+    const FLOOR   = config.min_tokens ?? 0;
     const CEILING = config.max_tokens;
     const RATIO   = 1.4;
     const base = Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));

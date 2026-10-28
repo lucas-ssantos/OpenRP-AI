@@ -256,7 +256,7 @@ export async function migrate() {
       seed INTEGER DEFAULT -1,
       stop TEXT,
       num_ctx_messages INTEGER DEFAULT 20,
-      min_tokens INTEGER DEFAULT 60,
+      min_tokens INTEGER DEFAULT 0,
       memory_interval INTEGER DEFAULT 5,
       persona_interval INTEGER DEFAULT 10,
       think INTEGER DEFAULT 0,

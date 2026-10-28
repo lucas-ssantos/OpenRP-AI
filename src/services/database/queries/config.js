@@ -42,7 +42,7 @@ export function getGenerationConfig() {
     min_p: row.min_p, repeat_penalty: row.repeat_penalty, repeat_last_n: row.repeat_last_n,
     max_tokens: row.max_tokens, context_size: row.context_size, stream: row.stream === 1,
     seed: row.seed, stop: parseStop(row.stop), num_ctx_messages: row.num_ctx_messages,
-    min_tokens: row.min_tokens ?? 60,
+    min_tokens: row.min_tokens ?? 0,
     memory_interval: row.memory_interval ?? 5,
     persona_interval: row.persona_interval ?? 10,
     think_mode: parseThinkMode(row.think_mode, row.think),
@@ -93,7 +93,7 @@ export function setGenerationConfig(config = {}) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
      max_tokens, context_size, toStream(stream), toSeed(seed),
-     toStop(stop), num_ctx_messages || 20, min_tokens ?? 60,
+     toStop(stop), num_ctx_messages || 20, min_tokens ?? 0,
      memory_interval ?? 5, persona_interval ?? 10,
      // coluna legada `think` mantida em sincronia (1 = qualquer modo ativo)
      thinkMode !== "off" ? 1 : 0, thinkMode, now]
