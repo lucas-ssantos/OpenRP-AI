@@ -1,3 +1,4 @@
+import os from "os";
 import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -163,6 +164,7 @@ export function detachLlamaServer() {
     registerLlamaServerStop(null);
 }
 
+/*
 export async function initLlamaServer({ model: modelOverride = null, contextSize: contextOverride = null } = {}) {
     serverWasHealthy = false;
     const config = getGenerationConfig();
@@ -218,4 +220,131 @@ export async function initLlamaServer({ model: modelOverride = null, contextSize
 
     await stopLlamaServer();
     throw new Error(`llama-server não respondeu em ${STARTUP_TIMEOUT_MS / 1000}s. Consulte logs/llama-server.log.`);
+}
+*/
+
+
+export async function initLlamaServer({
+    model: modelOverride = null,
+    contextSize: contextOverride = null
+} = {}) {
+    serverWasHealthy = false;
+
+    const config = getGenerationConfig();
+    const routerMode = !modelOverride;
+
+    // O modo normal usa o Gemma como padrão.
+    // Um modelOverride explícito mantém o modo de modelo único,
+    // usado por operações como benchmarks.
+    const model = routerMode
+        ? "gemma4-12b"
+        : (modelOverride || config?.model || appConfig.defaults.model);
+
+    const modelPath = routerMode ? null : resolveModelFile(model);
+    const ctxSize = contextOverride || config?.context_size || appConfig.llama.contextSize;
+
+    const modelsDir = path.resolve(
+        process.env.AI_MODELS_DIR || path.join(os.homedir(), ".ai-models")
+    );
+    const presetPath = path.join(modelsDir, "models.ini");
+
+    const logsDir = path.resolve(process.cwd(), "logs");
+    fs.mkdirSync(logsDir, { recursive: true });
+
+    const logFd = fs.openSync(
+        path.join(logsDir, "llama-server.log"),
+        "a"
+    );
+
+    const args = [
+        ...(routerMode
+            ? [
+                "--models-preset", presetPath,
+                "--models-max", "1",
+            ]
+            : ["-m", modelPath]),
+
+        "--host", appConfig.llama.bindHost,
+        "--ctx-size", String(ctxSize),
+        "-ngl", String(appConfig.llama.gpuLayers),
+        "--port", String(appConfig.llama.port),
+        "--jinja",
+    ];
+
+    console.log(
+        routerMode
+            ? `[llama] Iniciando llama-server em modo router (padrão: ${model})...`
+            : `[llama] Iniciando llama-server para "${model}" (${modelPath})...`
+    );
+
+    serverProcess = spawn(appConfig.llama.binary, args, {
+        cwd: process.cwd(),
+        env: getServerEnvironment(appConfig.llama.binary),
+        stdio: ["ignore", logFd, logFd],
+    });
+
+    fs.closeSync(logFd);
+
+    let spawnError = null;
+
+    serverProcess.once("error", (error) => {
+        spawnError = error;
+        console.error(
+            `[llama] Falha ao iniciar "${appConfig.llama.binary}": ${error.message}`
+        );
+    });
+
+    serverProcess.once("exit", (code, signal) => {
+        if (code !== 0 && signal !== "SIGTERM") {
+            console.error(
+                `[llama] llama-server encerrou inesperadamente (code=${code}, signal=${signal}).`
+            );
+        }
+    });
+
+    registerLlamaServerStop(() =>
+        stopLlamaServer({ includeExternal: true })
+    );
+
+    const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+        if (spawnError) {
+            throw new Error(
+                `Não foi possível iniciar llama-server: ${spawnError.message}`
+            );
+        }
+
+        if (
+            serverProcess.exitCode !== null ||
+            serverProcess.signalCode !== null
+        ) {
+            throw new Error(
+                "llama-server encerrou durante a inicialização. Consulte logs/llama-server.log."
+            );
+        }
+
+        if (await isHealthy()) {
+            serverWasHealthy = true;
+
+            appConfig.llama.model = model;
+            appConfig.llama.routerMode = routerMode;
+            appConfig.llama.contextSize = ctxSize;
+
+            console.log(
+                `[llama] llama-server pronto em ${appConfig.llama.host} (contexto ${ctxSize}).`
+            );
+
+            return;
+        }
+
+        await wait(HEALTH_CHECK_INTERVAL_MS);
+        appConfig.llama.routerMode = routerMode;
+    }
+
+    await stopLlamaServer();
+
+    throw new Error(
+        `llama-server não respondeu em ${STARTUP_TIMEOUT_MS / 1000}s. Consulte logs/llama-server.log.`
+    );
 }

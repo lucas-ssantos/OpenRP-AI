@@ -105,6 +105,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: content.trim(),
+            intimateTriggerMessage: content.trim(),
             memories, personaFacts, lorebooks, affection, dailyMood,
             thinkingEnabled: genConfig.think,
         });
@@ -115,6 +116,14 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const gen = beginGeneration(conversationId);
 
         const sendConfig = { ...genConfig, max_tokens: dynamicMaxTokens(content.trim(), genConfig) };
+
+        console.log("[GEN LIMIT]", {
+            configuredMaxTokens: config.max_tokens,
+            actualNumPredict: sendConfig.max_tokens,
+            minTokens: config.min_tokens,
+            thinking: sendConfig.think,
+            maxResponseChars: config.max_response_chars,
+        });
 
         startSSE(res);
         attachSubscriber(conversationId, res);
@@ -147,6 +156,10 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 filteredResponse: fullContent,
                 thinking: rawThinking,
                 thinkingTrigger,
+                //contextTokens: usage?.prompt_tokens,   // novo
+                contextTokens: null,   // novo
+                //contextSize: ctxSize,                  // novo
+                contextSize: null,                  // novo
                 prepMs,
                 generationMs,
                 allMemories: getMemories(conversationId),
@@ -232,9 +245,18 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
             userMessage: null,
+            intimateTriggerMessage: lastUser?.content ?? '',
             memories, personaFacts, lorebooks, dailyMood,
             affection,
             thinkingEnabled: genConfig.think,
+        });
+
+        console.log("[REGEN - GEN LIMIT]", {
+            configuredMaxTokens: config.max_tokens,
+            actualNumPredict: genConfig.max_tokens,
+            minTokens: config.min_tokens,
+            thinking: genConfig.think,
+            maxResponseChars: config.max_response_chars,
         });
 
         const regenConfig  = { ...genConfig, max_tokens: lastUser ? dynamicMaxTokens(lastUser.content, genConfig) : withThinkingBudget((config.min_tokens ?? 0) * 2, genConfig) };
@@ -266,6 +288,10 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 filteredResponse: fullContent,
                 thinking: rawThinking,
                 thinkingTrigger,
+                //contextTokens: usage?.prompt_tokens,   // novo
+                contextTokens: null,   // novo
+                //contextSize: ctxSize,                  // novo
+                contextSize: null,                  // novo
                 prepMs,
                 generationMs,
                 allMemories: getMemories(conversationId),

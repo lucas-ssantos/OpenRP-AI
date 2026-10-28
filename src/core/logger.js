@@ -83,6 +83,8 @@ export function archiveConversationLog(conversationId, characterName) {
  * @param {string}   opts.filteredResponse - resposta após remover tokens de raciocínio
  * @param {string}   [opts.thinking]       - raciocínio retornado pelo modelo no campo reasoning_content
  * @param {string}   [opts.thinkingTrigger] - motivo da ativação do thinking neste turno ('always' | 'forced' | 'level_up' | 'emotional' | 'memory_load'), null se desativado
+ * @param {number}   [opts.contextTokens]   - tokens do contexto usados neste turno (ex.: usage.prompt_tokens ou timings.prompt_n do llama-server)
+ * @param {number}   [opts.contextSize]     - tamanho máximo do contexto em tokens (n_ctx); se informado, mostra "usados/máximo (%)"
  * @param {number}   [opts.prepMs]         - tempo (ms) desde a requisição até o envio ao llama-server
  * @param {number}   [opts.generationMs]   - tempo (ms) que o llama-server levou para gerar a resposta
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
@@ -101,6 +103,8 @@ export function logConversationTurn({
     filteredResponse,
     thinking = "",
     thinkingTrigger = null,
+    contextTokens = null,
+    contextSize = null,
     prepMs = null,
     generationMs = null,
     allMemories  = [],
@@ -125,6 +129,7 @@ export function logConversationTurn({
         const entry = buildLogEntry({
             character, model, messages,
             rawResponse, filteredResponse, thinking, thinkingTrigger,
+            contextTokens, contextSize,
             prepMs, generationMs,
             allMemories, allLorebooks,
             isRegen,
@@ -171,7 +176,24 @@ function formatDuration(ms) {
     return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(2)}s`;
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage, label }) {
+// "3.412 tokens" ou, com o tamanho máximo, "3.412/8.192 tokens (42%)".
+function formatContext(used, size) {
+    if (used == null || !Number.isFinite(used)) return null;
+    const fmt = (n) => n.toLocaleString("pt-BR");
+    if (size == null || !Number.isFinite(size) || size <= 0) return `${fmt(used)} tokens`;
+    const pct = Math.round((used / size) * 100);
+    return `${fmt(used)}/${fmt(size)} tokens (${pct}%)`;
+}
+
+// Considera que houve thinking quando o modelo realmente devolveu raciocínio
+// (reasoning_content ou bloco <think> na resposta bruta) — não apenas quando foi solicitado.
+function formatThinking({ thinking, rawResponse, thinkingTrigger }) {
+    const happened = Boolean(thinking?.trim()) || /<think>/i.test(rawResponse || "");
+    if (happened) return thinkingTrigger ? `sim (${thinkingTrigger})` : "sim";
+    return thinkingTrigger ? `não (ativado: ${thinkingTrigger}, sem raciocínio retornado)` : "não";
+}
+
+function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, contextTokens, contextSize, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage, label }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -180,10 +202,23 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
     const turnType = isRegen ? "REGENERAÇÃO" : "MENSAGEM";
     const prepStr = formatDuration(prepMs);
     const genStr  = formatDuration(generationMs);
+    const ctxStr  = formatContext(contextTokens, contextSize);
+    const thinkStr = formatThinking({ thinking, rawResponse, thinkingTrigger });
     const lines = [];
 
     lines.push(`\n${DIVIDER}`);
-    lines.push(`  ${now}  |  ${turnType}  |  Personagem: ${character?.name}  |  Modelo: ${model}${label ? `  |  ${label}` : ""}${thinkingTrigger ? `  |  Thinking: ${thinkingTrigger}` : ""}${prepStr ? `  |  Preparo: ${prepStr}` : ""}${genStr ? `  |  Geração: ${genStr}` : ""}`);
+    const headerParts = [
+        now,
+        turnType,
+        `Personagem: ${character?.name}`,
+        `Modelo: ${model}`,
+        label,
+        ctxStr && `Contexto: ${ctxStr}`,
+        `Thinking: ${thinkStr}`,
+        prepStr && `Preparo: ${prepStr}`,
+        genStr && `Geração: ${genStr}`,
+    ].filter(Boolean);
+    lines.push(`  ${headerParts.join("  |  ")}`);
     lines.push(DIVIDER);
 
     if (!messages?.length) {

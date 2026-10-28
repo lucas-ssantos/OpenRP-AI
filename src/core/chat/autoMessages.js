@@ -162,6 +162,8 @@ async function generateAutomaticMessage(conversationId) {
                 filteredResponse: fullContent,
                 thinking: rawThinking,
                 thinkingTrigger,
+                contextTokens: usage?.prompt_tokens,   // novo
+                contextSize: ctxSize,                  // novo
                 prepMs: 0,
                 generationMs: Date.now() - startedAt,
                 allMemories: getMemories(conversationId),

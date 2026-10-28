@@ -23,6 +23,13 @@ function buildInstructionPrompt(character, persona) {
   return (
     `You are roleplaying as ${name} in an ongoing, immersive chat with ${userName}.\n` +
     `\n` +
+    `[ROLEPLAY CONTROL — HIGH PRIORITY]\n` +
+    `- Control ${name} only. Never control ${userName}, the user's character.\n` +
+    `- Never write ${userName}'s actions, dialogue, thoughts, feelings, or decisions.\n` +
+    `- React only through ${name}'s own actions, dialogue, thoughts, and observations.\n` +
+    `- Do not introduce new characters, voices, events, or plot twists unless prompted by the user.\n` +
+    `- Leave room for the user to decide what happens next.\n` +
+    `- KEEP IT SHORT, ONE PARAGRAPTH MAXIMUM.\n` +
     `CHARACTER\n` +
     `- Speak and act only as ${name}, in first person. Never break character, never mention being an AI, never add out-of-character commentary.\n` +
     `- Stay strictly faithful to ${name}'s personality, speech style, likes and dislikes — even when it means disagreeing with or refusing ${userName}.\n` +
@@ -36,7 +43,6 @@ function buildInstructionPrompt(character, persona) {
     `- Do not fade out or become coy just because a consensual adult scene is sexual. Describe relevant actions, physical sensations, and reactions concretely, and use direct anatomical or sexual words in the conversation's language when they fit the character's voice.\n` +
     `- Keep intimacy consistent with the established relationship, the character, and the user's agency. Never introduce sexual framing into an unrelated scene, presume consent, or decide the user's actions or feelings.\n` +
     `\n` +
-    
     `STYLE\n` +
     `STRICT RESPONSE LENGTH AND PACING:\n` +
     `- Write one short action beat followed by one brief line of dialogue per reply, whenever dialogue fits naturally.\n` +
@@ -92,7 +98,12 @@ function buildInstructionPrompt(character, persona) {
     `- Before replying, give strong attention to the six most recent conversation messages (or all available messages if fewer than six). Read them together to understand the immediate situation, tone, emotional shifts, and unresolved actions or questions; do not treat the latest message as isolated.\n` +
     `- Make the reply follow naturally from that recent context. Use older history, memories, and world info when relevant, but do not let unrelated older details override what is happening in the latest exchange.\n` +
     `- React directly to what ${userName} just said or did. Add a new detail only when it contributes naturally to the moment. Leave a question, invitation, tease, or challenge when appropriate, but never force one into a simple reaction.\n` +
-    `- Let feelings show through concrete actions and tone, not explanations of emotions.`
+    `- Let feelings show through concrete actions and tone, not explanations of emotions.` +
+    `[RESPONSE LENGTH — HIGH PRIORITY]\n` +
+    `- Write ONE paragraph maximum per reply.\n` +
+    `- Aim for 2–5 sentences.\n` +
+    `- Keep the response concise, but finish the scene naturally.\n` +
+    `- Never add extra paragraphs or unrelated plot developments.\n`
   );
 }
 
@@ -124,7 +135,11 @@ const INTIMATE_SCENE_KEYWORDS =
   'gemido, gemendo, geme, arqueio, arqueia, estocada, estoco, penetro, ' +
   'goza, gozo, gozando, tesão, excitada, excitado, molhada, duro, buceta, ' +
   'pau, pica, seios, mordida, mordo, lambe, lambo, chupa, chupo, nua, nu, ' +
-  'transando, fodendo, foder';
+  'transando, fodendo, foder, ' +
+  'moan, moaning, moans, arch, arches, thrust, I thrust, I penetrate, ' +
+  'orgasm, I orgasm, having an orgasm, horny, aroused, wet, hard, pussy, ' +
+  'cock, dick, breasts, bite, I bite, lick, I lick, suck, I suck, naked, ' +
+  'having sex, fucking, to fuck';
 
 // Scoped override for the tail end of INTERACTION's "always leave a hook"
 // rule, which otherwise pushes every line — including peak-arousal moments —
@@ -209,19 +224,14 @@ the reply inside this block.`;
 // isolated at the end it's followed far more reliably.
 function buildHardLimitBlock() {
   //return `HARD LIMIT\n250 characters max per reply. Cut early if needed. Never pad.`;
-  return `HARD LIMIT\n` + 
-  `Default reply: 100 characters max.\n` +
-  `Extended reply: up to 250 characters — only when the moment genuinely earns it:\n` +
-  `  · strong emotional beat (grief, anger, confession, fear, tenderness)\n` +
-  `  · an explanation that cannot land without context\n` +
-  `  · a scene that requires physical and emotional detail together\n` +
-  `\n` +
-  ` These are ceilings, not targets. Stop when the thought is done.\n` +
-  ` A cut-off reply is correct. A padded reply is not.\n` +
-  `\n` +
-  ` One beat per reply. Short sentences. If it reads like prose, cut it in half.\n` +
-  ` Do not extend just because the scene is intense — intensity is not the same\n` +
-  ` as needing more words. A single line can hit harder than a paragraph.`;
+  return `HARD LIMIT — HIGHEST PRIORITY:\n` +
+`- Target: 35–65 tokens per reply. Hard maximum: 90 tokens whenever possible.\n` +
+`- Write exactly ONE compact paragraph. Never use multiple paragraphs or separate dialogue lines.\n` +
+`- Include at most ONE brief action and ONE short line of dialogue.\n` +
+`- Use 1–3 short sentences. No extra reactions, descriptions, explanations, or follow-up beats.\n` +
+`- Respond only to the latest message. Do not advance the scene.\n` +
+`- Stop immediately when the reaction and dialogue are complete. Do not add a closing thought or conversational hook.\n` +
+`- If the reply already makes sense, do not add anything else.\n`;
 }
 
 // Expands {{char}}/{{user}} placeholders with the character and persona names.
@@ -361,6 +371,7 @@ export function buildPromptMessages({
   conversation = null,
   historyMessages = [],
   userMessage = null,
+  intimateTriggerMessage = null,
   memories = [],
   personaFacts = [],
   lorebooks = [],
@@ -511,14 +522,21 @@ export function buildPromptMessages({
       `If you are apart, stay consistent with the established situation and communication method; do not suddenly move ${character.name} into the user's location or invent that they reunited. The character may infer that ${persona?.name || 'the user'} is avoiding them, but only through their personality, not through a static rule. Keep the message brief and leave room for ${persona?.name || 'the user'} to respond.`
     );
   }
+  
   // Only active while the visible context already shows an explicit/physical
   // scene — reusing the same keyword matcher as lorebook activation. Keeping
   // this conditional (rather than always-on) avoids nudging ordinary scenes
   // toward a sexual framing just because the instruction exists in the prompt.
-  const normalizedContext = normalize(contextText || '');
-  if (matchesKeywords(INTIMATE_SCENE_KEYWORDS, normalizedContext)) {
+  // Analisa exclusivamente a mensagem escolhida para o gatilho íntimo.
+  // Nunca usa contextText nem o histórico completo.
+  const currentMessageForIntimacy =
+    intimateTriggerMessage ?? userMessage ?? '';
+  const normalizedCurrentMessage = normalize(currentMessageForIntimacy);
+  if (matchesKeywords(INTIMATE_SCENE_KEYWORDS, normalizedCurrentMessage)) {
     systemParts.push(buildIntimateSceneBlock(character));
   }
+
+
   // Escopo do thinking entra logo antes do hard limit — só quando o raciocínio
   // nativo está ativo na config; com think:false o bloco seria ruído.
   if (thinkingEnabled) systemParts.push(buildThinkingScopeBlock(character));

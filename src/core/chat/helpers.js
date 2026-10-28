@@ -120,15 +120,12 @@ export function withThinkingBudget(tokens, config) {
     return tokens + THINKING_TOKEN_BONUS;
 }
 
-// When max_tokens <= 0 (i.e. -1), passes -1 through for natural stopping.
-// Dynamic capping only applies when the user sets a positive max_tokens ceiling.
 export function dynamicMaxTokens(userMessage, config) {
-    if (!config.max_tokens || config.max_tokens <= 0) return -1;
-    const FLOOR   = config.min_tokens ?? 0;
-    const CEILING = config.max_tokens;
-    const RATIO   = 1.4;
-    const base = Math.max(FLOOR, Math.min(CEILING, Math.ceil(estimateTokens(userMessage) * RATIO)));
-    return withThinkingBudget(base, config);
+    if (!config.max_tokens || config.max_tokens <= 0) {
+        return -1;
+    }
+
+    return config.max_tokens;
 }
 
 function lastSentenceBoundary(str) {
@@ -203,6 +200,20 @@ const PERSIST_THROTTLE_MS = 300;
 // opts.insertPosition replica a posição de uma mensagem substituída (regenerate).
 export async function streamLlama(conversationId, gen, messages, config, onDone, opts = {}) {
     const { afterDone = null, insertPosition = null, automated = false } = opts;
+
+    if (appConfig.llama.routerMode) {
+        const hasIntimateSceneBlock = messages.some(
+            (message) =>
+                message.role === "system" &&
+                typeof message.content === "string" &&
+                message.content.includes("INTIMATE SCENE OVERRIDE")
+        );
+
+        config.model = hasIntimateSceneBlock
+            ? "stheno-intimate"
+            : "gemma4-12b";
+    }
+
     const controller = new AbortController();
     gen.controller = controller; // cancelGeneration() usa isto para abortar de fora
     let stallTimer   = null;
@@ -254,6 +265,14 @@ export async function streamLlama(conversationId, gen, messages, config, onDone,
     };
 
     try {
+
+        console.log("[LLAMA REQUEST]", {
+            num_predict: config.max_tokens,
+            think: config.think,
+            min_tokens: config.min_tokens,
+            model: config.model,
+        });
+
         resetStallTimer();
         const llamaRes = await fetch(llamaChatEndpoint(), {
             method: "POST",
