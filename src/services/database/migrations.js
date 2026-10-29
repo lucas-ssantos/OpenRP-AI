@@ -244,6 +244,7 @@ export async function migrate() {
     CREATE TABLE IF NOT EXISTS generation_config (
       id TEXT PRIMARY KEY DEFAULT 'global',
       model TEXT NOT NULL DEFAULT 'gemma4:12b',
+      affection_model TEXT,
       temperature REAL DEFAULT 0.85,
       top_p REAL DEFAULT 0.95,
       top_k INTEGER DEFAULT 40,
@@ -265,6 +266,10 @@ export async function migrate() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration: modelo usado quando a cena ativa o bloco INTIMATE SCENE
+  // OVERRIDE ("affection override"). NULL = usa o mesmo modelo principal.
+  try { db.run(`ALTER TABLE generation_config ADD COLUMN affection_model TEXT`); } catch {}
 
   // Migration para DBs existentes sem a coluna memory_interval
   try { db.run(`ALTER TABLE generation_config ADD COLUMN memory_interval INTEGER DEFAULT 5`); } catch {}
@@ -298,12 +303,12 @@ export async function migrate() {
   const stopCsv = Array.isArray(d.stop) ? d.stop.join(", ") : (d.stop || "");
   db.run(`
     INSERT OR IGNORE INTO generation_config
-      (id, model, temperature, top_p, top_k, min_p,
+      (id, model, affection_model, temperature, top_p, top_k, min_p,
        repeat_penalty, repeat_last_n, max_tokens,
        context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, persona_interval, think, think_mode)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
-    'global', d.model, d.temperature, d.top_p, d.top_k, d.min_p,
+    'global', d.model, d.affection_model ?? null, d.temperature, d.top_p, d.top_k, d.min_p,
     d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
     stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.persona_interval ?? 10,

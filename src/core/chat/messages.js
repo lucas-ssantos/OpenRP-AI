@@ -137,7 +137,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         // A geração roda independente desta conexão: se o cliente desconectar
         // (troca de página, tela apagou), ela continua e persiste no banco —
         // ver generationManager.js e GET /conversations/:id/generation.
-        await streamLlama(conversationId, gen, promptMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+        await streamLlama(conversationId, gen, promptMessages, sendConfig, async (fullContent, rawContent, rawThinking, asstMsgId, draftRawOutput) => {
             const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
@@ -152,6 +152,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
                 character,
                 model: sendConfig.model,
                 messages: promptMessages,
+                draftRawOutput,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,
@@ -269,7 +270,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         let turnSaved = false;
         const prepMs = Date.now() - requestStartTime;
         const genStartTime = Date.now();
-        await streamLlama(conversationId, gen, promptMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId) => {
+        await streamLlama(conversationId, gen, promptMessages, regenConfig, async (fullContent, rawContent, rawThinking, asstMsgId, draftRawOutput) => {
             const generationMs = Date.now() - genStartTime;
             const savedContent = trimToLastSentence(fullContent, config.max_response_chars);
             if (asstMsgId) {
@@ -284,6 +285,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
                 character,
                 model: regenConfig.model,
                 messages: promptMessages,
+                draftRawOutput,
                 rawResponse: rawContent,
                 filteredResponse: fullContent,
                 thinking: rawThinking,

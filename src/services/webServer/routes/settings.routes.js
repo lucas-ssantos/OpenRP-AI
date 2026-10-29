@@ -48,7 +48,12 @@ router.get("/api/models", async (_req, res) => {
             loaded: model.name === appConfig.llama.model,
             context_length: model.name === appConfig.llama.model ? getLlamaContextSize() : null,
         }));
-        res.json({ ok: true, models, loaded_model: appConfig.llama.model });
+        res.json({
+            ok: true,
+            models,
+            loaded_model: appConfig.llama.model,
+            router_mode: appConfig.llama.routerMode === true,
+        });
     } catch (err) {
         res.status(500).json({ ok: false, message: err.message });
     }
@@ -74,18 +79,32 @@ router.post("/api/config", (req, res) => {
     try {
         const config = req.body;
         if (!config.model) return res.status(400).json({ ok: false, message: "Modelo é obrigatório." });
-        if (!listLocalModels().some((model) => model.name === config.model)) {
+
+        const installed = new Set(listLocalModels().map((model) => model.name));
+        if (!installed.has(config.model)) {
             return res.status(400).json({ ok: false, message: `O modelo "${config.model}" não está em ~/.ai-models.` });
         }
+        if (config.affection_model && !installed.has(config.affection_model)) {
+            return res.status(400).json({
+                ok: false,
+                message: `O modelo de afeto "${config.affection_model}" não está em ~/.ai-models.`,
+            });
+        }
+
         const previous = getGenerationConfig();
         setGenerationConfig(config);
-        const restartRequired = config.model !== appConfig.llama.model
-            || (config.context_size ?? null) !== (previous?.context_size ?? null);
+
+        const contextChanged = (config.context_size ?? null) !== (previous?.context_size ?? null);
+        // No modo router o llama.cpp troca de modelo sob demanda, então mudar
+        // de modelo não exige reiniciar — só o contexto (definido no processo).
+        const restartRequired = contextChanged
+            || (!appConfig.llama.routerMode && config.model !== appConfig.llama.model);
+
         res.json({
             ok: true,
             restart_required: restartRequired,
             message: restartRequired
-                ? "Configuração salva. Reinicie o OpenRP AI para carregar o novo modelo/contexto."
+                ? "Configuração salva. Reinicie o OpenRP AI para aplicar o novo contexto."
                 : "Configuração salva com sucesso.",
         });
     } catch (err) {

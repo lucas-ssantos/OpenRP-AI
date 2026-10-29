@@ -38,7 +38,8 @@ export function getGenerationConfig() {
   const row = rowToObject(db.exec(`SELECT * FROM generation_config WHERE id = 'global'`));
   if (!row) return null;
   return {
-    model: row.model, temperature: row.temperature, top_p: row.top_p, top_k: row.top_k,
+    model: row.model, affection_model: row.affection_model || null,
+    temperature: row.temperature, top_p: row.top_p, top_k: row.top_k,
     min_p: row.min_p, repeat_penalty: row.repeat_penalty, repeat_last_n: row.repeat_last_n,
     max_tokens: row.max_tokens, context_size: row.context_size, stream: row.stream === 1,
     seed: row.seed, stop: parseStop(row.stop), num_ctx_messages: row.num_ctx_messages,
@@ -82,16 +83,16 @@ export function setGenerationConfig(config = {}) {
   // Aceita payloads antigos (think boolean) e novos (think_mode string).
   const thinkMode = parseThinkMode(config.think_mode, (config.think === true || config.think === 1 || config.think === "1") ? 1 : 0);
 
-  const { model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+  const { model, affection_model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
           max_tokens, context_size, stream, seed, stop, num_ctx_messages,
           min_tokens, memory_interval, persona_interval } = config;
   db.run(
     `INSERT OR REPLACE INTO generation_config
-     (id, model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+     (id, model, affection_model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
       max_tokens, context_size, stream, seed, stop, num_ctx_messages, min_tokens,
       memory_interval, persona_interval, think, think_mode, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ["global", model, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["global", model, affection_model?.trim() || null, temperature, top_p, top_k, min_p, repeat_penalty, repeat_last_n,
      max_tokens, context_size, toStream(stream), toSeed(seed),
      toStop(stop), num_ctx_messages || 20, min_tokens ?? 0,
      memory_interval ?? 5, persona_interval ?? 10,

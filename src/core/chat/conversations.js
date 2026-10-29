@@ -11,6 +11,7 @@ import { extractAndSaveMemories } from "../memory/index.js";
 import { getGeneration, attachSubscriber, detachSubscriber, cancelGeneration } from "./generationManager.js";
 import { configureAutoMessages } from "./autoMessages.js";
 import { appConfig } from "../../config.js";
+import { isLocalModel } from "../../services/llama.models.js";
 import { archiveConversationLog } from "../logger.js";
 
 const router = Router();
@@ -41,8 +42,17 @@ router.post("/conversations", (req, res) => {
     try {
         const { character_id, title, scenario, first_message, model } = req.body;
         if (!character_id) return res.status(400).json({ ok: false, message: "character_id é obrigatório." });
-        if (model?.trim() && model.trim() !== appConfig.llama.model) {
-            return res.status(400).json({ ok: false, message: "O llama.cpp mantém um único modelo carregado; use o modelo global ativo." });
+
+        const requestedModel = model?.trim();
+        const modelAllowed = !requestedModel
+            || (appConfig.llama.routerMode ? isLocalModel(requestedModel) : requestedModel === appConfig.llama.model);
+        if (!modelAllowed) {
+            return res.status(400).json({
+                ok: false,
+                message: appConfig.llama.routerMode
+                    ? `O modelo "${requestedModel}" não está em ~/.ai-models.`
+                    : "O llama.cpp mantém um único modelo carregado; use o modelo global ativo.",
+            });
         }
 
         const character = getCharacter(character_id);
@@ -194,8 +204,15 @@ router.post("/conversations/:id/model", (req, res) => {
         const conv = getConversation(req.params.id);
         if (!conv) return res.status(404).json({ ok: false, message: "Conversa não encontrada." });
         const model = req.body?.model?.trim() || null;
-        if (model && model !== appConfig.llama.model) {
-            return res.status(400).json({ ok: false, message: "O llama.cpp mantém um único modelo carregado; modelos por conversa não podem ser alternados." });
+        const modelAllowed = !model
+            || (appConfig.llama.routerMode ? isLocalModel(model) : model === appConfig.llama.model);
+        if (!modelAllowed) {
+            return res.status(400).json({
+                ok: false,
+                message: appConfig.llama.routerMode
+                    ? `O modelo "${model}" não está em ~/.ai-models.`
+                    : "O llama.cpp mantém um único modelo carregado; modelos por conversa não podem ser alternados.",
+            });
         }
         setConversationModel(req.params.id, model);
         res.json({ ok: true });

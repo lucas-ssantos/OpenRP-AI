@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { appConfig } from "../config.js";
 
-function getModelDirectory() {
+export function getModelDirectory() {
     return path.resolve(process.env.AI_MODELS_DIR || path.join(os.homedir(), ".ai-models"));
 }
 
@@ -25,6 +25,19 @@ export function resolveModelFile(modelName) {
     return model.path;
 }
 
+// Um GGUF só é um modelo carregável quando não é um arquivo auxiliar
+// (mmproj) nem um shard secundário de um modelo dividido em partes.
+function isLoadableModelFile(fileName) {
+    const lower = fileName.toLowerCase();
+    if (!lower.endsWith(".gguf")) return false;
+    if (lower.includes("mmproj")) return false;
+
+    const shard = lower.match(/-(\d{5})-of-(\d{5})\.gguf$/);
+    if (shard && shard[1] !== "00001") return false;
+
+    return true;
+}
+
 export function listLocalModels() {
     const modelsDir = getModelDirectory();
     if (!fs.existsSync(modelsDir)) return [];
@@ -39,7 +52,7 @@ export function listLocalModels() {
                 stack.push(fullPath);
                 continue;
             }
-            if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".gguf") continue;
+            if (!entry.isFile() || !isLoadableModelFile(entry.name)) continue;
 
             const name = getModelName(modelsDir, fullPath);
             models.push({
@@ -52,6 +65,69 @@ export function listLocalModels() {
         }
     }
     return models.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function isLocalModel(modelName) {
+    return listLocalModels().some((model) => model.name === modelName);
+}
+
+// Nomes de seção do models.ini não podem conter ":" (o llama.cpp interpreta o
+// trecho após os dois-pontos como tag e altera a caixa). O nome visível para o
+// app continua sendo o alias ("gemma4:12b"), preservado no campo `alias`.
+function slugifyModelName(name, usedSlugs) {
+    const base = name
+        .replace(/[^a-zA-Z0-9_.-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "model";
+
+    let slug = base;
+    let suffix = 2;
+    while (usedSlugs.has(slug.toLowerCase())) {
+        slug = `${base}-${suffix++}`;
+    }
+    usedSlugs.add(slug.toLowerCase());
+    return slug;
+}
+
+// Gera o preset do modo router a partir de TODOS os GGUFs encontrados em
+// ~/.ai-models. O arquivo models.ini é apenas um artefato: a fonte da verdade é
+// o sistema de arquivos, portanto ele é sobrescrito a cada inicialização.
+export function buildRouterPreset(models, { defaultModel = null } = {}) {
+    const lines = [
+        "# Gerado automaticamente pelo OpenRP AI a partir dos GGUFs em ~/.ai-models.",
+        "# Alterações neste arquivo são sobrescritas na próxima inicialização.",
+        "version = 1",
+        "",
+    ];
+    const usedSlugs = new Set();
+
+    for (const model of models) {
+        const slug = slugifyModelName(model.name, usedSlugs);
+        lines.push(`[${slug}]`);
+        lines.push(`model = ${model.path}`);
+        if (slug !== model.name) lines.push(`alias = ${model.name}`);
+        if (model.name === defaultModel) lines.push("load-on-startup = true");
+        lines.push("");
+    }
+
+    return lines.join("\n");
+}
+
+export function getRouterPresetPath() {
+    const modelsDir = getModelDirectory();
+    try {
+        fs.mkdirSync(modelsDir, { recursive: true });
+        fs.accessSync(modelsDir, fs.constants.W_OK);
+        return path.join(modelsDir, "models.ini");
+    } catch {
+        // ~/.ai-models pode ser somente leitura; nesse caso o preset vive em /tmp.
+        return path.join(os.tmpdir(), "openrp-ai-models.ini");
+    }
+}
+
+export function writeRouterPreset(models, options = {}) {
+    const presetPath = getRouterPresetPath();
+    fs.writeFileSync(presetPath, buildRouterPreset(models, options), "utf8");
+    return presetPath;
 }
 
 export function getLlamaContextSize() {

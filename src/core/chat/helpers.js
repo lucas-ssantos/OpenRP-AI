@@ -3,6 +3,7 @@ import path from "path";
 import { getGenerationConfig, getConversationModel, addMessage, updateMessage, deleteMessage } from "../../services/database/queries.js";
 import { normalize } from "../memory/retrieval.js";
 import { llamaChatBody, llamaChatEndpoint } from "../../services/llama.client.js";
+import { isLocalModel } from "../../services/llama.models.js";
 import { appConfig } from "../../config.js";
 import { broadcast, closeGeneration } from "./generationManager.js";
 
@@ -20,6 +21,8 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const isInt = (v) => Number.isInteger(v);
 const VALIDATORS = {
     model:              (v) => typeof v === "string" && v.trim().length > 0,
+    // null/vazio = usa o mesmo modelo principal (bloco INTIMATE SCENE OVERRIDE).
+    affection_model:    (v) => v === null || (typeof v === "string" && v.trim().length > 0),
     temperature:        (v) => isNum(v) && v >= 0 && v <= 2,
     top_p:              (v) => isNum(v) && v > 0 && v <= 1,
     top_k:              (v) => isInt(v) && v >= 0,
@@ -56,11 +59,30 @@ export function resolveConfig(conversationId = null) {
         if (src) config[key] = src[key];
     }
 
-    if (conversationId) {
-        const convModel = getConversationModel(conversationId);
-        if (VALIDATORS.model(convModel) && convModel === appConfig.llama.model) config.model = convModel;
+    if (appConfig.llama.routerMode) {
+        // No modo router qualquer GGUF instalado pode ser usado, inclusive o
+        // override por conversa.
+        if (conversationId) {
+            const convModel = getConversationModel(conversationId);
+            if (VALIDATORS.model(convModel) && isLocalModel(convModel)) config.model = convModel;
+        }
+        if (!VALIDATORS.model(config.model) || !isLocalModel(config.model)) {
+            if (appConfig.llama.model) config.model = appConfig.llama.model;
+        }
+    } else {
+        // Modo de modelo único (benchmark): o llama-server só tem um modelo.
+        if (conversationId) {
+            const convModel = getConversationModel(conversationId);
+            if (VALIDATORS.model(convModel) && convModel === appConfig.llama.model) config.model = convModel;
+        }
+        if (appConfig.llama.model) config.model = appConfig.llama.model;
     }
-    if (appConfig.llama.model) config.model = appConfig.llama.model;
+
+    // Sem escolha explícita, o override de afeto usa o modelo principal.
+    if (!VALIDATORS.affection_model(config.affection_model) || !isLocalModel(config.affection_model)) {
+        config.affection_model = config.model;
+    }
+
     return config;
 }
 
@@ -114,7 +136,7 @@ export function resolveThinkingTrigger({ mode, forced = false, userMessage = "",
 // resposta — sem folga, o check (por mais mínimo que a instrução THINKING peça)
 // rouba espaço da resposta real. O bônus só se aplica a orçamentos positivos:
 // -1 (parada natural) já não tem teto a estourar.
-const THINKING_TOKEN_BONUS = 400;
+const THINKING_TOKEN_BONUS = 800;
 export function withThinkingBudget(tokens, config) {
     if (!tokens || tokens <= 0 || config.think !== true) return tokens;
     return tokens + THINKING_TOKEN_BONUS;
@@ -177,6 +199,56 @@ export function handleSSEError(res, err, label) {
     }
 }
 
+
+
+async function generateDraft(messages, config, signal, model) {
+    const maxTokens = Math.min(
+        config.max_tokens > 0 ? config.max_tokens : 600,
+        600
+    );
+
+    const response = await fetch(llamaChatEndpoint(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify(llamaChatBody({
+            model,
+            messages,
+            stream: false,
+            think: config.think === true,
+            options: {
+                temperature: config.temperature,
+                top_p: config.top_p,
+                top_k: config.top_k,
+                min_p: config.min_p,
+                repeat_penalty: config.repeat_penalty,
+                repeat_last_n: config.repeat_last_n,
+                num_predict: maxTokens,
+                seed: config.seed !== -1 && config.seed != null
+                    ? config.seed
+                    : undefined,
+                stop: config.stop?.length ? config.stop : undefined,
+            },
+        })),
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `Modelo de afeto "${model}" falhou: ${response.status} — ${await response.text()}`
+        );
+    }
+
+    const data = await response.json();
+    const draft = data.choices?.[0]?.message?.content ?? "";
+
+    if (!draft.trim()) {
+        throw new Error(`O modelo de afeto "${model}" retornou um rascunho vazio.`);
+    }
+
+    return draft.trim();
+}
+
+
 // Sem nenhum chunk do llama-server por este tempo, o stream é abortado (modelo travado).
 // 5 min: cobre load a frio + prompt eval de contextos grandes em hardware lento
 // antes de declarar timeout.
@@ -191,7 +263,7 @@ const PERSIST_THROTTLE_MS = 300;
 // todo subscriber atualmente registrado em `gen` (ver generationManager.js) e
 // persistindo o conteúdo progressivamente — a geração roda até o fim
 // independentemente de haver alguém conectado ouvindo. onDone(filteredContent,
-// rawContent, rawThinking, assistantMessageId) é chamado quando a geração
+// rawContent, rawThinking, assistantMessageId, draftRawOutput) é chamado quando a geração
 // termina (com sucesso ou interrompida por stall, desde que tenha gerado algo);
 // deve persistir o conteúdo final (já trimado) e retornar campos extras para o
 // evento `done`. opts.afterDone() roda depois do evento `done` ser transmitido
@@ -199,19 +271,22 @@ const PERSIST_THROTTLE_MS = 300;
 // eventos SSE próprios sem atrasar a percepção de conclusão do cliente.
 // opts.insertPosition replica a posição de uma mensagem substituída (regenerate).
 export async function streamLlama(conversationId, gen, messages, config, onDone, opts = {}) {
+    const hasIntimateSceneBlock = messages.some(
+        (message) =>
+            message.role === "system" &&
+            typeof message.content === "string" &&
+            message.content.includes("INTIMATE SCENE OVERRIDE")
+    );
+
     const { afterDone = null, insertPosition = null, automated = false } = opts;
 
-    if (appConfig.llama.routerMode) {
-        const hasIntimateSceneBlock = messages.some(
-            (message) =>
-                message.role === "system" &&
-                typeof message.content === "string" &&
-                message.content.includes("INTIMATE SCENE OVERRIDE")
-        );
+    // config.model já chega resolvido (modelo principal ou override por
+    // conversa); affection_model é o modelo escolhido para o bloco íntimo.
+    const mainModel = config.model;
+    const affectionModel = config.affection_model || mainModel;
 
-        config.model = hasIntimateSceneBlock
-            ? "stheno-intimate"
-            : "gemma4-12b";
+    if (appConfig.llama.routerMode) {
+        config.model = hasIntimateSceneBlock ? affectionModel : mainModel;
     }
 
     const controller = new AbortController();
@@ -256,7 +331,7 @@ export async function streamLlama(conversationId, gen, messages, config, onDone,
         // é o que loga/trata uma resposta vazia do llama.cpp). No caminho de stall,
         // só roda se algo chegou a ser gerado, preservando esse parcial.
         if (!errorMsg || fullContent) {
-            try { extra = (await onDone(fullContent, rawContent, rawThinking, gen.assistantMessageId)) ?? {}; }
+            try { extra = (await onDone(fullContent, rawContent, rawThinking, gen.assistantMessageId, draftRawOutput)) ?? {}; }
             catch (e) { console.error("streamLlama onDone error:", e); }
         }
         broadcast(conversationId, { delta: "", done: true, ...extra, ...(errorMsg ? { error: errorMsg } : {}) });
@@ -264,7 +339,121 @@ export async function streamLlama(conversationId, gen, messages, config, onDone,
         closeGeneration(conversationId);
     };
 
+    let draftRawOutput = null;
     try {
+        // Supervisor de cena íntima: o modelo de afeto escreve o rascunho e o
+        // modelo principal revisa. Só faz sentido no router e com modelos
+        // diferentes; com o mesmo modelo, uma única geração já basta.
+        if (
+            appConfig.llama.routerMode &&
+            hasIntimateSceneBlock &&
+            affectionModel &&
+            affectionModel !== mainModel
+        ) {
+            console.log(`[SUPERVISOR] Gerando rascunho com "${affectionModel}"...`);
+
+            const draft = await generateDraft(messages, config, controller.signal, affectionModel);
+            draftRawOutput = draft;
+
+            const reviewerInstruction =
+                "[FINAL RESPONSE REVIEW — HIGH PRIORITY]\n" +
+                "You are editing a roleplay draft, not continuing the conversation.\n" +
+                "Preserve the draft's personality, voice, tone, physical reactions, " +
+                "dialogue, and established events as much as possible.\n" +
+                "Correct instruction violations, especially controlling the user's " +
+                "character, inventing their actions or thoughts, and adding unrelated events.\n" +
+                "The final answer MUST be ONE paragraph maximum, with 2–5 sentences.\n" +
+                "Keep the response concise. Do not add new plot twists or characters.\n" +
+                "Do not explain your edits, provide commentary, or mention this review.\n" +
+                "Output only the corrected roleplay response.";
+
+            let reviewMessages = messages.map((message, index) =>
+                index === 0 && message.role === "system"
+                    ? {
+                        ...message,
+                        content: `${message.content}\n\n${reviewerInstruction}`,
+                    }
+                    : message
+            );
+
+            if (!reviewMessages.some(message => message.role === "system")) {
+                reviewMessages.unshift({
+                    role: "system",
+                    content: reviewerInstruction,
+                });
+            }
+
+            reviewMessages.push(
+                {
+                    role: "assistant",
+                    content: draft,
+                },
+                {
+                    role: "user",
+                    content:
+                        "Review and correct the assistant draft immediately above " +
+                        "according to the system review instructions. Return only " +
+                        "the final corrected response.",
+                }
+            );
+
+            console.log(`[SUPERVISOR] Enviando rascunho ao "${mainModel}"...`);
+
+            messages = reviewMessages;
+            // Cópia local: não altera max_tokens/think do config usado depois
+            // pelo log e pelos hooks de memória/persona.
+            config = { ...config, model: mainModel, max_tokens: 260, think: false };
+        }
+
+        /*
+        if (config.enableSupervisor !== false) {
+            console.log("[SUPERVISOR] Gerando rascunho com Stheno...");
+
+            const draft = await generateDraft(
+                messages,
+                config,
+                controller.signal
+            );
+
+            sthenoRawOutput = draft;
+
+            const reviewerInstruction =
+                "[FINAL RESPONSE REVIEW — HIGH PRIORITY]\n" +
+                "You are reviewing a draft written by another model.\n" +
+                "Preserve its style, personality, tone, dialogue and established events.\n" +
+                "Correct instruction violations, contradictions and unwanted control over the user's character.\n" +
+                "Do not invent the user's actions, thoughts, feelings or dialogue.\n" +
+                "Do not add unrelated events, characters or plot twists.\n" +
+                "Respect the original conversation's instructions and formatting requirements.\n" +
+                "Keep the final response concise and natural.\n" +
+                "Output only the corrected response, without explanations or commentary.";
+
+            const reviewMessages = [
+                ...messages.map(message => ({ ...message })),
+                {
+                    role: "system",
+                    content: reviewerInstruction,
+                },
+                {
+                    role: "assistant",
+                    content: draft,
+                },
+                {
+                    role: "user",
+                    content:
+                        "Review the draft above against the conversation context " +
+                        "and all applicable instructions. Return only the final response.",
+                },
+            ];
+
+            console.log("[SUPERVISOR] Enviando rascunho ao Gemma 4...");
+
+            messages = reviewMessages;
+            config.model = "gemma4-12b";
+            config.max_tokens = 700;
+            config.think = false;
+        }
+        */
 
         console.log("[LLAMA REQUEST]", {
             num_predict: config.max_tokens,

@@ -1,5 +1,6 @@
 let presetsData = {};
 let configData  = null;
+let routerMode  = false;
 
 const form       = document.getElementById('settings-form');
 const feedbackEl = document.getElementById('feedback-msg');
@@ -27,35 +28,50 @@ function showFeedback(text, isError = false) {
 
 async function loadModels() {
   const modelSelect = document.getElementById('model');
+  const affectionSelect = document.getElementById('affection_model');
   try {
     const res  = await fetch('/api/models');
     const data = await res.json();
 
-    if (!data.ok || !data.models?.length) {
+    routerMode = data.ok && data.router_mode === true;
+    const models = data.ok ? (data.models || []) : [];
+
+    if (!models.length) {
       modelSelect.innerHTML = '<option value="">— Nenhum modelo instalado —</option>';
+      affectionSelect.innerHTML = '<option value="">Mesmo modelo principal (padrão)</option>';
       return [];
     }
 
-    const models = data.models;
     modelSelect.innerHTML = '<option value="">— Selecione o modelo —</option>';
+    affectionSelect.innerHTML = '<option value="">Mesmo modelo principal (padrão)</option>';
+
     for (const m of models) {
-      const opt = document.createElement('option');
-      opt.value = m.name;
       const gb = m.size ? ` · ${(m.size / 1e9).toFixed(1)} GB` : '';
-      opt.textContent = `${m.name}${gb}${m.loaded ? ' · carregado' : ' · requer reinicialização'}`;
-      modelSelect.appendChild(opt);
+      const status = m.loaded ? ' · carregado' : (routerMode ? ' · carrega ao usar' : ' · requer reinicialização');
+
+      const mainOpt = document.createElement('option');
+      mainOpt.value = m.name;
+      mainOpt.textContent = `${m.name}${gb}${status}`;
+      modelSelect.appendChild(mainOpt);
+
+      const affectionOpt = document.createElement('option');
+      affectionOpt.value = m.name;
+      affectionOpt.textContent = `${m.name}${gb}`;
+      affectionSelect.appendChild(affectionOpt);
     }
 
     return models.map(m => m.name);
   } catch {
     modelSelect.innerHTML = '<option value="">— Erro ao carregar modelos —</option>';
+    affectionSelect.innerHTML = '<option value="">Mesmo modelo principal (padrão)</option>';
     return [];
   }
 }
 
-function ensureModelOption(modelName) {
+function ensureModelOption(modelName, selectId = 'model') {
   if (!modelName) return;
-  const modelSelect = document.getElementById('model');
+  const modelSelect = document.getElementById(selectId);
+  if (!modelSelect) return;
   const exists = Array.from(modelSelect.options).some(o => o.value === modelName);
   if (!exists) {
     const opt = document.createElement('option');
@@ -90,7 +106,9 @@ async function loadConfig() {
 
 function fillForm(config) {
   ensureModelOption(config.model);
+  ensureModelOption(config.affection_model, 'affection_model');
   document.getElementById('model').value          = config.model          || '';
+  document.getElementById('affection_model').value = config.affection_model || '';
   // think_mode ausente (presets antigos / payload legado com boolean think):
   // think=true equivale a 'always'; sem nada, 'off'.
   document.getElementById('think_mode').value     = config.think_mode || (config.think ? 'always' : 'off');
@@ -156,6 +174,7 @@ async function handleSubmit(e) {
 
   const config = {
     model:            document.getElementById('model').value.trim(),
+    affection_model:  document.getElementById('affection_model').value || null,
     temperature:      parseFloat(document.getElementById('temperature').value)    || null,
     top_p:            parseFloat(document.getElementById('top_p').value)          || null,
     top_k:            parseInt(document.getElementById('top_k').value)            || null,

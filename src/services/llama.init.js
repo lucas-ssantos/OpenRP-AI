@@ -1,10 +1,9 @@
-import os from "os";
 import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { appConfig } from "../config.js";
 import { getGenerationConfig } from "./database/queries.js";
-import { resolveModelFile } from "./llama.models.js";
+import { listLocalModels, resolveModelFile, writeRouterPreset } from "./llama.models.js";
 import { registerLlamaServerStop } from "../core/shutdown.js";
 
 const STARTUP_TIMEOUT_MS = 600_000;
@@ -233,20 +232,31 @@ export async function initLlamaServer({
     const config = getGenerationConfig();
     const routerMode = !modelOverride;
 
-    // O modo normal usa o Gemma como padrão.
-    // Um modelOverride explícito mantém o modo de modelo único,
-    // usado por operações como benchmarks.
-    const model = routerMode
-        ? "gemma4-12b"
-        : (modelOverride || config?.model || appConfig.defaults.model);
+    // O modo normal usa o modelo principal escolhido em /settings. Todos os
+    // GGUFs de ~/.ai-models entram no preset do router; um modelOverride
+    // explícito mantém o modo de modelo único, usado por benchmarks.
+    let model;
+    let presetPath = null;
+    if (routerMode) {
+        const models = listLocalModels();
+        if (!models.length) {
+            throw new Error(
+                `Nenhum modelo .gguf encontrado em ${process.env.AI_MODELS_DIR || "~/.ai-models"}.`
+            );
+        }
+
+        const candidates = [config?.model, appConfig.llama.model, appConfig.defaults.model]
+            .filter(Boolean);
+        model = candidates.find((name) => models.some((item) => item.name === name))
+            || models[0].name;
+
+        presetPath = writeRouterPreset(models, { defaultModel: model });
+    } else {
+        model = modelOverride || config?.model || appConfig.defaults.model;
+    }
 
     const modelPath = routerMode ? null : resolveModelFile(model);
     const ctxSize = contextOverride || config?.context_size || appConfig.llama.contextSize;
-
-    const modelsDir = path.resolve(
-        process.env.AI_MODELS_DIR || path.join(os.homedir(), ".ai-models")
-    );
-    const presetPath = path.join(modelsDir, "models.ini");
 
     const logsDir = path.resolve(process.cwd(), "logs");
     fs.mkdirSync(logsDir, { recursive: true });
@@ -273,7 +283,7 @@ export async function initLlamaServer({
 
     console.log(
         routerMode
-            ? `[llama] Iniciando llama-server em modo router (padrão: ${model})...`
+            ? `[llama] Iniciando llama-server em modo router (padrão: ${model}; preset: ${presetPath})...`
             : `[llama] Iniciando llama-server para "${model}" (${modelPath})...`
     );
 

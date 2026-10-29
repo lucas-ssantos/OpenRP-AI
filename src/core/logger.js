@@ -115,6 +115,7 @@ export function logConversationTurn({
     filename = null,
     force = false,
     label = null,
+    draftRawOutput = null,
 }) {
     if (!force && !isDevMode()) return;
 
@@ -128,6 +129,7 @@ export function logConversationTurn({
 
         const entry = buildLogEntry({
             character, model, messages,
+            draftRawOutput,
             rawResponse, filteredResponse, thinking, thinkingTrigger,
             contextTokens, contextSize,
             prepMs, generationMs,
@@ -193,7 +195,7 @@ function formatThinking({ thinking, rawResponse, thinkingTrigger }) {
     return thinkingTrigger ? `não (ativado: ${thinkingTrigger}, sem raciocínio retornado)` : "não";
 }
 
-function buildLogEntry({ character, model, messages, rawResponse, filteredResponse, thinking, thinkingTrigger, contextTokens, contextSize, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage, label }) {
+function buildLogEntry({ character, model, messages, draftRawOutput, rawResponse, filteredResponse, thinking, thinkingTrigger, contextTokens, contextSize, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage, label }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -340,7 +342,13 @@ function buildLogEntry({ character, model, messages, rawResponse, filteredRespon
         lines.push(thinking);
     }
 
-    // ── Resposta do modelo ────────────────────────────────────────────────────
+    // ── Rascunho bruto do modelo de afeto ────────────────────────────────────
+    if (draftRawOutput != null) {
+        lines.push(section("RAW OUTPUT DO MODELO DE AFETO — RASCUNHO"));
+        lines.push(draftRawOutput || "(sem resposta)");
+    }
+
+    // ── Resposta final do modelo ──────────────────────────────────────────────
     lines.push(section("RESPOSTA BRUTA DO MODELO"));
     lines.push(rawResponse || "(sem resposta)");
 

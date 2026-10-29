@@ -1,29 +1,16 @@
 import { appConfig } from "../config.js";
-
-/*
-export function assertLoadedModel(model) {
-    if (model !== appConfig.llama.model) {
-        throw new Error(
-            `O modelo "${model}" não está carregado. O llama-server está executando ` +
-            `"${appConfig.llama.model}"; altere o modelo global e reinicie o OpenRP AI.`
-        );
-    }
-}
-*/
-
-const ROUTER_MODEL_IDS = new Set([
-    "gemma4-12b",
-    "stheno-intimate",
-]);
+import { isLocalModel } from "./llama.models.js";
 
 export function assertLoadedModel(model) {
     if (appConfig.llama.routerMode === true) {
-        if (ROUTER_MODEL_IDS.has(model)) {
+        // No modo router todos os GGUFs de ~/.ai-models são registrados no
+        // preset gerado na inicialização e podem ser carregados sob demanda.
+        if (isLocalModel(model)) {
             return;
         }
 
         throw new Error(
-            `Modelo "${model}" não registrado na configuração do router.`
+            `Modelo "${model}" não encontrado em ~/.ai-models.`
         );
     }
 

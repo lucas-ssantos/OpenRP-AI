@@ -68,9 +68,14 @@ export function initConvModelModal() {
       inheritedModel = cfgData.ok ? cfgData.inherited_model : null;
       contextSize    = cfgData.ok ? cfgData.context_size : null;
       models         = modelsData.ok ? (modelsData.models || []) : [];
+      const routerMode = modelsData.ok && modelsData.router_mode === true;
 
+      const available = routerMode ? models : models.filter(m => m.loaded);
       const opts = [`<option value="" ${!current ? 'selected' : ''}>Padrão (${esc(inheritedModel) || 'global / personagem'})</option>`]
-        .concat(models.filter(m => m.loaded).map(m => `<option value="${esc(m.name)}" ${m.name === current ? 'selected' : ''}>${esc(m.name)} (carregado)</option>`));
+        .concat(available.map(m => {
+          const suffix = m.loaded ? ' (carregado)' : (routerMode ? ' (carrega ao usar)' : '');
+          return `<option value="${esc(m.name)}" ${m.name === current ? 'selected' : ''}>${esc(m.name)}${suffix}</option>`;
+        }));
       select.innerHTML = opts.join('');
       updateContextWarning();
     } catch {
