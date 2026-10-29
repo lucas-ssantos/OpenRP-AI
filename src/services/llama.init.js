@@ -3,7 +3,12 @@ import fs from "fs";
 import path from "path";
 import { appConfig } from "../config.js";
 import { getGenerationConfig } from "./database/queries.js";
-import { listLocalModels, resolveModelFile, writeRouterPreset } from "./llama.models.js";
+import {
+    getModelDirectory,
+    listLocalModels,
+    resolveModelFile,
+    writeRouterPreset,
+} from "./llama.models.js";
 import { registerLlamaServerStop } from "../core/shutdown.js";
 
 const STARTUP_TIMEOUT_MS = 600_000;
@@ -223,6 +228,29 @@ export async function initLlamaServer({ model: modelOverride = null, contextSize
 */
 
 
+// O boot não pode depender do modelo principal continuar instalado. Se ele
+// sumiu de ~/.ai-models, o router sobe com o modelo padrão (gemma4:12b) e, na
+// falta deste, com o primeiro GGUF disponível.
+function chooseRouterModel(models, configuredModel) {
+    const installed = new Set(models.map((item) => item.name));
+    const fallback = appConfig.defaults.model;
+
+    // Ordem: escolhido em /settings → padrão do app → modelo anterior da sessão.
+    const model = [configuredModel, fallback, appConfig.llama.model]
+        .filter(Boolean)
+        .find((name) => installed.has(name))
+        || models[0].name;
+
+    if (configuredModel && configuredModel !== model) {
+        console.warn(
+            `[llama] Modelo principal "${configuredModel}" não encontrado em ` +
+            `${getModelDirectory()}; usando "${model}" como fallback.`
+        );
+    }
+
+    return model;
+}
+
 export async function initLlamaServer({
     model: modelOverride = null,
     contextSize: contextOverride = null
@@ -245,11 +273,7 @@ export async function initLlamaServer({
             );
         }
 
-        const candidates = [config?.model, appConfig.llama.model, appConfig.defaults.model]
-            .filter(Boolean);
-        model = candidates.find((name) => models.some((item) => item.name === name))
-            || models[0].name;
-
+        model = chooseRouterModel(models, config?.model);
         presetPath = writeRouterPreset(models, { defaultModel: model });
     } else {
         model = modelOverride || config?.model || appConfig.defaults.model;

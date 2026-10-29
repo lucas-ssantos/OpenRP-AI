@@ -77,7 +77,7 @@ npm install
 npm start
 ```
 
-O `llama-server` é iniciado automaticamente. O modelo deve existir em `~/.ai-models` e o comando deve ser executável.
+O `llama-server` é iniciado automaticamente. O modelo deve existir em `~/.ai-models` e o comando deve ser executável. Se o modelo principal configurado não for encontrado, o app inicia com o modelo padrão `gemma4:12b` (ou, na falta dele, com o primeiro GGUF disponível) e avisa no log, em vez de falhar.
 Se usar um build local do llama.cpp em `bin/` e `lib/`, configure o caminho absoluto do executável em `LLAMA_SERVER_BIN`; o app inclui automaticamente a pasta `lib/` do build na busca de bibliotecas compartilhadas.
 
 Configurações opcionais no `.env`:
