@@ -144,7 +144,7 @@ npm run launcher
 
 A bandeja abre e já inicia o servidor automaticamente. O menu oferece:
 
-- **Servidor** — iniciar/parar o Node + llama-server. O indicador (🟢/⚪) mostra o estado real, checado a cada poucos segundos — reflete a situação de verdade mesmo que o servidor tenha sido iniciado por fora (ex: `npm start` manual em outro terminal), e "Parar" também funciona nesse caso.
+- **Servidor** — iniciar/parar/reiniciar o Node + llama-server. O indicador (🟢/⚪) mostra o estado real, checado a cada poucos segundos — reflete a situação de verdade mesmo que o servidor tenha sido iniciado por fora (ex: `npm start` ou `launcher:cli` em outro terminal), e "Parar"/"Reiniciar" também funcionam nesse caso.
 - **Tailscale** — conectar/desconectar da tailnet (`tailscale up`/`down`).
 - **Abrir no navegador** e **Sair** (encerra servidor e Tailscale).
 
@@ -164,6 +164,46 @@ sudo tailscale set --operator=$USER
 
 Isso autoriza seu usuário a conectar/desconectar (`up`/`down`) sem precisar de senha. Não afeta o serviço `tailscaled` em si — ele continua rodando em segundo plano, gerenciado pelo systemd, independente disso; só muda quem pode controlar a conexão.
 
+### Launcher por CLI (sem bandeja)
+
+Para controlar o servidor pelo terminal, use o `launcher:cli`. O alvo `server` controla o OpenRP AI e o llama-server juntos (o app inicia e encerra o llama-server).
+
+**Iniciar o servidor:**
+
+```bash
+npm run launcher:cli -- start server
+```
+
+**Reiniciar o servidor:**
+
+```bash
+npm run launcher:cli -- restart server
+```
+
+**Parar o servidor:**
+
+```bash
+npm run launcher:cli -- stop server
+```
+
+**Ver o estado do servidor, llama-server e Tailscale:**
+
+```bash
+npm run launcher:cli -- status
+```
+
+**Controlar o Tailscale:**
+
+```bash
+npm run launcher:cli -- start tailscale
+npm run launcher:cli -- stop tailscale
+npm run launcher:cli -- restart tailscale
+```
+
+`start server` e `restart server` deixam o terminal aberto exibindo os logs — use `Ctrl+C` para encerrar. `stop server` também desconecta o Tailscale; `restart server` mantém a conexão.
+
+Também é possível iniciar direto com `npm start`, sem passar pelo launcher. Nesse caso, a bandeja (`npm run launcher`) detecta que o servidor já está rodando e não cria um segundo processo.
+
 ## Uso e desenvolvimento
 
 - Rodar em modo de desenvolvimento (backend + watcher):
@@ -178,6 +218,7 @@ npm run dev
 - `npm run dev` — inicia em modo watch
 - `npm test` — roda os testes (node:test, pasta `tests/`)
 - `npm run launcher` — abre o launcher (ícone na bandeja, ver seção acima)
+- `npm run launcher:cli -- <comando>` — controla servidor/llama-server e Tailscale pelo terminal (ver seção acima)
 - `npm run launcher:install` / `npm run launcher:uninstall` — cria/remove o atalho no menu de aplicativos
 
 ## Ajuda / Troubleshooting

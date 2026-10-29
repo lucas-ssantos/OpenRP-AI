@@ -10,7 +10,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const entryPoint = path.join(projectRoot, "src", "index.js");
 
-const SHUTDOWN_TIMEOUT_MS = 8000;
+// O shutdown graceful do app pode levar até ~15s (5s para o servidor web +
+// 10s para o llama-server); só força SIGKILL se passar disso.
+const SHUTDOWN_TIMEOUT_MS = 20000;
 const KILL_POLL_INTERVAL_MS = 300;
 
 let child = null;
@@ -72,6 +74,15 @@ export function stopServer()
         if (isRunning())
         {
             const proc = child;
+
+            // Pode ter encerrado entre a checagem de isRunning() e a
+            // inscrição no evento abaixo; sem isso o promise nunca resolveria.
+            if (proc.exitCode !== null || proc.signalCode !== null)
+            {
+                resolve();
+                return;
+            }
+
             const forceKillTimer = setTimeout(() => {
                 if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
             }, SHUTDOWN_TIMEOUT_MS);

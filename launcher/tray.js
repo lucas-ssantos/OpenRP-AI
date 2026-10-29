@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { startServer, stopServer, isRunning } from "./serverProcess.js";
 import { startTailscale, stopTailscaleConnection, isTailscaleRunning } from "./tailscaleProcess.js";
 import { notify } from "./notify.js";
+import { acquireSingleInstanceLock } from "./singleInstance.js";
 import { appConfig } from "../src/config.js";
 
 // No Linux, o nome do processo (ps/htop) reflete o argv original — sem isso
@@ -232,9 +233,16 @@ async function refreshMenu()
     }
 }
 
-function handleStart()
+async function handleStart()
 {
-    if (isRunning()) return;
+    // Pode já haver um servidor iniciado pelo CLI ou por `npm start` — nesse
+    // caso não inicia outro processo (que falharia ao disputar a porta).
+    if (isRunning() || await isServerReachable())
+    {
+        refreshMenu();
+        return;
+    }
+
     console.log("Iniciando OpenRP AI...");
     notify("OpenRP AI", `Iniciando servidor em http://localhost:${appConfig.port}...`);
     // Iniciar o servidor também inicia o llama-server (ver src/index.js).
@@ -340,9 +348,20 @@ process.on("SIGTERM", () => handleExit());
 
 async function main()
 {
+    if (!acquireSingleInstanceLock())
+    {
+        console.log("OpenRP AI já está em execução na bandeja — abortando esta instância.");
+        notify("OpenRP AI", "A bandeja já está em execução.");
+        process.exit(0);
+    }
+
+    const [reachable, llamaReachable] = await Promise.all([
+        isServerReachable(),
+        isLlamaReachable(),
+    ]);
     const initialState = {
-        reachable: false,
-        llamaReachable: false,
+        reachable,
+        llamaReachable,
         tailscaleActive: isTailscaleRunning(),
     };
     systray = await createTray(initialState);
@@ -350,7 +369,7 @@ async function main()
     previousNotifyState = initialState;
 
     console.log("Tray iniciada.");
-    handleStart();
+    if (!initialState.reachable) await handleStart();
     refreshTimer = setInterval(refreshMenu, REFRESH_INTERVAL_MS);
 }
 

@@ -152,6 +152,35 @@ async function run()
     console.log(`Tailscale ${active ? "ativo" : "desconectado"}.`);
 }
 
+// O CLI fica em primeiro plano enquanto o servidor roda. Encaminha o
+// encerramento para que o graceful shutdown do app (banco + llama-server)
+// aconteça também quando o processo recebe SIGTERM de fora do terminal.
+let shuttingDown = false;
+
+async function handleShutdownSignal(signal)
+{
+    if (shuttingDown)
+    {
+        process.exit(1);
+        return;
+    }
+
+    shuttingDown = true;
+
+    // Só encerra o que este CLI iniciou; não derruba um servidor que estava
+    // rodando antes (ex: iniciado pela bandeja) ao cancelar um `status`.
+    if (isRunning())
+    {
+        console.log(`\nRecebido ${signal}; encerrando OpenRP AI...`);
+        await stopServer();
+    }
+
+    process.exit(0);
+}
+
+process.on("SIGINT", () => handleShutdownSignal("SIGINT"));
+process.on("SIGTERM", () => handleShutdownSignal("SIGTERM"));
+
 run().catch((error) => {
     console.error("Falha no comando do launcher:", error.message || error);
     process.exitCode = 1;
