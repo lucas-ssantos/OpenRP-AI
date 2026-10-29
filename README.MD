@@ -18,7 +18,7 @@ Principais características:
 
 - **Configurações de geração** — controle fino de parâmetros como temperature, top-p, top-k, min-p, repeat penalty, tamanho do contexto e número de mensagens de histórico enviadas ao modelo. Presets para máquinas fracas, médias e potentes, e troca de modelo por conversa.
 
-- **Integração com llama.cpp** — inicia e encerra `llama-server` junto com o app, usa a API Chat Completions compatível com OpenAI e transmite tokens em streaming. Os arquivos GGUF são carregados diretamente de `~/.ai-models`, sem depender do Ollama. Em modo router, todos os modelos da pasta ficam disponíveis e são carregados sob demanda; o modelo principal e o modelo de cenas íntimas (`affection override`) são escolhidos em Configurações. Apenas o contexto exige reiniciar o app.
+- **Integração com llama.cpp** — inicia e encerra `llama-server` junto com o app, usa a API Chat Completions compatível com OpenAI e transmite tokens em streaming. Os arquivos GGUF são carregados diretamente de `~/.ai-models`, sem depender do Ollama. Em modo router, todos os modelos da pasta ficam disponíveis e são carregados sob demanda; o modelo principal e o modelo de cenas íntimas (`affection override`) são escolhidos em Configurações, com um toggle para o principal revisar (ou não) o rascunho do modelo de afeto (desligado por padrão). Apenas o contexto exige reiniciar o app.
 
 - **100% offline e local** — nenhum dado sai da sua máquina. Sem login, sem nuvem, sem assinatura. Opcionalmente, acesse de outros dispositivos via Tailscale com autenticação básica.
 

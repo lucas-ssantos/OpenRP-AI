@@ -23,6 +23,8 @@ const VALIDATORS = {
     model:              (v) => typeof v === "string" && v.trim().length > 0,
     // null/vazio = usa o mesmo modelo principal (bloco INTIMATE SCENE OVERRIDE).
     affection_model:    (v) => v === null || (typeof v === "string" && v.trim().length > 0),
+    // true = modelo principal revisa o rascunho do modelo de afeto.
+    affection_review:   (v) => typeof v === "boolean",
     temperature:        (v) => isNum(v) && v >= 0 && v <= 2,
     top_p:              (v) => isNum(v) && v > 0 && v <= 1,
     top_k:              (v) => isInt(v) && v >= 0,
@@ -82,6 +84,8 @@ export function resolveConfig(conversationId = null) {
     if (!VALIDATORS.affection_model(config.affection_model) || !isLocalModel(config.affection_model)) {
         config.affection_model = config.model;
     }
+    // Configs antigas/presets sem o campo mantêm a revisão desligada.
+    if (typeof config.affection_review !== "boolean") config.affection_review = false;
 
     return config;
 }
@@ -342,11 +346,13 @@ export async function streamLlama(conversationId, gen, messages, config, onDone,
     let draftRawOutput = null;
     try {
         // Supervisor de cena íntima: o modelo de afeto escreve o rascunho e o
-        // modelo principal revisa. Só faz sentido no router e com modelos
-        // diferentes; com o mesmo modelo, uma única geração já basta.
+        // modelo principal revisa. Só faz sentido no router, com modelos
+        // diferentes e com a revisão ligada; caso contrário o modelo de afeto
+        // (ou o principal, sem override) responde diretamente.
         if (
             appConfig.llama.routerMode &&
             hasIntimateSceneBlock &&
+            config.affection_review &&
             affectionModel &&
             affectionModel !== mainModel
         ) {

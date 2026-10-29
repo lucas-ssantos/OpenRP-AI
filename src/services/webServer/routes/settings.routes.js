@@ -90,6 +90,12 @@ router.post("/api/config", (req, res) => {
                 message: `O modelo de afeto "${config.affection_model}" não está em ~/.ai-models.`,
             });
         }
+        if (config.affection_review !== undefined && typeof config.affection_review !== "boolean") {
+            return res.status(400).json({
+                ok: false,
+                message: "affection_review deve ser booleano.",
+            });
+        }
 
         const previous = getGenerationConfig();
         setGenerationConfig(config);

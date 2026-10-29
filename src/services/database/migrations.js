@@ -245,6 +245,7 @@ export async function migrate() {
       id TEXT PRIMARY KEY DEFAULT 'global',
       model TEXT NOT NULL DEFAULT 'gemma4:12b',
       affection_model TEXT,
+      affection_review INTEGER DEFAULT 0,
       temperature REAL DEFAULT 0.85,
       top_p REAL DEFAULT 0.95,
       top_k INTEGER DEFAULT 40,
@@ -270,6 +271,11 @@ export async function migrate() {
   // Migration: modelo usado quando a cena ativa o bloco INTIMATE SCENE
   // OVERRIDE ("affection override"). NULL = usa o mesmo modelo principal.
   try { db.run(`ALTER TABLE generation_config ADD COLUMN affection_model TEXT`); } catch {}
+
+  // Migration: quando ligado, o modelo principal revisa o rascunho do modelo de
+  // afeto; desligado, o modelo de afeto responde diretamente. Default 0: o
+  // modelo de afeto roda sozinho, sem revisão.
+  try { db.run(`ALTER TABLE generation_config ADD COLUMN affection_review INTEGER DEFAULT 0`); } catch {}
 
   // Migration para DBs existentes sem a coluna memory_interval
   try { db.run(`ALTER TABLE generation_config ADD COLUMN memory_interval INTEGER DEFAULT 5`); } catch {}
@@ -303,12 +309,12 @@ export async function migrate() {
   const stopCsv = Array.isArray(d.stop) ? d.stop.join(", ") : (d.stop || "");
   db.run(`
     INSERT OR IGNORE INTO generation_config
-      (id, model, affection_model, temperature, top_p, top_k, min_p,
+      (id, model, affection_model, affection_review, temperature, top_p, top_k, min_p,
        repeat_penalty, repeat_last_n, max_tokens,
        context_size, stream, seed, stop, num_ctx_messages, min_tokens, memory_interval, persona_interval, think, think_mode)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
-    'global', d.model, d.affection_model ?? null, d.temperature, d.top_p, d.top_k, d.min_p,
+    'global', d.model, d.affection_model ?? null, d.affection_review === true ? 1 : 0, d.temperature, d.top_p, d.top_k, d.min_p,
     d.repeat_penalty, d.repeat_last_n, d.max_tokens,
     d.context_size, d.stream ? 1 : 0, d.seed,
     stopCsv, d.num_ctx_messages, d.min_tokens, d.memory_interval ?? 5, d.persona_interval ?? 10,

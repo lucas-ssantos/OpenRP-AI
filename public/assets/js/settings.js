@@ -104,11 +104,27 @@ async function loadConfig() {
   } catch { /* silent */ }
 }
 
+// O toggle só tem efeito quando há um modelo de afeto distinto do principal.
+function syncAffectionReviewState() {
+  const main = document.getElementById('model').value;
+  const affection = document.getElementById('affection_model').value;
+  const review = document.getElementById('affection_review');
+  const hint = document.getElementById('affection_review_hint');
+  const applies = !!affection && affection !== main;
+
+  review.disabled = !applies;
+  hint.textContent = applies
+    ? 'Padrão: desligado — o modelo de afeto responde sozinho. Ligado, ele gera um rascunho e o principal revisa.'
+    : 'Selecione um modelo de afeto diferente do principal para usar esta opção.';
+}
+
 function fillForm(config) {
   ensureModelOption(config.model);
   ensureModelOption(config.affection_model, 'affection_model');
   document.getElementById('model').value          = config.model          || '';
   document.getElementById('affection_model').value = config.affection_model || '';
+  // Campo ausente (presets antigos) = revisão desligada, o padrão atual.
+  document.getElementById('affection_review').checked = config.affection_review === true;
   // think_mode ausente (presets antigos / payload legado com boolean think):
   // think=true equivale a 'always'; sem nada, 'off'.
   document.getElementById('think_mode').value     = config.think_mode || (config.think ? 'always' : 'off');
@@ -132,6 +148,7 @@ function fillForm(config) {
     document.getElementById('stop').value =
       Array.isArray(config.stop) ? config.stop.join(', ') : config.stop;
   }
+  syncAffectionReviewState();
 }
 
 function loadPreset(key) {
@@ -175,6 +192,7 @@ async function handleSubmit(e) {
   const config = {
     model:            document.getElementById('model').value.trim(),
     affection_model:  document.getElementById('affection_model').value || null,
+    affection_review: document.getElementById('affection_review').checked,
     temperature:      parseFloat(document.getElementById('temperature').value)    || null,
     top_p:            parseFloat(document.getElementById('top_p').value)          || null,
     top_k:            parseInt(document.getElementById('top_k').value)            || null,
@@ -233,6 +251,8 @@ window.addEventListener('load', async () => {
   });
 
   form.addEventListener('submit', handleSubmit);
+  document.getElementById('model').addEventListener('change', syncAffectionReviewState);
+  document.getElementById('affection_model').addEventListener('change', syncAffectionReviewState);
 
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(
     (el) => new bootstrap.Tooltip(el)
