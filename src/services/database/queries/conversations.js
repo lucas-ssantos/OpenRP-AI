@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { localDatetime } from "../../../utils/datetime.js";
 import { deletePersonaFactsForConversation } from "./personaFacts.js";
 
-const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, auto_messages_enabled, auto_message_next_at, auto_message_ignored_count, omit_history, created_at, updated_at`;
+const CONV_COLUMNS = `id, character_id, user_persona, title, scenario, first_message, last_memory_position, last_persona_position, auto_messages_enabled, auto_message_next_at, auto_message_ignored_count, omit_history, history_start_position, created_at, updated_at`;
 
 function mapConversationRow(row) {
   return {
@@ -19,8 +19,9 @@ function mapConversationRow(row) {
     auto_message_next_at: row[9] ?? null,
     auto_message_ignored_count: Number(row[10] ?? 0),
     omit_history: row[11] === 1,
-    created_at: row[12],
-    updated_at: row[13],
+    history_start_position: row[12] ?? null,
+    created_at: row[13],
+    updated_at: row[14],
   };
 }
 
@@ -105,13 +106,31 @@ export function setAutoMessages(conversationId, enabled, nextAt = null, ignoredC
   return changed;
 }
 
-// Liga/desliga a omissão do histórico no prompt desta conversa.
+// Liga/desliga o "novo histórico" desta conversa. Ao ligar, grava um marco zero
+// na posição da última mensagem existente: tudo até ali fica fora do prompt e
+// as mensagens seguintes formam um novo histórico. Ao desligar, o marco é
+// removido e o histórico completo volta a ser enviado.
 export function setOmitHistory(conversationId, enabled) {
   const db = getDB();
-  db.run(
-    `UPDATE conversations SET omit_history = ?, updated_at = ? WHERE id = ?`,
-    [enabled ? 1 : 0, localDatetime(), conversationId]
-  );
+  if (enabled) {
+    db.run(
+      `UPDATE conversations
+       SET omit_history = 1,
+           history_start_position = COALESCE(
+             (SELECT MAX(position) FROM messages WHERE conversation_id = ?), -1
+           ),
+           updated_at = ?
+       WHERE id = ?`,
+      [conversationId, localDatetime(), conversationId]
+    );
+  } else {
+    db.run(
+      `UPDATE conversations
+       SET omit_history = 0, history_start_position = NULL, updated_at = ?
+       WHERE id = ?`,
+      [localDatetime(), conversationId]
+    );
+  }
   const changed = db.getRowsModified() > 0;
   if (changed) saveDB();
   return changed;

@@ -562,7 +562,7 @@ body.immersive .input-area {
   font-weight: 500;
 }
 
-/* ── Aviso de histórico omitido (acima da caixa de envio) ── */
+/* ── Aviso de novo histórico (acima da caixa de envio) ── */
 .omit-history-banner {
   display: none;
   align-items: center;

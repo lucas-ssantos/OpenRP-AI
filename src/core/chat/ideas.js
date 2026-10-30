@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
     getCharacter, getPersona, getConversation, getLastNMessages,
 } from "../../services/database/queries.js";
-import { resolveConfig } from "./helpers.js";
+import { resolveConfig, promptHistoryStart } from "./helpers.js";
 import { appConfig } from "../../config.js";
 import { llamaChatBody, llamaChatEndpoint, extractMessageContent } from "../../services/llama.client.js";
 
@@ -92,7 +92,11 @@ router.post("/conversations/:id/ideas", async (req, res) => {
 
         const personaName   = persona?.name || "User";
         const characterName = character.name;
-        const recent  = getLastNMessages(req.params.id, Math.min(config.num_ctx_messages || 20, 12));
+        const recent  = getLastNMessages(
+            req.params.id,
+            Math.min(config.num_ctx_messages || 20, 12),
+            promptHistoryStart(conv)
+        );
         const excerpt = recent
             .filter(m => m.role !== "system")
             .map(m => `${m.role === "user" ? personaName : characterName}: ${m.content}`)

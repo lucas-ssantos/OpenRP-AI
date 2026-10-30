@@ -6,7 +6,7 @@ import {
     getAllLorebooks, getMemories, addAffectionPoints, getDailyMoodForCharacter,
 } from "../../services/database/queries.js";
 import { buildPromptMessages } from "../promptBuilder.js";
-import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamLlama, trimToLastSentence } from "./helpers.js";
+import { resolveConfig, dynamicMaxTokens, withThinkingBudget, resolveThinkingTrigger, startSSE, handleSSEError, streamLlama, trimToLastSentence, promptHistoryStart } from "./helpers.js";
 import { getEffectiveAffection, computeAffectionGain } from "../affection.js";
 import { getMemoriesForPrompt, processMemoryBacklogIfDue, getPersonaFactsForPrompt, processPersonaBacklogIfDue } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
@@ -73,7 +73,11 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const persona    = getPersona();
         const config     = resolveConfig(conversationId);
 
-        const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+        const recentMsgs   = getLastNMessages(
+            conversationId,
+            config.num_ctx_messages || 20,
+            promptHistoryStart(conv)
+        );
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: content.trim(), recentMessages: recentMsgs });
         const personaFacts = getPersonaFactsForPrompt(conv.character_id);
         const lorebooks    = getAllLorebooks(conv.character_id);
@@ -104,7 +108,6 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
-            omitHistory: conv.omit_history === true,
             userMessage: content.trim(),
             intimateTriggerMessage: content.trim(),
             memories, personaFacts, lorebooks, affection, dailyMood,
@@ -206,18 +209,39 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         if (!lastMsg) return res.status(400).json({ ok: false, message: "Nenhuma mensagem para regenerar." });
 
         const isContinue = lastMsg.role === "user";
+        const historyStart = promptHistoryStart(conv);
 
         let insertPos = null; // null → MAX(position)+1 no insert
         if (!isContinue) {
+            // Se a resposta sendo regenerada é anterior ao marco zero, anexa a
+            // nova ao fim em vez de reutilizar uma posição que ficaria oculta no
+            // novo histórico.
+            const visibleForHistory = historyStart === null || lastMsg.position > historyStart;
             deleteMessage(lastMsg.id);
-            insertPos = lastMsg.position;
+            insertPos = visibleForHistory ? lastMsg.position : null;
         }
 
         const persona    = getPersona();
         const config     = resolveConfig(conversationId);
 
-        const recentMsgs   = getLastNMessages(conversationId, config.num_ctx_messages || 20);
-        const lastUser     = isContinue ? lastMsg : [...recentMsgs].reverse().find(m => m.role === "user");
+        const recentMsgs   = getLastNMessages(
+            conversationId,
+            config.num_ctx_messages || 20,
+            historyStart
+        );
+        let lastUser       = isContinue ? lastMsg : [...recentMsgs].reverse().find(m => m.role === "user");
+
+        // Regenerar uma mensagem anterior ao marco zero: o histórico visível pode
+        // estar vazio, mas ainda precisamos do turno do usuário como prompt atual.
+        // Nesse caso ele entra sozinho, sem ressuscitar o restante do histórico.
+        if (!lastUser && historyStart !== null) {
+            const fullRecent = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+            lastUser = [...fullRecent].reverse().find(m => m.role === "user") ?? null;
+        }
+        const promptUserMessage = lastUser && historyStart !== null && !(lastUser.position > historyStart)
+            ? lastUser.content
+            : null;
+
         const memories     = getMemoriesForPrompt(conversationId, { userMessage: lastUser?.content ?? '', recentMessages: recentMsgs });
         const personaFacts = getPersonaFactsForPrompt(conv.character_id);
         const lorebooks    = getAllLorebooks(conv.character_id);
@@ -246,11 +270,7 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
-            omitHistory: conv.omit_history === true,
-            // Com o histórico omitido não há turno anterior no prompt: a última
-            // mensagem do usuário precisa entrar como turno atual, senão o modelo
-            // receberia só o system prompt (inclusive no "continuar").
-            userMessage: conv.omit_history === true ? (lastUser?.content ?? null) : null,
+            userMessage: promptUserMessage,
             intimateTriggerMessage: lastUser?.content ?? '',
             memories, personaFacts, lorebooks, dailyMood,
             affection,

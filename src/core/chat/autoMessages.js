@@ -8,7 +8,7 @@ import { getEffectiveAffection } from "../affection.js";
 import { getMemoriesForPrompt, getPersonaFactsForPrompt } from "../memory/index.js";
 import { logConversationTurn } from "../logger.js";
 import {
-    dynamicMaxTokens, resolveConfig, resolveThinkingTrigger, streamLlama, trimToLastSentence,
+    dynamicMaxTokens, resolveConfig, resolveThinkingTrigger, streamLlama, trimToLastSentence, promptHistoryStart,
 } from "./helpers.js";
 import { beginGeneration, isGenerating } from "./generationManager.js";
 
@@ -106,7 +106,11 @@ async function generateAutomaticMessage(conversationId) {
 
     const persona = getPersona();
     const config = resolveConfig(conversationId);
-    const historyMessages = getLastNMessages(conversationId, config.num_ctx_messages || 20);
+    const historyMessages = getLastNMessages(
+        conversationId,
+        config.num_ctx_messages || 20,
+        promptHistoryStart(conversation)
+    );
     const memories = getMemoriesForPrompt(conversationId, {
         userMessage: "",
         recentMessages: historyMessages,
@@ -126,7 +130,6 @@ async function generateAutomaticMessage(conversationId) {
         persona,
         conversation,
         historyMessages,
-        omitHistory: conversation.omit_history === true,
         memories,
         personaFacts,
         lorebooks,

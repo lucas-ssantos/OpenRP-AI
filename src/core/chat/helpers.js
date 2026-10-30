@@ -90,6 +90,13 @@ export function resolveConfig(conversationId = null) {
     return config;
 }
 
+// Início da janela de histórico visível: null = histórico completo; com o
+// "novo histórico" ativo, só entram mensagens posteriores ao marco zero salvo.
+export function promptHistoryStart(conversation) {
+    if (!conversation?.omit_history) return null;
+    return conversation.history_start_position ?? -1;
+}
+
 function estimateTokens(text) {
     return Math.ceil(text.trim().split(/\s+/).length * 1.3);
 }

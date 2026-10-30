@@ -6,7 +6,7 @@ let backgroundGallery = [];
 let currentBackgroundUrl = null;
 let messagePollTimer = null;
 
-// Tarja acima da caixa de envio — visível enquanto o histórico estiver omitido.
+// Tarja acima da caixa de envio — visível enquanto o novo histórico estiver ativo.
 const omitHistoryBanner = document.getElementById('omit-history-banner');
 
 function updateOmitHistoryBanner(enabled) {

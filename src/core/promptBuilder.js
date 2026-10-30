@@ -353,7 +353,6 @@ function filterLorebooks(lorebooks, contextText) {
  * @param {object}   opts.persona          - persona row from DB (may be null)
  * @param {object}   opts.conversation     - conversation row from DB (may be null); provides scenario
  * @param {object[]} opts.historyMessages  - recent messages from DB (role !== 'system' are forwarded)
- * @param {boolean}  opts.omitHistory      - true → não envia o bloco [4] histórico; só system prompt + mensagem atual
  * @param {string}   opts.userMessage      - current user message; null for regenerate
  * @param {object[]} opts.memories         - memories already selected by the retrieval layer
  * @param {object[]} opts.personaFacts     - active persona facts (getPersonaFactsForPrompt); always injected
@@ -371,7 +370,6 @@ export function buildPromptMessages({
   persona,
   conversation = null,
   historyMessages = [],
-  omitHistory = false,
   userMessage = null,
   intimateTriggerMessage = null,
   memories = [],
@@ -395,7 +393,7 @@ export function buildPromptMessages({
   // actually see the thing that triggered it.
   const contextText = [
     userMessage ?? '',
-    ...(omitHistory ? [] : historyMessages.map(m => m.content)),
+    ...historyMessages.map(m => m.content),
   ].join(' ');
 
   // ── [0] Fixed behavioral instruction (own system message) ──────────────────
@@ -423,7 +421,7 @@ export function buildPromptMessages({
   // Proactive turns are not a fresh user prompt. When the trigger is automatic,
   // we strip the last live user input out of the visible history so the model does
   // not treat the old message as a new, still-open conversation beat.
-  const baseHistory = omitHistory ? [] : historyMessages.filter(m => m.role !== 'system');
+  const baseHistory = historyMessages.filter(m => m.role !== 'system');
   let visibleHistory = baseHistory;
   let lastUserTurn = null;
   if (proactiveMessage && !userMessage) {

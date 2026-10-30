@@ -80,13 +80,20 @@ export function rollbackConversation(conversationId, messageId) {
     [conversationId, position]
   );
   // Clampeia os cursores de extração (memórias e persona facts): mensagens
-  // reescritas após o rollback não podem ser consideradas "já processadas"
+  // reescritas após o rollback não podem ser consideradas "já processadas".
+  // O marco do novo histórico também não pode ficar à frente do ponto de
+  // rollback — senão as próximas mensagens cairiam antes dele e ficariam fora
+  // do prompt até a posição ultrapassar o marco antigo.
   db.run(
     `UPDATE conversations SET
        last_memory_position  = MIN(last_memory_position, ?),
-       last_persona_position = MIN(last_persona_position, ?)
+       last_persona_position = MIN(last_persona_position, ?),
+       history_start_position = CASE
+         WHEN history_start_position IS NOT NULL AND history_start_position > ? THEN ?
+         ELSE history_start_position
+       END
      WHERE id = ?`,
-    [position, position, conversationId]
+    [position, position, position, position, conversationId]
   );
   saveDB();
   return true;
@@ -98,7 +105,11 @@ export function resetConversation(conversationId) {
   db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
   db.run(`DELETE FROM memories WHERE conversation_id = ?`, [conversationId]);
   deletePersonaFactsForConversation(conversationId);
-  db.run(`UPDATE conversations SET last_memory_position = 0, last_persona_position = 0 WHERE id = ?`, [conversationId]);
+  db.run(`UPDATE conversations SET
+            last_memory_position = 0,
+            last_persona_position = 0,
+            history_start_position = CASE WHEN omit_history = 1 THEN -1 ELSE NULL END
+          WHERE id = ?`, [conversationId]);
   saveDB();
 }
 
@@ -116,13 +127,21 @@ export function getConversationMessages(conversationId) {
 // Últimas N mensagens não-system da conversa, mais antiga primeiro.
 // N é o total (user + assistant juntos) — a mesma definição de "janela de
 // contexto" usada pelo gatilho de memórias (trigger.js).
-export function getLastNMessages(conversationId, n = 20) {
+// afterPosition (opcional): só mensagens com position > marco — usado pelo
+// "novo histórico" para começar a janela depois do ponto de ativação.
+export function getLastNMessages(conversationId, n = 20, afterPosition = null) {
   const db = getDB();
+  const hasStart = Number.isInteger(afterPosition);
+  const params = [conversationId];
+  if (hasStart) params.push(afterPosition);
+  params.push(n);
   const result = db.exec(
     `SELECT id, conversation_id, role, content, position, automated, created_at
-     FROM messages WHERE conversation_id = ? AND role != 'system'
+     FROM messages
+     WHERE conversation_id = ? AND role != 'system'
+       ${hasStart ? "AND position > ?" : ""}
      ORDER BY position DESC LIMIT ?`,
-    [conversationId, n]
+    params
   );
   if (result.length === 0) return [];
   return result[0].values.map(mapRow).reverse();

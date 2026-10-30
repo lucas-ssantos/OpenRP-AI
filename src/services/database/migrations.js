@@ -135,6 +135,7 @@ export async function migrate() {
       auto_message_next_at TEXT,
       auto_message_ignored_count INTEGER NOT NULL DEFAULT 0,
       omit_history INTEGER NOT NULL DEFAULT 0,
+      history_start_position INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -152,10 +153,13 @@ export async function migrate() {
   try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_next_at TEXT`); } catch {}
   try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_ignored_count INTEGER NOT NULL DEFAULT 0`); } catch {}
 
-  // Migration: quando ligado, o prompt enviado ao llama.cpp não inclui o bloco
-  // [4] histórico — só o system prompt e a mensagem atual. Default 0 preserva
-  // o comportamento anterior nas conversas existentes.
+  // Migration: quando ligado, o prompt usa só as mensagens posteriores ao
+  // marco zero salvo em history_start_position (ver setOmitHistory). Default 0
+  // preserva o comportamento anterior nas conversas existentes.
   try { db.run(`ALTER TABLE conversations ADD COLUMN omit_history INTEGER NOT NULL DEFAULT 0`); } catch {}
+  // Marco zero do histórico (posição da última mensagem no momento em que o
+  // toggle foi ativado). NULL = histórico completo.
+  try { db.run(`ALTER TABLE conversations ADD COLUMN history_start_position INTEGER`); } catch {}
 
   // ===== PERSONA =====
   db.run(`
@@ -184,6 +188,17 @@ export async function migrate() {
   `);
 
   try { db.run(`ALTER TABLE messages ADD COLUMN automated INTEGER NOT NULL DEFAULT 0`); } catch {}
+
+  // Backfill: conversas que já estavam com o toggle ativo em versões anteriores
+  // ganham um marco zero a partir de agora — as mensagens antigas ficam fora do
+  // novo histórico, e as próximas passam a ser enviadas normalmente.
+  db.run(`
+    UPDATE conversations
+    SET history_start_position = COALESCE(
+      (SELECT MAX(position) FROM messages WHERE conversation_id = conversations.id), -1
+    )
+    WHERE omit_history = 1 AND history_start_position IS NULL
+  `);
 
   // ===== MEMORIES (auto, manual, pinned) =====
   db.run(`

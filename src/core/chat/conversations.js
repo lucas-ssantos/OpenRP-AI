@@ -112,8 +112,9 @@ router.put("/conversations/:id/auto-messages", (req, res) => {
 });
 
 // ── PUT /api/conversations/:id/omit-history ──────────────────────────────────
-// Liga/desliga a omissão do histórico no prompt desta conversa. Quando ligado,
-// o buildPromptMessages envia só o system prompt e a mensagem atual ao llama.cpp.
+// Liga/desliga o "novo histórico" da conversa. Ao ligar, o backend grava um
+// marco zero: as mensagens anteriores deixam de ser enviadas, mas as novas
+// formam um histórico novo. Ao desligar, o histórico completo volta ao prompt.
 router.put("/conversations/:id/omit-history", (req, res) => {
     try {
         const conv = getConversation(req.params.id);
