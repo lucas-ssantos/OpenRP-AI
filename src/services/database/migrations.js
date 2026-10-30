@@ -134,6 +134,7 @@ export async function migrate() {
       auto_messages_enabled INTEGER NOT NULL DEFAULT 0,
       auto_message_next_at TEXT,
       auto_message_ignored_count INTEGER NOT NULL DEFAULT 0,
+      omit_history INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (character_id) REFERENCES characters(id)
@@ -150,6 +151,11 @@ export async function migrate() {
   try { db.run(`ALTER TABLE conversations ADD COLUMN auto_messages_enabled INTEGER NOT NULL DEFAULT 0`); } catch {}
   try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_next_at TEXT`); } catch {}
   try { db.run(`ALTER TABLE conversations ADD COLUMN auto_message_ignored_count INTEGER NOT NULL DEFAULT 0`); } catch {}
+
+  // Migration: quando ligado, o prompt enviado ao llama.cpp não inclui o bloco
+  // [4] histórico — só o system prompt e a mensagem atual. Default 0 preserva
+  // o comportamento anterior nas conversas existentes.
+  try { db.run(`ALTER TABLE conversations ADD COLUMN omit_history INTEGER NOT NULL DEFAULT 0`); } catch {}
 
   // ===== PERSONA =====
   db.run(`

@@ -126,6 +126,7 @@ async function generateAutomaticMessage(conversationId) {
         persona,
         conversation,
         historyMessages,
+        omitHistory: conversation.omit_history === true,
         memories,
         personaFacts,
         lorebooks,

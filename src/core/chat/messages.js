@@ -104,6 +104,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
         const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
+            omitHistory: conv.omit_history === true,
             userMessage: content.trim(),
             intimateTriggerMessage: content.trim(),
             memories, personaFacts, lorebooks, affection, dailyMood,
@@ -245,7 +246,11 @@ router.post("/conversations/:id/regenerate", async (req, res) => {
         const promptMessages = buildPromptMessages({
             character, persona, conversation: conv,
             historyMessages: recentMsgs,
-            userMessage: null,
+            omitHistory: conv.omit_history === true,
+            // Com o histórico omitido não há turno anterior no prompt: a última
+            // mensagem do usuário precisa entrar como turno atual, senão o modelo
+            // receberia só o system prompt (inclusive no "continuar").
+            userMessage: conv.omit_history === true ? (lastUser?.content ?? null) : null,
             intimateTriggerMessage: lastUser?.content ?? '',
             memories, personaFacts, lorebooks, dailyMood,
             affection,

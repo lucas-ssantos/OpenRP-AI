@@ -50,6 +50,27 @@ export async function init() {
       }
     });
     startMessagePolling(conversation.auto_messages_enabled);
+
+    const omitHistoryToggle = document.getElementById('omit-history-toggle');
+    omitHistoryToggle.checked = conversation.omit_history === true;
+    omitHistoryToggle.addEventListener('change', async () => {
+      omitHistoryToggle.disabled = true;
+      try {
+        const response = await fetch(`/api/conversations/${state.conversationId}/omit-history`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: omitHistoryToggle.checked }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível alterar a configuração.');
+      } catch (err) {
+        omitHistoryToggle.checked = !omitHistoryToggle.checked;
+        showError(`Erro ao configurar a omissão do histórico: ${err.message}`);
+      } finally {
+        omitHistoryToggle.disabled = false;
+      }
+    });
+
     if (convData.affection) updateAffectionBadge(convData.affection);
 
     // 2) Dados do personagem + persona (para expandir {{char}}/{{user}} na exibição).
