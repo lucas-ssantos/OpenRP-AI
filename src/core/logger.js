@@ -89,10 +89,6 @@ export function archiveConversationLog(conversationId, characterName) {
  * @param {number}   [opts.generationMs]   - tempo (ms) que o llama-server levou para gerar a resposta
  * @param {boolean}  [opts.isRegen=false]  - true quando é uma regeneração
  * @param {boolean}  [opts.isProactiveMessage=false] - true quando a IA está iniciando sem nova mensagem do usuário
- * @param {string}   [opts.logDir]         - diretório de destino (default: data/logs)
- * @param {string}   [opts.filename]       - nome do arquivo (default: <personagem>_<conversa>.log)
- * @param {boolean}  [opts.force=false]    - grava mesmo fora do modo dev (usado por ferramentas manuais)
- * @param {string}   [opts.label]          - rótulo extra no cabeçalho (ex.: "Cena 1/4 · Mensagem 1/51")
  */
 export function logConversationTurn({
     conversationId,
@@ -111,21 +107,17 @@ export function logConversationTurn({
     allLorebooks = [],
     isRegen = false,
     isProactiveMessage = false,
-    logDir = LOG_DIR,
-    filename = null,
-    force = false,
-    label = null,
     draftRawOutput = null,
 }) {
-    if (!force && !isDevMode()) return;
+    if (!isDevMode()) return;
 
     try {
-        fs.mkdirSync(logDir, { recursive: true });
+        fs.mkdirSync(LOG_DIR, { recursive: true });
 
         const safeName = getSafeCharacterName(character?.name);
         const safeId   = String(conversationId || "").replace(/-/g, "").slice(0, 8);
-        const targetFilename = filename || `${safeName}_${safeId}.log`;
-        const filepath = path.join(logDir, targetFilename);
+        const filename = `${safeName}_${safeId}.log`;
+        const filepath = path.join(LOG_DIR, filename);
 
         const entry = buildLogEntry({
             character, model, messages,
@@ -136,28 +128,11 @@ export function logConversationTurn({
             allMemories, allLorebooks,
             isRegen,
             isProactiveMessage,
-            label,
         });
 
         fs.appendFileSync(filepath, entry, "utf8");
     } catch (err) {
         console.error("[logger] Erro ao salvar log de prompt:", err.message);
-    }
-}
-
-/**
- * Anexa texto bruto a um arquivo de log (cabeçalhos, separadores, rodapés).
- * Cria o diretório de destino se necessário.
- *
- * @param {string} filepath - caminho completo do arquivo
- * @param {string} text     - conteúdo a anexar
- */
-export function appendLogText(filepath, text) {
-    try {
-        fs.mkdirSync(path.dirname(filepath), { recursive: true });
-        fs.appendFileSync(filepath, text, "utf8");
-    } catch (err) {
-        console.error("[logger] Erro ao salvar log:", err.message);
     }
 }
 
@@ -195,7 +170,7 @@ function formatThinking({ thinking, rawResponse, thinkingTrigger }) {
     return thinkingTrigger ? `não (ativado: ${thinkingTrigger}, sem raciocínio retornado)` : "não";
 }
 
-function buildLogEntry({ character, model, messages, draftRawOutput, rawResponse, filteredResponse, thinking, thinkingTrigger, contextTokens, contextSize, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage, label }) {
+function buildLogEntry({ character, model, messages, draftRawOutput, rawResponse, filteredResponse, thinking, thinkingTrigger, contextTokens, contextSize, prepMs, generationMs, allMemories, allLorebooks, isRegen, isProactiveMessage }) {
     const now = new Date().toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "medium",
@@ -214,7 +189,6 @@ function buildLogEntry({ character, model, messages, draftRawOutput, rawResponse
         turnType,
         `Personagem: ${character?.name}`,
         `Modelo: ${model}`,
-        label,
         ctxStr && `Contexto: ${ctxStr}`,
         `Thinking: ${thinkStr}`,
         prepStr && `Preparo: ${prepStr}`,
