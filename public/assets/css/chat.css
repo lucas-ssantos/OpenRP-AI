@@ -562,6 +562,25 @@ body.immersive .input-area {
   font-weight: 500;
 }
 
+/* ── Aviso de histórico omitido (acima da caixa de envio) ── */
+.omit-history-banner {
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 0.65rem;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.omit-history-banner.is-visible {
+  display: flex;
+}
+
 .chat-status-spinner {
   width: 0.75rem;
   height: 0.75rem;

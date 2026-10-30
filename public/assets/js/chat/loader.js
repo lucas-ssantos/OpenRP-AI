@@ -6,6 +6,13 @@ let backgroundGallery = [];
 let currentBackgroundUrl = null;
 let messagePollTimer = null;
 
+// Tarja acima da caixa de envio — visível enquanto o histórico estiver omitido.
+const omitHistoryBanner = document.getElementById('omit-history-banner');
+
+function updateOmitHistoryBanner(enabled) {
+  omitHistoryBanner?.classList.toggle('is-visible', enabled === true);
+}
+
 // Substitui {{user}}/{{char}} pelo nome da persona e do personagem para exibição.
 function expandPlaceholders(text, charName, userName) {
   if (!text) return text;
@@ -53,6 +60,7 @@ export async function init() {
 
     const omitHistoryToggle = document.getElementById('omit-history-toggle');
     omitHistoryToggle.checked = conversation.omit_history === true;
+    updateOmitHistoryBanner(omitHistoryToggle.checked);
     omitHistoryToggle.addEventListener('change', async () => {
       omitHistoryToggle.disabled = true;
       try {
@@ -63,8 +71,10 @@ export async function init() {
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.message || 'Não foi possível alterar a configuração.');
+        updateOmitHistoryBanner(result.enabled === true);
       } catch (err) {
         omitHistoryToggle.checked = !omitHistoryToggle.checked;
+        updateOmitHistoryBanner(omitHistoryToggle.checked);
         showError(`Erro ao configurar a omissão do histórico: ${err.message}`);
       } finally {
         omitHistoryToggle.disabled = false;
